@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="구를 굴려 탐험하는 WebGL2 그래픽스 포트폴리오" />
+    <title>그래픽스 플레이그라운드</title>
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <canvas id="game" tabindex="-1" aria-label="구를 조작하는 3D 공간"></canvas>
+
+    <div id="hud" hidden>
+      <span id="hud-swatch"></span>
+      <span id="hud-label"></span>
+    </div>
+
+    <div id="screen">
+      <div class="screen-card">
+        <h1 id="screen-title">불러오는 중</h1>
+        <p id="screen-message"></p>
+        <dl id="screen-controls" hidden>
+          <dt><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></dt>
+          <dd>구 굴리기</dd>
+          <dt><kbd>Space</kbd></dt>
+          <dd>튕기기</dd>
+          <dt><kbd>마우스</kbd></dt>
+          <dd>시점 돌리기</dd>
+          <dt><kbd>Esc</kbd></dt>
+          <dd>일시 정지</dd>
+        </dl>
+        <button id="screen-action" type="button" hidden></button>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
