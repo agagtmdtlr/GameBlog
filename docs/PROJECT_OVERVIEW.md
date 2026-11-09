@@ -2,7 +2,7 @@
 
 현재 구현된 구조와 기능을 기록하는 문서다. 결정 배경과 앞으로의 계획은 [개발 계획서](DEVELOPMENT_PLAN.md)에 둔다.
 
-- **분석 기준:** 커밋 `bf265c2` (2026-11-09)
+- **분석 기준:** 커밋 `1d863db` (2026-11-09)
 - **공개 URL:** <https://agagtmdtlr.github.io/GameBlog/>
 - **관리 규칙:** 폴더 구조, 기능, 조작, 알려진 한계가 바뀌면 같은 변경에서 이 문서도 고치고 기준 커밋을 갱신한다.
 
@@ -17,8 +17,8 @@
 | 그래픽스 | 직접 작성한 WebGL2 엔진. 런타임 라이브러리 없음 |
 | 개발 도구 | TypeScript, Vite, Vitest (모두 개발 시에만 사용) |
 | 배포 | `main` 푸시 시 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 배포 |
-| 코드 규모 | TypeScript 1,512줄, 셰이더 180줄, CSS 166줄, 테스트 413줄 |
-| 빌드 크기 | JS 26.18KB (gzip 10.38KB), CSS 2.26KB (gzip 0.94KB) |
+| 코드 규모 | TypeScript 1,746줄, 셰이더 369줄, CSS 166줄, 테스트 473줄 |
+| 빌드 크기 | JS 37.49KB (gzip 13.86KB), CSS 2.26KB (gzip 0.94KB) |
 
 ### 명령어
 
@@ -42,7 +42,7 @@ GameBlog/
 │  │  ├─ shader.ts             컴파일·링크, uniform 위치 캐시
 │  │  ├─ mesh.ts               구·박스·원기둥·평면 생성과 업로드
 │  │  ├─ math.ts               Vec3, Quat, Mat4 연산
-│  │  ├─ renderer.ts           그림자 패스와 메인 패스
+│  │  ├─ renderer.ts           그림자 패스, 메인 패스, 물이 든 구
 │  │  └─ input.ts              키보드, 마우스, 포인터 잠금 상태
 │  ├─ physics/
 │  │  ├─ collision.ts          구-상자 충돌과 반발
@@ -52,16 +52,22 @@ GameBlog/
 │  │  ├─ player.ts             구의 이동, 점프, 회전
 │  │  ├─ cameraRig.ts          3인칭 궤도 카메라
 │  │  ├─ pressurePlate.ts      발판의 작동 판정과 눌림
-│  │  └─ colorTransition.ts    색 전환
+│  │  ├─ colorTransition.ts    색 전환
+│  │  └─ waterFill.ts          구 안의 물: 차오름, 출렁임, 물결
 │  ├─ content/
 │  │  ├─ types.ts              콘텐츠 인터페이스
 │  │  ├─ manager.ts            활성 콘텐츠 관리
 │  │  ├─ registry.ts           발판과 콘텐츠 등록 목록
-│  │  └─ sphereColor.ts        구 색 변경 콘텐츠
-│  ├─ shaders/                 mesh.vert, pbr.frag, depth.vert, depth.frag
+│  │  ├─ sphereColor.ts        구 색 변경 콘텐츠
+│  │  └─ waterSphere.ts        물이 든 구 콘텐츠
+│  ├─ shaders/                 mesh.vert, pbr.frag, water.frag, depth.vert, depth.frag
 │  └─ ui/overlay.ts            화면 안내와 HUD 제어
-├─ docs/                       문서
+├─ docs/
+│  ├─ README.md                기능별 규칙과 분석 문서의 색인
+│  ├─ rules/                   기능별 규칙
+│  └─ analysis/                기능별 구조 분석
 ├─ .github/workflows/deploy.yml
+├─ CLAUDE.md                   작업 전 문서 확인 절차
 └─ .claude/launch.json         앱 내 브라우저용 서버 설정
 ```
 
@@ -86,9 +92,9 @@ main.ts ─┬─ game/ ─┬─ content/
 
 1. `main.ts`가 입력을 읽어 카메라 기준 이동 방향을 계산한다.
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `fixedStep`은 구 이동과 충돌, 낙하 판정, 발판 판정, 색 전환, 활성 콘텐츠 갱신을 순서대로 처리한다.
+3. `fixedStep`은 구 이동과 충돌, 낙하 판정, 물 상태, 발판 판정, 색 전환, 활성 콘텐츠 갱신을 순서대로 처리한다.
 4. 카메라가 보간된 구 위치를 따라간다.
-5. `World.buildDrawList`가 그리기 목록을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한다.
+5. `World.buildDrawList`와 `buildWaterSphere`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한다. 구에 물이 있으면 장면을 복사한 뒤 구를 마지막에 그린다.
 
 ### 게임 상태
 
@@ -165,6 +171,8 @@ main.ts ─┬─ game/ ─┬─ content/
 
 ## 6. 콘텐츠 확장
 
+규칙은 [rules/content.md](rules/content.md)에, 유형별 수정 파일과 렌더러 구조, 확인 방법은 [analysis/content.md](analysis/content.md)에 정리되어 있다.
+
 **색 발판:** [`registry.ts`](../src/content/registry.ts)의 `CONTENT_ENTRIES`에 한 줄을 추가하면 된다. 발판, 판정, HUD 표시가 자동으로 따라온다.
 
 **새로운 종류의 콘텐츠:** 현재 `ContentContext`가 제공하는 기능은 `sphere.setColor`와 `sphere.setWaterFilled`다. 다음 작업이 함께 필요하다.
@@ -180,14 +188,14 @@ main.ts ─┬─ game/ ─┬─ content/
 
 ### 자동 테스트
 
-`npm test` 기준 49개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다.
+`npm test` 기준 53개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다.
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 11 | 벡터, 쿼터니언, 행렬 |
 | [`mesh.test.ts`](../src/engine/mesh.test.ts) | 8 | 인덱스 범위, 삼각형 방향 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 9 | 충돌, 반발, 고정 시간 간격 |
-| [`game.test.ts`](../src/game/game.test.ts) | 21 | 구 조작, 발판, 색 전환, 콘텐츠 관리, 월드 통합 |
+| [`game.test.ts`](../src/game/game.test.ts) | 25 | 구 조작, 발판, 색 전환, 구 안의 물, 콘텐츠 관리, 월드 통합 |
 
 렌더러, 입력, UI, `main.ts`는 단위 테스트가 없다.
 
@@ -198,7 +206,8 @@ main.ts ─┬─ game/ ─┬─ content/
 | 시작 화면과 렌더링 | 스크린샷 | 정상 |
 | 코랄 발판 작동 | 코드로 구 이동 | 활성 콘텐츠, 구 색, HUD 변경 |
 | Esc 일시 정지 | 키 이벤트 주입 | 일시 정지 화면 전환 |
-| 컨텍스트 손실과 복구 | `WEBGL_lose_context` | 복구 후 WebGL·콘솔 오류 없음 |
+| 컨텍스트 손실과 복구 | `WEBGL_lose_context` | 복구 후 WebGL·콘솔 오류 없음 (물이 든 구 추가 전 확인) |
+| 블루 발판과 물이 든 구 | 코드로 구 이동, 키 이벤트 주입 | 차오름, 수면 기울기, 다른 발판에서 복귀 정상. WebGL·콘솔 오류 없음 |
 
 공개 URL은 HTTP 200 응답과 최근 배포 성공까지 확인했다.
 
@@ -213,7 +222,8 @@ main.ts ─┬─ game/ ─┬─ content/
 
 | 항목 | 내용 |
 |---|---|
-| 콘텐츠 폭 | 콘텐츠가 구 색 변경뿐이고, 새로운 종류를 붙이려면 `ContentContext`와 `Renderer` 확장이 필요하다 |
+| 콘텐츠 폭 | 콘텐츠가 구 색 변경과 물이 든 구뿐이다. `FrameData.water`와 `renderWaterSphere`는 물 전용이라, 구를 대체하는 두 번째 셰이더를 붙이려면 공통 경로로 빼내야 한다 |
+| 물의 굴절 | 굴절된 배경을 바닥 높이 기준으로 찾으므로 벽 근처에서는 비치는 위치가 약간 다를 수 있다. 물이 든 동안 매 프레임 장면을 복사하며, 그 부담은 측정하지 않았다 |
 | 안 쓰는 코드 | `plane` 메시는 GPU에 올리지만 그리지 않는다 |
 | 재질 | PBR 셰이더가 `metallic`을 지원하지만 모든 재질이 0을 쓴다 |
 | 프레임 비용 | 그림자 패스를 매 프레임 전부 다시 그린다. 실제 부담은 측정하지 않았다 |
