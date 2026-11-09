@@ -2,6 +2,7 @@ import depthFrag from '../shaders/depth.frag?raw';
 import depthVert from '../shaders/depth.vert?raw';
 import meshVert from '../shaders/mesh.vert?raw';
 import pbrFrag from '../shaders/pbr.frag?raw';
+import waterFrag from '../shaders/water.frag?raw';
 import {
   mat4LookAt,
   mat4Multiply,
@@ -61,6 +62,23 @@ export interface FrameData {
   environment: Environment;
   /** 앰비언트 오클루전을 만드는 구 */
   occluder: { center: Vec3; radius: number };
+  /** 물이 든 투명한 구. 나머지 장면을 모두 그린 뒤에 그린다. */
+  water: WaterSphere | null;
+}
+
+export interface WaterSphere {
+  /** 투명해지기 전의 불투명한 구. 그림자 맵에는 들어가지 않는다. */
+  item: DrawItem;
+  center: Vec3;
+  radius: number;
+  surfaceNormal: Vec3;
+  /** 수면 높이 (구 반지름 기준) */
+  level: number;
+  /** 0이면 불투명한 구만, 1이면 물이 든 구만 보인다. */
+  opacity: number;
+  /** 물결의 세기 (0~1) */
+  ripple: number;
+  time: number;
 }
 
 const SHADOW_MAP_SIZE = 2048;
@@ -73,13 +91,18 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 export class Renderer {
   private readonly pbr: ShaderProgram;
   private readonly depth: ShaderProgram;
+  private readonly water: ShaderProgram;
   private readonly meshes: Record<MeshKind, Mesh>;
   private readonly shadowMap: WebGLTexture;
   private readonly shadowFramebuffer: WebGLFramebuffer;
+  private readonly sceneColor: WebGLTexture;
+  private sceneColorWidth = 0;
+  private sceneColorHeight = 0;
 
   constructor(private readonly gl: WebGL2RenderingContext) {
     this.pbr = new ShaderProgram(gl, meshVert, pbrFrag);
     this.depth = new ShaderProgram(gl, depthVert, depthFrag);
+    this.water = new ShaderProgram(gl, meshVert, waterFrag);
     this.meshes = {
       sphere: uploadMesh(gl, createSphereData()),
       box: uploadMesh(gl, createBoxData()),
@@ -103,6 +126,13 @@ export class Renderer {
     gl.drawBuffers([gl.NONE]);
     gl.readBuffer(gl.NONE);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    this.sceneColor = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneColor);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     gl.enable(gl.DEPTH_TEST);
     gl.enable(gl.CULL_FACE);
@@ -174,18 +204,89 @@ export class Renderer {
       frame.occluder.center[2],
       frame.occluder.radius,
     );
+    const water = frame.water;
+    gl.uniform4f(
+      p.uniform('uWaterBall'),
+      water ? water.center[0] : 0,
+      water ? water.center[1] : 0,
+      water ? water.center[2] : 0,
+      water ? water.radius : 0,
+    );
+    gl.uniform1f(p.uniform('uWaterOpacity'), water ? water.opacity : 0);
+    gl.uniform1f(p.uniform('uTime'), water ? water.time : 0);
 
-    for (const item of frame.items) {
-      const m = item.material;
-      gl.uniformMatrix4fv(p.uniform('uModel'), false, item.model);
-      gl.uniformMatrix3fv(p.uniform('uNormalMatrix'), false, item.normal);
-      gl.uniform3fv(p.uniform('uBaseColor'), m.baseColor);
-      gl.uniform3fv(p.uniform('uEmissive'), m.emissive);
-      gl.uniform1f(p.uniform('uMetallic'), m.metallic);
-      gl.uniform1f(p.uniform('uRoughness'), m.roughness);
-      gl.uniform1i(p.uniform('uPattern'), m.pattern);
-      this.drawMesh(item.mesh);
+    for (const item of frame.items) this.drawPbrItem(item);
+    if (water) this.renderWaterSphere(frame, water, lightViewProj);
+  }
+
+  private drawPbrItem(item: DrawItem): void {
+    const gl = this.gl;
+    const p = this.pbr;
+    const m = item.material;
+    gl.uniformMatrix4fv(p.uniform('uModel'), false, item.model);
+    gl.uniformMatrix3fv(p.uniform('uNormalMatrix'), false, item.normal);
+    gl.uniform3fv(p.uniform('uBaseColor'), m.baseColor);
+    gl.uniform3fv(p.uniform('uEmissive'), m.emissive);
+    gl.uniform1f(p.uniform('uMetallic'), m.metallic);
+    gl.uniform1f(p.uniform('uRoughness'), m.roughness);
+    gl.uniform1i(p.uniform('uPattern'), m.pattern);
+    this.drawMesh(item.mesh);
+  }
+
+  /** 지금까지 그린 장면을 복사해, 구 안에서 굴절된 배경으로 쓴다. */
+  private renderWaterSphere(frame: FrameData, water: WaterSphere, lightViewProj: Mat4): void {
+    const gl = this.gl;
+    const env = frame.environment;
+    this.copySceneColor();
+
+    if (water.opacity < 1) this.drawPbrItem(water.item);
+
+    const w = this.water;
+    gl.useProgram(w.program);
+    gl.uniform1i(w.uniform('uSceneColor'), 1);
+    gl.uniformMatrix4fv(w.uniform('uViewProj'), false, frame.viewProj);
+    gl.uniformMatrix4fv(w.uniform('uLightViewProj'), false, lightViewProj);
+    gl.uniformMatrix4fv(w.uniform('uModel'), false, water.item.model);
+    gl.uniformMatrix3fv(w.uniform('uNormalMatrix'), false, water.item.normal);
+    gl.uniform3fv(w.uniform('uCameraPos'), frame.cameraPosition);
+    gl.uniform3fv(w.uniform('uLightDir'), env.lightDirection);
+    gl.uniform3fv(w.uniform('uLightColor'), env.lightColor);
+    gl.uniform3fv(w.uniform('uSkyColor'), env.skyColor);
+    gl.uniform3fv(w.uniform('uGroundColor'), env.groundColor);
+    gl.uniform4f(w.uniform('uBall'), water.center[0], water.center[1], water.center[2], water.radius);
+    gl.uniform4f(
+      w.uniform('uSurface'),
+      water.surfaceNormal[0],
+      water.surfaceNormal[1],
+      water.surfaceNormal[2],
+      water.level,
+    );
+    gl.uniform1f(w.uniform('uOpacity'), water.opacity);
+    gl.uniform1f(w.uniform('uRipple'), water.ripple);
+    gl.uniform1f(w.uniform('uTime'), water.time);
+
+    // 같은 메시를 같은 정점 셰이더로 그리므로 깊이가 같다. 불투명한 구 위에 겹쳐 그린다.
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthFunc(gl.LEQUAL);
+    this.drawMesh(water.item.mesh);
+    gl.depthFunc(gl.LESS);
+    gl.disable(gl.BLEND);
+  }
+
+  private copySceneColor(): void {
+    const gl = this.gl;
+    const width = gl.drawingBufferWidth;
+    const height = gl.drawingBufferHeight;
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, this.sceneColor);
+    if (width !== this.sceneColorWidth || height !== this.sceneColorHeight) {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+      this.sceneColorWidth = width;
+      this.sceneColorHeight = height;
     }
+    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+    gl.activeTexture(gl.TEXTURE0);
   }
 
   private drawMesh(kind: MeshKind): void {

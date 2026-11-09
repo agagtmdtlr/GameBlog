@@ -5,6 +5,8 @@ export interface ContentContext {
   sphere: {
     /** 구의 색을 선형 RGB 값으로 서서히 바꾼다. */
     setColor(color: Vec3): void;
+    /** 구 안에 물을 채워 투명하게 만들거나, 다시 비워 불투명하게 되돌린다. */
+    setWaterFilled(filled: boolean): void;
   };
 }
 

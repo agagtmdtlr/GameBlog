@@ -144,6 +144,7 @@ function main(): void {
       cameraPosition: camera.position,
       environment: STUDIO_ENVIRONMENT,
       occluder: { center: playerPosition, radius: PLAYER_RADIUS },
+      water: world.buildWaterSphere(alpha),
     });
   }
 

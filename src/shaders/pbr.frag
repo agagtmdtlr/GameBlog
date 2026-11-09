@@ -19,6 +19,10 @@ uniform vec3 uLightColor;
 uniform vec3 uSkyColor;
 uniform vec3 uGroundColor;
 uniform vec4 uOccluder;
+/** 물이 든 구. xyz: 중심, w: 반지름 */
+uniform vec4 uWaterBall;
+uniform float uWaterOpacity;
+uniform float uTime;
 
 uniform sampler2DShadow uShadowMap;
 uniform float uShadowTexel;
@@ -78,6 +82,25 @@ float occluderVisibility(vec3 N) {
   return 1.0 - clamp(occlusion, 0.0, 1.0);
 }
 
+// 물이 든 구가 빛을 통과시키며 만드는 옅은 그림자와 일렁이는 커스틱. x: 빛 투과율, yzw: 추가 빛
+vec4 waterBallLight() {
+  if (uWaterOpacity <= 0.0 || uPattern == PATTERN_SPHERE_BANDS) return vec4(1.0, vec3(0.0));
+  vec3 toBall = uWaterBall.xyz - vWorldPos;
+  float along = dot(toBall, uLightDir);
+  if (along <= 0.0) return vec4(1.0, vec3(0.0));
+
+  vec3 offset = (toBall - uLightDir * along) / uWaterBall.w;
+  float radial = length(offset);
+  float inside = 1.0 - smoothstep(0.9, 1.08, radial);
+  float shadow = mix(1.0, mix(1.0, 0.0, inside), 1.0 - 0.62 * uWaterOpacity);
+
+  float wobble = sin(offset.x * 9.0 + uTime * 2.3) * sin(offset.z * 11.0 - uTime * 1.9);
+  float focus = exp(-radial * radial * 5.0) * (1.25 + 0.3 * wobble);
+  float ring = exp(-pow((radial - 0.72 - wobble * 0.05) * 9.0, 2.0)) * 0.55;
+  vec3 caustic = vec3(0.72, 0.95, 1.0) * (focus + ring) * inside * uWaterOpacity;
+  return vec4(shadow, caustic);
+}
+
 vec3 acesFilm(vec3 x) {
   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
 }
@@ -123,9 +146,13 @@ void main() {
 
   vec3 F = fresnelSchlick(VoH, f0);
   vec3 specular = distributionGGX(NoH, a) * visibilitySmith(NoV, NoL, a) * F;
-  vec3 direct = (diffuseColor / PI * (1.0 - F) + specular) * uLightColor * NoL * sampleShadow();
+  vec4 ballLight = waterBallLight();
+  float shadow = sampleShadow();
+  vec3 direct = (diffuseColor / PI * (1.0 - F) + specular) * uLightColor * NoL * shadow * ballLight.x;
+  direct += diffuseColor / PI * ballLight.yzw * uLightColor * NoL * shadow;
 
   float visibility = uPattern == PATTERN_SPHERE_BANDS ? 1.0 : occluderVisibility(N);
+  visibility = mix(visibility, 1.0, uWaterOpacity * 0.5);
   vec3 irradiance = mix(uGroundColor, uSkyColor, N.y * 0.5 + 0.5);
   vec3 R = reflect(-V, N);
   vec3 envColor = mix(uGroundColor, uSkyColor, R.y * 0.5 + 0.5);

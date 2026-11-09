@@ -9,6 +9,7 @@ import {
   quatNlerp,
   QUAT_IDENTITY,
   scale,
+  sub,
   type Quat,
   type Vec3,
 } from '../engine/math';
@@ -18,11 +19,13 @@ import {
   type Environment,
   type Material,
   type MeshKind,
+  type WaterSphere,
 } from '../engine/renderer';
 import type { AABB } from '../physics/collision';
 import { ColorTransition } from './colorTransition';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { PressurePlate } from './pressurePlate';
+import { WaterFill } from './waterFill';
 
 const ARENA_HALF_SIZE = 16;
 const PLATFORM_DEPTH = 1;
@@ -121,6 +124,7 @@ export class World {
   private readonly staticItems: readonly DrawItem[];
   private readonly plates: readonly PlateInstance[];
   private readonly sphereColor = new ColorTransition(DEFAULT_SPHERE_COLOR, COLOR_TRANSITION_SECONDS);
+  readonly water = new WaterFill();
 
   constructor(
     entries: readonly ContentEntry[] = CONTENT_ENTRIES,
@@ -150,9 +154,14 @@ export class World {
       glow: 0,
     }));
 
-    const sphereColor = this.sphereColor;
+    const { sphereColor, water } = this;
     this.content = new ContentManager(
-      { sphere: { setColor: (color) => sphereColor.setTarget(color) } },
+      {
+        sphere: {
+          setColor: (color) => sphereColor.setTarget(color),
+          setWaterFilled: (filled) => water.setFilled(filled),
+        },
+      },
       entries.map((entry) => entry.content),
       onContentChange,
     );
@@ -162,8 +171,10 @@ export class World {
   }
 
   fixedStep(dt: number, command: MoveCommand): void {
+    const previousVelocity = this.player.velocity;
     this.player.step(dt, command, this.colliders);
     if (this.player.position[1] < RESPAWN_Y) this.player.respawn();
+    this.water.update(dt, sub(this.player.velocity, previousVelocity));
 
     for (const instance of this.plates) {
       if (instance.plate.update(dt, this.player.position, PLAYER_RADIUS)) {
@@ -203,16 +214,35 @@ export class World {
       );
     }
 
-    const orientation = quatNlerp(this.player.previousOrientation, this.player.orientation, alpha);
-    items.push(
-      drawItem(
-        'sphere',
-        this.interpolatedPlayerPosition(alpha),
-        [PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS],
-        material(this.sphereColor.current, 0.32, { pattern: SurfacePattern.SphereBands }),
-        orientation,
-      ),
-    );
+    // 물이 든 구는 뒤 장면을 굴절시켜 보여 주므로 렌더러가 따로 그린다.
+    if (this.water.amount === 0) items.push(this.sphereDrawItem(alpha));
     return items;
+  }
+
+  /** 구에 물이 들어 있을 때만 값을 반환한다. */
+  buildWaterSphere(alpha: number): WaterSphere | null {
+    const { water } = this;
+    if (water.amount === 0) return null;
+    return {
+      item: this.sphereDrawItem(alpha),
+      center: this.interpolatedPlayerPosition(alpha),
+      radius: PLAYER_RADIUS,
+      surfaceNormal: water.surfaceNormal,
+      level: water.level,
+      opacity: water.opacity,
+      ripple: water.ripple,
+      time: water.time,
+    };
+  }
+
+  private sphereDrawItem(alpha: number): DrawItem {
+    const orientation = quatNlerp(this.player.previousOrientation, this.player.orientation, alpha);
+    return drawItem(
+      'sphere',
+      this.interpolatedPlayerPosition(alpha),
+      [PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS],
+      material(this.sphereColor.current, 0.32, { pattern: SurfacePattern.SphereBands }),
+      orientation,
+    );
   }
 }

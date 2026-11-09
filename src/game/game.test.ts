@@ -6,6 +6,7 @@ import type { Vec3 } from '../engine/math';
 import { ColorTransition } from './colorTransition';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { PressurePlate } from './pressurePlate';
+import { WaterFill } from './waterFill';
 import { World } from './world';
 
 const DT = 1 / 120;
@@ -131,6 +132,45 @@ describe('색 전환', () => {
   });
 });
 
+describe('구 안의 물', () => {
+  it('서서히 차오르고 투명해진 뒤 다시 비워진다', () => {
+    const water = new WaterFill();
+    const emptyLevel = water.level;
+    water.setFilled(true);
+    water.update(0.55, [0, 0, 0]);
+    expect(water.amount).toBeCloseTo(0.5);
+    expect(water.level).toBeGreaterThan(emptyLevel);
+
+    water.update(0.55, [0, 0, 0]);
+    expect(water.amount).toBe(1);
+    expect(water.opacity).toBe(1);
+
+    water.setFilled(false);
+    water.update(1.1, [0, 0, 0]);
+    expect(water.amount).toBe(0);
+    expect(water.opacity).toBe(0);
+  });
+
+  it('수면은 가속 방향으로 기울었다가 멈추면 수평으로 돌아온다', () => {
+    const water = new WaterFill();
+    expect(water.surfaceNormal).toEqual([0, 1, 0]);
+    for (let i = 0; i < 12; i++) water.update(DT, [26 * DT, 0, 0]);
+    expect(water.surfaceNormal[0]).toBeGreaterThan(0.01);
+
+    for (let i = 0; i < 1200; i++) water.update(DT, [0, 0, 0]);
+    expect(Math.abs(water.surfaceNormal[0])).toBeLessThan(0.01);
+  });
+
+  it('충격을 받으면 물결이 일고 시간이 지나면 잦아든다', () => {
+    const water = new WaterFill();
+    water.update(DT, [0, 8, 0]);
+    const impact = water.ripple;
+    expect(impact).toBeGreaterThan(0.3);
+    for (let i = 0; i < 240; i++) water.update(DT, [0, 0, 0]);
+    expect(water.ripple).toBeLessThan(impact * 0.1);
+  });
+});
+
 describe('콘텐츠 관리', () => {
   function fakeContent(id: string, log: string[]): GraphicsContent {
     return {
@@ -140,7 +180,7 @@ describe('콘텐츠 관리', () => {
       deactivate: () => log.push(`-${id}`),
     };
   }
-  const ctx = { sphere: { setColor: () => {} } };
+  const ctx = { sphere: { setColor: () => {}, setWaterFilled: () => {} } };
 
   it('새 콘텐츠를 켜기 전에 이전 콘텐츠를 끈다', () => {
     const log: string[] = [];
@@ -204,6 +244,26 @@ describe('월드 통합', () => {
 
     rollTo(world, fallback.plate.x, fallback.plate.z);
     expect(world.content.activeId).toBe('color-default');
+  });
+
+  it('블루 발판을 밟으면 구에 물이 차고, 다른 발판을 밟으면 비워진다', () => {
+    const world = new World();
+    const blue = CONTENT_ENTRIES.find((e) => e.content.id === 'water-blue')!;
+    const fallback = CONTENT_ENTRIES.find((e) => e.content.id === 'color-default')!;
+    expect(world.buildWaterSphere(1)).toBeNull();
+
+    rollTo(world, blue.plate.x, blue.plate.z);
+    for (let i = 0; i < 240; i++) world.fixedStep(DT, IDLE);
+    expect(world.content.activeId).toBe('water-blue');
+    expect(world.water.amount).toBe(1);
+    expect(world.buildWaterSphere(1)?.opacity).toBe(1);
+    expect(world.buildDrawList(1).some((item) => item.mesh === 'sphere')).toBe(false);
+
+    rollTo(world, fallback.plate.x, fallback.plate.z);
+    for (let i = 0; i < 240; i++) world.fixedStep(DT, IDLE);
+    expect(world.content.activeId).toBe('color-default');
+    expect(world.buildWaterSphere(1)).toBeNull();
+    expect(world.buildDrawList(1).some((item) => item.mesh === 'sphere')).toBe(true);
   });
 
   it('벽이 구를 가둔다', () => {
