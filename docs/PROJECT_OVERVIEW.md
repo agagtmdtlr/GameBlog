@@ -40,7 +40,11 @@ GameBlog/
 │  ├─ engine/                  게임을 모르는 범용 코드
 │  │  ├─ frame.ts              렌더러 입력 타입 (three.js와 무관)
 │  │  ├─ math.ts               Vec3, Quat, Mat4 연산
-│  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스, 물이 든 구
+│  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스, 콘텐츠 렌더러 호출
+│  │  ├─ contentRenderers/     콘텐츠 전용 그리기
+│  │  │  ├─ contentRenderer.ts   공통 기반 클래스와 RenderContext
+│  │  │  ├─ waterSphere.ts       물이 든 구
+│  │  │  └─ registry.ts          콘텐츠 렌더러 등록 목록
 │  │  └─ input.ts              키보드, 마우스, 포인터 잠금 상태
 │  ├─ physics/
 │  │  ├─ collision.ts          구-행성 충돌과 반발
@@ -84,7 +88,8 @@ main.ts ─┬─ game/ ─┬─ content/
 
 - `engine/`은 게임 규칙을 모른다.
 - `World`는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다.
-- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`와 `main.ts`에서만 쓴다.
+- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 쓴다.
+- `Renderer`는 특정 콘텐츠를 모른다. 콘텐츠 전용 그리기는 `ContentRenderer`를 상속한 클래스가 맡는다.
 - 콘텐츠는 `ContentContext`를 통해서만 월드에 영향을 준다. 발판은 콘텐츠의 내용을 모른다.
 
 ### 프레임 흐름
@@ -93,7 +98,7 @@ main.ts ─┬─ game/ ─┬─ content/
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
 3. `fixedStep`은 구 이동과 충돌, 물 상태, 발판 판정, 색 전환, 활성 콘텐츠 갱신을 순서대로 처리한다.
 4. 카메라가 보간된 구 위치를 따라간다.
-5. `World.buildDrawList`와 `buildWaterSphere`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한다. 구에 물이 있으면 장면을 복사한 뒤 구를 마지막에 그린다.
+5. `World.buildDrawList`와 `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 구에 물이 있으면 물이 든 구 렌더러가 장면을 복사한 뒤 구를 마지막에 그린다.
 
 ### 게임 상태
 
@@ -185,7 +190,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 1. `src/content/`에 `GraphicsContent`를 구현한 콘텐츠 파일을 추가한다.
 2. 필요한 기능을 [`ContentContext`](../src/content/types.ts)에 더하고 `World`에서 연결한다.
-3. 셰이더나 후처리를 바꾸는 콘텐츠라면 `Renderer`도 확장한다. 현재는 PBR과 물 재질, 그림자·메인 패스와 장면 복사 1회를 지원한다.
+3. 셰이더나 후처리를 바꾸는 콘텐츠라면 `src/engine/contentRenderers/`에 `ContentRenderer`를 상속한 클래스를 추가하고 그 폴더의 `registry.ts`에 등록한다. `Renderer`는 고치지 않는다.
 4. `registry.ts`에 등록한다.
 
 발판 위치는 위도와 경도로 직접 지정하며, 기존 테스트가 발판 간 간격, 시작 지점과의 거리, 해가 드는 쪽인지를 검사한다.
@@ -229,7 +234,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 | 항목 | 내용 |
 |---|---|
-| 콘텐츠 폭 | 콘텐츠가 구 색 변경과 물이 든 구뿐이다. `FrameData.water`와 `renderWaterSphere`는 물 전용이라, 구를 대체하는 두 번째 셰이더를 붙이려면 공통 경로로 빼내야 한다 |
+| 콘텐츠 폭 | 콘텐츠가 구 색 변경과 물이 든 구뿐이다. 전용 그리기는 콘텐츠 렌더러로 나뉘어 있지만, 불투명한 구 위에 겹쳐 그리는 절차는 물이 든 구 렌더러 안에 있고 콘텐츠 렌더러는 그림자 패스에 참여하지 못한다 |
 | 물의 굴절 | 굴절된 배경을 행성 표면 기준으로 찾으므로 발판 위에서는 비치는 위치가 약간 다를 수 있다. 물이 든 동안 매 프레임 장면을 복사하며, 그 부담은 측정하지 않았다 |
 | 안 쓰는 코드 | `math.ts`의 투영·시점 행렬 함수는 런타임에서 쓰지 않고 테스트만 남아 있다 |
 | 빌드 크기 | three.js로 옮기면서 JS가 약 15배(gzip 144.25KB)로 늘었다 |

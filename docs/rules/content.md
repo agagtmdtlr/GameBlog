@@ -26,6 +26,8 @@
 - `engine/`에 게임 규칙을 넣지 않는다.
 - `World`와 `game/`의 상태 클래스는 GPU와 DOM에 의존하지 않는다.
 - `Renderer`에 게임 상태를 두지 않는다. 값은 `FrameData`(`engine/frame.ts`)로 받는다.
+- `Renderer`(`engine/renderer.ts`)에 특정 콘텐츠의 그리기를 넣지 않는다. 콘텐츠 전용 그리기는 `engine/contentRenderers/`에 콘텐츠마다 파일을 나누고, `ContentRenderer`를 상속해 메서드를 오버라이드한다 (2026-11-15 사용자 결정).
+- `Renderer`는 `ContentRenderer`의 공통 메서드(`init`, `prepare`, `render`)만 호출한다. 콘텐츠 종류에 따라 분기하지 않는다.
 
 ## 완료 조건
 

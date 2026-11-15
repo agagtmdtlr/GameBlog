@@ -16,6 +16,7 @@ import {
 } from '../engine/math';
 import {
   SurfacePattern,
+  type ContentFrame,
   type DrawItem,
   type Environment,
   type Material,
@@ -202,11 +203,20 @@ export class World {
     return items;
   }
 
+  /** 전용 렌더러가 그릴 콘텐츠의 값. 이번 프레임에 보이는 것만 담는다. */
+  buildContentFrames(alpha: number): ContentFrame[] {
+    const frames: ContentFrame[] = [];
+    const water = this.buildWaterSphere(alpha);
+    if (water) frames.push(water);
+    return frames;
+  }
+
   /** 구에 물이 들어 있을 때만 값을 반환한다. */
   buildWaterSphere(alpha: number): WaterSphere | null {
     const { water } = this;
     if (water.amount === 0) return null;
     return {
+      kind: 'water-sphere',
       item: this.sphereDrawItem(alpha),
       center: this.interpolatedPlayerPosition(alpha),
       radius: PLAYER_RADIUS,

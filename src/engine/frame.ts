@@ -49,7 +49,16 @@ export interface CameraView {
   far: number;
 }
 
-export interface WaterSphere {
+/**
+ * PBR 그리기 목록만으로 표현할 수 없는 콘텐츠가 프레임마다 넘기는 값.
+ * `kind`가 같은 콘텐츠 렌더러(`engine/contentRenderers/`)가 받아서 그린다.
+ */
+export interface ContentFrame {
+  readonly kind: string;
+}
+
+export interface WaterSphere extends ContentFrame {
+  kind: 'water-sphere';
   /** 투명해지기 전의 불투명한 구. 그림자 맵에는 들어가지 않는다. */
   item: DrawItem;
   center: Vec3;
@@ -72,6 +81,6 @@ export interface FrameData {
   environment: Environment;
   /** 앰비언트 오클루전을 만드는 구 */
   occluder: { center: Vec3; radius: number };
-  /** 물이 든 투명한 구. 나머지 장면을 모두 그린 뒤에 그린다. */
-  water: WaterSphere | null;
+  /** 전용 렌더러가 그리는 콘텐츠. 나머지 장면을 모두 그린 뒤에 순서대로 그린다. */
+  contents: readonly ContentFrame[];
 }

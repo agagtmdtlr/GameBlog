@@ -4,19 +4,19 @@
 
 - **규칙:** [rules/threejs.md](../rules/threejs.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `7b5a2ab` 다음의 점프 제거와 행성 변경
+- **분석 기준:** 커밋 `0bb670f` 다음의 콘텐츠 렌더러 분리
 - **버전:** `three` 0.187.0, `@types/three` 0.187.0 (개발용)
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline 7b5a2ab..HEAD -- src/engine src/shaders src/main.ts package.json
+git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.json
 ```
 
 ## 포팅 방침
 
 - 화면 결과와 플레이는 포팅 전과 같게 유지한다. 그래서 PBR과 물 셰이더는 내용을 그대로 두고 three.js의 `RawShaderMaterial`로 옮겼다.
 - WebGL 호출을 직접 하던 부분(컨텍스트, 프로그램, 버퍼, 프레임버퍼, 상태 전환)은 모두 three.js에 맡겼다. `src/`에 `gl.*` 호출은 남아 있지 않다.
-- three.js는 `engine/renderer.ts`와 `main.ts`에서만 가져온다. `World`, 물리, 콘텐츠는 three.js를 모른다.
+- three.js는 `engine/renderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 가져온다. `World`, 물리, 콘텐츠는 three.js를 모른다.
 
 ## 바뀐 파일
 
@@ -56,10 +56,10 @@ git log --oneline 7b5a2ab..HEAD -- src/engine src/shaders src/main.ts package.js
 
 ## 렌더러 구조
 
-`Renderer`는 장면 두 개와 카메라 두 개를 가진다.
+`Renderer`는 장면 하나와 카메라 두 개를 가지고, 콘텐츠 전용 그리기는 `engine/contentRenderers/`의 `ContentRenderer`들에 맡긴다 (포팅 직후에는 물이 든 구도 `Renderer` 안에 있었다). 인터페이스는 [analysis/content.md](content.md)의 "콘텐츠 렌더러"에 있다.
 
 - `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
-- `waterScene`: 물이 든 구 전용. 불투명한 구(`waterBase`)와 물 셰이더 메시(`waterMesh`)가 들어 있다.
+- `WaterSphereRenderer`의 장면: 물이 든 구 전용. 불투명한 구(`base`)와 물 셰이더 메시(`mesh`)가 들어 있다.
 - `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
 - `lightCamera`: 그림자용 `OrthographicCamera`
 
@@ -67,7 +67,7 @@ git log --oneline 7b5a2ab..HEAD -- src/engine src/shaders src/main.ts package.js
 
 1. `setRenderTarget(shadowTarget)` → `clear()` → `overrideMaterial`을 걸고 `render(scene, lightCamera)`
 2. `setRenderTarget(null)` → `setClearColor` → `clear()` → `render(scene, camera)`
-3. `frame.water`가 있으면 `copyFramebufferToTexture(sceneColor)` → `render(waterScene, camera)`
+3. `frame.contents`에 값이 있는 콘텐츠 렌더러마다 `render()`. 물이 든 구는 `copySceneColor()`(`copyFramebufferToTexture`) → `render(자기 장면, camera)`
 
 ### 행렬
 

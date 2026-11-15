@@ -4,11 +4,11 @@
 
 - **규칙:** [rules/content.md](../rules/content.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `7b5a2ab` 다음의 점프 제거와 행성 변경
+- **분석 기준:** 커밋 `0bb670f` 다음의 콘텐츠 렌더러 분리
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline 7b5a2ab..HEAD -- src/content src/game src/engine/renderer.ts src/shaders src/main.ts
+git log --oneline 0bb670f..HEAD -- src/content src/game src/engine/renderer.ts src/engine/contentRenderers src/shaders src/main.ts
 ```
 
 ## 작업 유형별 수정 파일
@@ -21,9 +21,9 @@ git log --oneline 7b5a2ab..HEAD -- src/content src/game src/engine/renderer.ts s
 | B. 기존 기능 조합 | `ContentContext`로 충분하다 | `content/<이름>.ts` 추가, `registry.ts` |
 | C. 새 월드 상태 | 시간에 따라 변하는 상태나 새 동작이 필요하다 | B + `game/<이름>.ts`, `content/types.ts`, `game/world.ts`, `game/game.test.ts` |
 | D. PBR 표면 변형 | 불투명 재질의 무늬나 색 변화 | C(필요 시) + `shaders/pbr.frag`, `engine/frame.ts`의 `SurfacePattern` |
-| E. 별도 셰이더 | 투명, 굴절 등 PBR로 안 되는 표현 | C + `shaders/<이름>.frag`, `engine/frame.ts`, `engine/renderer.ts`, `main.ts`, 필요하면 `pbr.frag` |
+| E. 별도 셰이더 | 투명, 굴절 등 PBR로 안 되는 표현 | C + `shaders/<이름>.frag`, `engine/frame.ts`, `engine/contentRenderers/<이름>.ts`와 `registry.ts`, `game/world.ts`의 `buildContentFrames`, 필요하면 `pbr.frag` |
 
-유형 E의 실제 예는 물이 든 구다. `content/waterSphere.ts`, `game/waterFill.ts`, `shaders/water.frag`, `renderer.ts`의 `renderWaterSphere`를 보면 된다.
+유형 E의 실제 예는 물이 든 구다. `content/waterSphere.ts`, `game/waterFill.ts`, `shaders/water.frag`, `engine/contentRenderers/waterSphere.ts`를 보면 된다. 유형 A~D는 `engine/renderer.ts`와 `engine/contentRenderers/`를 고치지 않는다.
 
 ## 콘텐츠 인터페이스
 
@@ -83,7 +83,41 @@ three.js로 그린다. 구조와 three.js 규약은 [analysis/threejs.md](threej
 
 1. 그림자 패스: `items` 중 `castShadow`인 것을 깊이만 그린다.
 2. 메인 패스: `items`를 PBR 재질로 그린다. 불투명한 물체의 순서는 three.js가 정한다.
-3. `frame.water`가 있으면 장면을 텍스처로 복사하고, `waterScene`의 불투명한 구와 물 셰이더 메시를 그린다.
+3. `frame.contents`에 값이 있는 콘텐츠 렌더러를 등록한 순서대로 그린다. 물이 든 구는 장면을 텍스처로 복사하고, 자기 장면의 불투명한 구와 물 셰이더 메시를 그린다.
+
+### 콘텐츠 렌더러
+
+콘텐츠 전용 그리기는 `engine/contentRenderers/`에 콘텐츠마다 파일로 나뉘어 있다. `Renderer`는 아래 공통 메서드만 호출하고, 콘텐츠는 필요한 것만 오버라이드한다. 기본 구현은 아무 일도 하지 않는다.
+
+```ts
+// engine/contentRenderers/contentRenderer.ts
+abstract class ContentRenderer<T extends ContentFrame> {
+  abstract readonly kind: T['kind'];   // 받을 ContentFrame.kind
+  readonly pbrUniforms: Uniforms = {}; // pbr.frag에 더하는 uniform
+  init(ctx): void {}                   // 한 번. 메시와 재질을 만든다
+  prepare(data: T | null): void {}     // 매 프레임, 패스보다 먼저. 값이 없으면 null
+  render(data: T, ctx): void {}        // 메인 패스 뒤, 값이 있을 때만
+}
+```
+
+| 파일 | 내용 |
+|---|---|
+| `contentRenderer.ts` | 기반 클래스와 `RenderContext` |
+| `waterSphere.ts` | `WaterSphereRenderer` (`kind: 'water-sphere'`) |
+| `registry.ts` | `createContentRenderers()`. `main.ts`가 `Renderer` 생성자에 넘긴다 |
+
+- **값 전달:** `World.buildContentFrames`가 이번 프레임에 보이는 콘텐츠의 값(`ContentFrame`)만 모아 `FrameData.contents`에 넣는다. `Renderer`는 `kind`가 같은 렌더러에 넘긴다. 같은 `kind`의 렌더러를 두 번 등록하면 생성자가 예외를 던진다.
+- **켜진 콘텐츠와 그리는 콘텐츠는 다르다:** 물이 빠지는 동안에는 활성 콘텐츠가 이미 다른 발판이다. 그래서 활성 id가 아니라 값의 유무로 그린다.
+- **`RenderContext`:** `renderer`, `camera`, `geometries`, `shared`(프레임 단위 uniform), `createPbrMesh()`, `applyItem()`, `copySceneColor()`(지금까지 그린 화면 복사)를 제공한다.
+- **`pbrUniforms`:** `Renderer`가 PBR 재질을 만들기 전에 모든 렌더러의 값을 합친다. 그래서 필드 초기값으로 선언해야 하고, `init`에서 추가하면 반영되지 않는다. 값은 `prepare`에서 고치며, `data`가 `null`이면 효과를 끈다.
+- **구 색 발판**은 그리기 목록의 재질 값만 바꾸므로 콘텐츠 렌더러가 없다.
+
+새 콘텐츠 렌더러 추가 순서:
+
+1. `engine/frame.ts`에 `ContentFrame`을 확장한 타입을 만들고 `kind`를 문자열 리터럴로 정한다.
+2. `engine/contentRenderers/<이름>.ts`에 `ContentRenderer<그 타입>`을 상속한 클래스를 만든다.
+3. `engine/contentRenderers/registry.ts`에 한 줄을 추가한다. 목록 순서가 그리는 순서다.
+4. `World.buildContentFrames`에서 값을 만들어 넣는다.
 
 새 재질을 만들 때 알아 둘 점:
 
@@ -91,15 +125,17 @@ three.js로 그린다. 구조와 three.js 규약은 [analysis/threejs.md](threej
 - **재질:** `RawShaderMaterial`에 `glslVersion: GLSL3`를 준다. 셰이더 파일에 `#version`은 쓰지 않는다.
 - **겹쳐 그리기:** 같은 메시를 `mesh.vert`로 그리면 깊이가 같다. 재질의 깊이 함수 기본값이 `LessEqualDepth`이므로 `transparent: true`, `depthWrite: false`만 주면 된다.
 - **색공간:** 프레임 버퍼에는 ACES와 sRGB 변환을 마친 값이 들어 있다. 복사한 장면(`uSceneColor`)은 `srgbToLinear`로 풀어서 쓰고, ACES는 새로 더하는 빛에만 적용한다.
-- **uniform:** 프레임 단위 값은 `Renderer.shared`의 객체를 함께 참조한다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
-- **시간:** 전역 시계는 없다. `uTime`은 `WaterFill.time`을 쓰고, 물이 없으면 0이다.
+- **uniform:** 프레임 단위 값은 `RenderContext.shared`의 객체를 함께 참조한다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
+- **시간:** 전역 시계는 없다. `pbr.frag`의 `uTime`은 `WaterSphereRenderer.pbrUniforms`가 소유하며 `WaterFill.time`을 쓰고, 물이 없으면 0이다.
 - **위쪽:** 셰이더에서도 위쪽을 +Y로 가정하지 않는다. `water.frag`는 수면 법선(`uSurface`)을 기준으로 좌표축을 만들고, 굴절된 배경은 행성(`uGround`)과의 교차점에서 찾는다.
 - **격자:** `SurfacePattern.Grid`는 구 메시 전용이다. 오브젝트 공간 방향을 정육면체 면에 투영해 격자를 그린다.
 - **그림자:** 물이 든 구는 `items`에서 빠져 그림자 맵에 그려지지 않는다. `pbr.frag`의 `waterBallLight`가 옅은 그림자와 커스틱을 대신 그린다.
 
 ## 현재 구조의 한계
 
-`FrameData.water`와 `renderWaterSphere`는 물 전용이다. 구가 아닌 물체의 투명 효과도 지금은 경로가 없다. 구를 대체하는 두 번째 셰이더를 추가한다면 이 코드를 복사하기보다, 장면 복사와 겹쳐 그리기를 공통 경로로 빼내는 편이 낫다.
+- 장면 복사(`copySceneColor`)는 공통 경로지만, 불투명한 구 위에 겹쳐 그리는 절차는 `WaterSphereRenderer` 안에 있다. 구를 대체하는 두 번째 셰이더가 생기면 그 부분을 중간 클래스로 올리는 편이 낫다.
+- 구를 그리기 목록에서 빼는 조건(`water.amount === 0`)은 `World.buildDrawList`에 물 전용으로 남아 있다.
+- 콘텐츠 렌더러는 그림자 패스에 참여하지 못한다. 메인 패스 뒤에만 그린다.
 
 ## 브라우저 확인 방법
 

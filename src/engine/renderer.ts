@@ -23,38 +23,38 @@ import {
   WebGLRenderer,
   WebGLRenderTarget,
   type BufferGeometry,
-  type IUniform,
+  type Texture,
 } from 'three';
 import meshVert from '../shaders/mesh.vert?raw';
 import pbrFrag from '../shaders/pbr.frag?raw';
-import waterFrag from '../shaders/water.frag?raw';
-import type { DrawItem, Environment, FrameData, MeshKind, WaterSphere } from './frame';
+import type { ContentRenderer, PbrMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
+import type { ContentFrame, DrawItem, Environment, FrameData, MeshKind } from './frame';
 
 const SHADOW_MAP_SIZE = 2048;
 const MAX_DEVICE_PIXEL_RATIO = 2;
 /** 그림자를 드리우는 메시만 켜는 레이어. 광원 카메라는 이 레이어만 본다. */
 const SHADOW_LAYER = 1;
 
-type Uniforms = Record<string, IUniform>;
-type PbrMesh = Mesh<BufferGeometry, RawShaderMaterial>;
-
 /**
  * three.js로 장면을 그린다. 게임 상태는 들고 있지 않고, 매 프레임 `FrameData`를 받아
  * 메시 풀과 uniform에 옮겨 적는다. 컨텍스트 손실과 복구는 `WebGLRenderer`가 처리한다.
+ *
+ * 콘텐츠 전용 그리기는 여기에 두지 않는다. `ContentRenderer`를 상속한 클래스가 맡고,
+ * 이 클래스는 `init`, `prepare`, `render`만 호출한다.
  */
 export class Renderer {
   private readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
-  /** 장면을 복사한 뒤에 그리는 물이 든 구 */
-  private readonly waterScene = new Scene();
   private readonly camera = new PerspectiveCamera();
   private readonly lightCamera = new OrthographicCamera();
   private readonly geometries: Record<MeshKind, BufferGeometry>;
   private readonly depthMaterial: MeshBasicMaterial;
   private readonly shadowTarget: WebGLRenderTarget;
   private readonly pool: PbrMesh[] = [];
-  private readonly waterBase: PbrMesh;
-  private readonly waterMesh: Mesh<BufferGeometry, RawShaderMaterial>;
+  private readonly contentRenderers: ReadonlyMap<string, ContentRenderer>;
+  private readonly renderContext: RenderContext;
+  /** 이번 프레임의 콘텐츠 값을 `kind`로 찾는 표. 매 프레임 다시 채운다. */
+  private readonly contentFrames = new Map<string, ContentFrame>();
   private sceneColor: FramebufferTexture | null = null;
 
   private readonly clearColor = new Color();
@@ -69,17 +69,23 @@ export class Renderer {
     uGroundColor: { value: new Vector3() },
   };
   private readonly pbrShared: Uniforms;
-  private readonly waterUniforms: Uniforms;
 
-  /** `onShaderError`는 셰이더 컴파일이나 링크가 실패했을 때 한 번 이상 호출된다. */
-  constructor(canvas: HTMLCanvasElement, onShaderError: () => void) {
+  /**
+   * `contentRenderers`는 전용 그리기가 있는 콘텐츠의 렌더러다. 목록 순서대로 그린다.
+   * `onShaderError`는 셰이더 컴파일이나 링크가 실패했을 때 한 번 이상 호출된다.
+   */
+  constructor(
+    canvas: HTMLCanvasElement,
+    contentRenderers: readonly ContentRenderer[],
+    onShaderError: () => void,
+  ) {
     this.renderer = new WebGLRenderer({
       canvas,
       alpha: false,
       antialias: true,
       powerPreference: 'high-performance',
     });
-    // 지우기와 그리기 순서를 직접 제어한다 (그림자 → 장면 → 복사 → 물이 든 구).
+    // 지우기와 그리기 순서를 직접 제어한다 (그림자 → 장면 → 콘텐츠 렌더러).
     this.renderer.autoClear = false;
     this.renderer.debug.onShaderError = (gl, program) => {
       console.error(`셰이더 오류:\n${gl.getProgramInfoLog(program)}`);
@@ -108,43 +114,32 @@ export class Renderer {
     });
     this.lightCamera.layers.set(SHADOW_LAYER);
 
+    const byKind = new Map<string, ContentRenderer>();
+    for (const content of contentRenderers) {
+      if (byKind.has(content.kind)) throw new Error(`콘텐츠 렌더러 kind 중복: ${content.kind}`);
+      byKind.set(content.kind, content);
+    }
+    this.contentRenderers = byKind;
+
+    // 콘텐츠 렌더러가 더한 uniform까지 모은 뒤에 PBR 재질을 만들어야 모든 재질이 함께 참조한다.
     this.pbrShared = {
       ...this.shared,
       uShadowMap: { value: shadowMap },
       uShadowTexel: { value: 1 / SHADOW_MAP_SIZE },
       uOccluder: { value: new Vector4() },
-      uWaterBall: { value: new Vector4() },
-      uWaterOpacity: { value: 0 },
-      uTime: { value: 0 },
     };
-    this.waterUniforms = {
-      ...this.shared,
-      uNormalMatrix: { value: new Matrix3() },
-      uViewProj: { value: new Matrix4() },
-      uSceneColor: { value: null },
-      uBall: { value: new Vector4() },
-      uGround: { value: new Vector4() },
-      uSurface: { value: new Vector4() },
-      uOpacity: { value: 0 },
-      uRipple: { value: 0 },
-      uTime: { value: 0 },
-    };
+    for (const content of contentRenderers) Object.assign(this.pbrShared, content.pbrUniforms);
 
-    this.waterBase = this.createPbrMesh();
-    this.waterMesh = new Mesh(
-      this.geometries.sphere,
-      new RawShaderMaterial({
-        glslVersion: GLSL3,
-        vertexShader: meshVert,
-        fragmentShader: waterFrag,
-        uniforms: this.waterUniforms,
-        // 불투명한 구와 깊이가 같다. 재질 기본값인 LessEqualDepth로 그 위에 겹쳐 그린다.
-        transparent: true,
-        depthWrite: false,
-      }),
-    );
-    this.waterMesh.matrixAutoUpdate = false;
-    this.waterScene.add(this.waterBase, this.waterMesh);
+    this.renderContext = {
+      renderer: this.renderer,
+      camera: this.camera,
+      geometries: this.geometries,
+      shared: this.shared,
+      createPbrMesh: () => this.createPbrMesh(),
+      applyItem: (mesh, item) => this.applyItem(mesh, item),
+      copySceneColor: () => this.copySceneColor(),
+    };
+    for (const content of contentRenderers) content.init(this.renderContext);
   }
 
   /** 개발용 확인(`getError`)에 쓰는 WebGL 컨텍스트 */
@@ -170,6 +165,12 @@ export class Renderer {
     this.updateSharedUniforms(frame);
     this.syncItems(frame.items);
 
+    this.contentFrames.clear();
+    for (const content of frame.contents) this.contentFrames.set(content.kind, content);
+    for (const [kind, content] of this.contentRenderers) {
+      content.prepare(this.contentFrames.get(kind) ?? null);
+    }
+
     // 1. 그림자 패스: 그림자 레이어의 메시를 깊이만 그린다.
     r.setRenderTarget(this.shadowTarget);
     r.clear();
@@ -184,8 +185,11 @@ export class Renderer {
     r.clear();
     r.render(this.scene, this.camera);
 
-    // 3. 물이 든 구: 지금까지 그린 장면을 복사해 굴절된 배경으로 쓴다.
-    if (frame.water) this.renderWaterSphere(frame.water);
+    // 3. 콘텐츠 렌더러: 이번 프레임에 값이 있는 것만 등록한 순서대로 그린다.
+    for (const [kind, content] of this.contentRenderers) {
+      const data = this.contentFrames.get(kind);
+      if (data) content.render(data, this.renderContext);
+    }
   }
 
   private updateCameras(frame: FrameData, aspect: number): void {
@@ -226,14 +230,8 @@ export class Renderer {
     shared.uSkyColor.value.fromArray(env.skyColor);
     shared.uGroundColor.value.fromArray(env.groundColor);
 
-    const pbr = this.pbrShared;
     const { center, radius } = frame.occluder;
-    pbr.uOccluder.value.set(center[0], center[1], center[2], radius);
-    const water = frame.water;
-    if (water) pbr.uWaterBall.value.set(water.center[0], water.center[1], water.center[2], water.radius);
-    else pbr.uWaterBall.value.set(0, 0, 0, 0);
-    pbr.uWaterOpacity.value = water ? water.opacity : 0;
-    pbr.uTime.value = water ? water.time : 0;
+    this.pbrShared.uOccluder.value.set(center[0], center[1], center[2], radius);
   }
 
   /** 그리기 목록을 메시 풀에 옮긴다. 목록보다 남는 메시는 숨긴다. */
@@ -289,7 +287,8 @@ export class Renderer {
     u.uPattern.value = m.pattern;
   }
 
-  private renderWaterSphere(water: WaterSphere): void {
+  /** 지금까지 그린 화면을 텍스처로 복사한다. 굴절처럼 뒤 장면을 읽는 콘텐츠가 쓴다. */
+  private copySceneColor(): Texture {
     const r = this.renderer;
     const size = r.getDrawingBufferSize(this.bufferSize);
     if (!this.sceneColor || this.sceneColor.image.width !== size.x || this.sceneColor.image.height !== size.y) {
@@ -303,27 +302,6 @@ export class Renderer {
       this.sceneColor.magFilter = LinearFilter;
     }
     r.copyFramebufferToTexture(this.sceneColor);
-
-    this.applyItem(this.waterBase, water.item);
-    this.waterBase.layers.set(0);
-    this.waterBase.visible = water.opacity < 1;
-
-    const mesh = this.waterMesh;
-    mesh.matrix.fromArray(water.item.model);
-    mesh.matrixWorldNeedsUpdate = true;
-    const u = this.waterUniforms;
-    u.uNormalMatrix.value.fromArray(water.item.normal);
-    u.uViewProj.value.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
-    u.uSceneColor.value = this.sceneColor;
-    u.uBall.value.set(water.center[0], water.center[1], water.center[2], water.radius);
-    const ground = water.ground;
-    u.uGround.value.set(ground.center[0], ground.center[1], ground.center[2], ground.radius);
-    const n = water.surfaceNormal;
-    u.uSurface.value.set(n[0], n[1], n[2], water.level);
-    u.uOpacity.value = water.opacity;
-    u.uRipple.value = water.ripple;
-    u.uTime.value = water.time;
-
-    r.render(this.waterScene, this.camera);
+    return this.sceneColor;
   }
 }

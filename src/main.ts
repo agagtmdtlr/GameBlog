@@ -1,5 +1,6 @@
 import WebGL from 'three/addons/capabilities/WebGL.js';
 import { CONTENT_ENTRIES } from './content/registry';
+import { createContentRenderers } from './engine/contentRenderers/registry';
 import { Input } from './engine/input';
 import { add, length, scale, type Vec3 } from './engine/math';
 import { Renderer } from './engine/renderer';
@@ -49,7 +50,7 @@ function main(): void {
   // 컨텍스트 손실과 복구는 three.js의 WebGLRenderer가 처리하므로 한 번만 만든다.
   let renderer: Renderer;
   try {
-    renderer = new Renderer(canvas, showGraphicsFailure);
+    renderer = new Renderer(canvas, createContentRenderers(), showGraphicsFailure);
   } catch (error) {
     console.error(error);
     showGraphicsFailure();
@@ -133,7 +134,7 @@ function main(): void {
         camera: camera.view,
         environment: STUDIO_ENVIRONMENT,
         occluder: { center: playerPosition, radius: PLAYER_RADIUS },
-        water: world.buildWaterSphere(alpha),
+        contents: world.buildContentFrames(alpha),
       },
       aspect,
     );
