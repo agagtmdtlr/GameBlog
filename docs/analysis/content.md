@@ -43,6 +43,7 @@ interface ContentEntry { content: GraphicsContent; plate: { latitude; longitude;
 
 - `setColor(color)`: 0.3초 동안 색 전환
 - `setWaterFilled(filled)`: 물을 약 1.1초 동안 채우거나 비움
+- `setHeated(heated)`: 구를 0.7초 동안 달구거나 1.6초 동안 식힘. 코랄 발판(`content/heatSphere.ts`)이 쓴다. 상태는 `game/sphereHeat.ts`(열, 연기 입자), 그리기는 `engine/contentRenderers/heatSphere.ts`(`kind: 'heat-sphere'`, `shaders/heat.frag`·`billboard.vert`·`puff.frag`)가 맡고, 구 자체의 빛은 `World`가 구 재질의 `emissive`로 넣는다
 
 동작:
 

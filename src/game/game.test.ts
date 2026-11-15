@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ContentManager } from '../content/manager';
 import { CONTENT_ENTRIES, DEFAULT_SPHERE_COLOR } from '../content/registry';
+import { SMOKE_CAPACITY, SMOKE_STRIDE } from '../engine/frame';
 import type { GraphicsContent } from '../content/types';
 import { cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
@@ -8,6 +9,7 @@ import { ColorTransition } from './colorTransition';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { PressurePlate } from './pressurePlate';
+import { SphereHeat } from './sphereHeat';
 import { WaterFill } from './waterFill';
 import { STUDIO_ENVIRONMENT, World } from './world';
 
@@ -227,6 +229,46 @@ describe('구 안의 물', () => {
   });
 });
 
+describe('달아오른 구', () => {
+  const heatFor = (heat: SphereHeat, seconds: number, center: Vec3 = TOP): void => {
+    for (let i = 0; i < Math.round(seconds / DT); i++) heat.update(DT, center, PLAYER_RADIUS, PLANET.center);
+  };
+
+  it('서서히 달아오르며 연기를 뿜고, 식으면 연기가 모두 사라진다', () => {
+    const heat = new SphereHeat();
+    expect(heat.visible).toBe(false);
+    heat.setHeated(true);
+    heatFor(heat, 0.2);
+    expect(heat.amount).toBeGreaterThan(0);
+    expect(heat.amount).toBeLessThan(1);
+
+    heatFor(heat, 3);
+    expect(heat.amount).toBe(1);
+    expect(heat.smokeCount).toBeGreaterThan(20);
+    expect(heat.smokeCount).toBeLessThanOrEqual(SMOKE_CAPACITY);
+
+    heat.setHeated(false);
+    heatFor(heat, 5);
+    expect(heat.amount).toBe(0);
+    expect(heat.smokeCount).toBe(0);
+    expect(heat.visible).toBe(false);
+  });
+
+  it('연기는 행성 어디서나 표면 바깥쪽으로 떠오른다', () => {
+    const heat = new SphereHeat();
+    const side: Vec3 = [REST_DISTANCE, 0, 0];
+    heat.setHeated(true);
+    heatFor(heat, 3, side);
+    const smoke = heat.smokeData(PLAYER_RADIUS);
+    let outward = 0;
+    for (let i = 0; i < heat.smokeCount; i++) {
+      outward += smoke[i * SMOKE_STRIDE] - side[0];
+      expect(smoke[i * SMOKE_STRIDE + 4]).toBeGreaterThanOrEqual(0);
+    }
+    expect(outward / heat.smokeCount).toBeGreaterThan(PLAYER_RADIUS);
+  });
+});
+
 describe('콘텐츠 관리', () => {
   function fakeContent(id: string, log: string[]): GraphicsContent {
     return {
@@ -236,7 +278,7 @@ describe('콘텐츠 관리', () => {
       deactivate: () => log.push(`-${id}`),
     };
   }
-  const ctx = { sphere: { setColor: () => {}, setWaterFilled: () => {} } };
+  const ctx = { sphere: { setColor: () => {}, setWaterFilled: () => {}, setHeated: () => {} } };
 
   it('새 콘텐츠를 켜기 전에 이전 콘텐츠를 끈다', () => {
     const log: string[] = [];
@@ -318,6 +360,23 @@ describe('월드 통합', () => {
 
     rollTo(world, find('color-default'));
     expect(world.content.activeId).toBe('color-default');
+  });
+
+  it('코랄 발판을 밟으면 구가 달아올라 빛나고, 다른 발판을 밟으면 식는다', () => {
+    const world = new World();
+    expect(world.buildHeatSphere(1)).toBeNull();
+    const playerEmissive = (): number => world.buildDrawList(1).at(-1)!.material.emissive[0];
+
+    rollTo(world, find('color-coral'));
+    for (let i = 0; i < 240; i++) world.fixedStep(DT, IDLE);
+    expect(world.buildHeatSphere(1)?.heat).toBe(1);
+    expect(world.buildHeatSphere(1)?.smokeCount).toBeGreaterThan(0);
+    expect(playerEmissive()).toBeGreaterThan(0);
+
+    rollTo(world, find('color-default'));
+    for (let i = 0; i < 600; i++) world.fixedStep(DT, IDLE);
+    expect(world.buildHeatSphere(1)).toBeNull();
+    expect(playerEmissive()).toBe(0);
   });
 
   it('블루 발판을 밟으면 구에 물이 차고, 다른 발판을 밟으면 비워진다', () => {

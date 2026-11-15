@@ -7,6 +7,8 @@ export interface ContentContext {
     setColor(color: Vec3): void;
     /** 구 안에 물을 채워 투명하게 만들거나, 다시 비워 불투명하게 되돌린다. */
     setWaterFilled(filled: boolean): void;
+    /** 구를 달궈 표면을 빛내고 연기를 뿜게 하거나, 다시 식힌다. */
+    setHeated(heated: boolean): void;
   };
 }
 

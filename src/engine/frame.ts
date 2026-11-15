@@ -75,6 +75,25 @@ export interface WaterSphere extends ContentFrame {
   time: number;
 }
 
+/** 연기 입자 하나가 차지하는 값의 개수: x, y, z, 크기, 불투명도, 무늬 씨앗, 열기 */
+export const SMOKE_STRIDE = 7;
+/** 한 번에 그릴 수 있는 연기 입자 수 */
+export const SMOKE_CAPACITY = 96;
+
+export interface HeatSphere extends ContentFrame {
+  kind: 'heat-sphere';
+  /** 달아오른 구. 같은 자리에 빛나는 껍질을 겹쳐 그린다. */
+  item: DrawItem;
+  center: Vec3;
+  radius: number;
+  /** 0이면 식어 있고 1이면 완전히 달아올랐다. */
+  heat: number;
+  time: number;
+  /** 입자마다 `SMOKE_STRIDE`개씩 들어 있는 연기 값. 앞의 `smokeCount`개만 유효하다. */
+  smoke: Float32Array;
+  smokeCount: number;
+}
+
 export interface FrameData {
   items: readonly DrawItem[];
   camera: CameraView;

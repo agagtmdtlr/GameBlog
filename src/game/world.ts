@@ -19,6 +19,7 @@ import {
   type ContentFrame,
   type DrawItem,
   type Environment,
+  type HeatSphere,
   type Material,
   type MeshKind,
   type WaterSphere,
@@ -27,6 +28,7 @@ import { ColorTransition } from './colorTransition';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { PressurePlate } from './pressurePlate';
+import { SphereHeat } from './sphereHeat';
 import { WaterFill } from './waterFill';
 
 /** 행성의 꼭대기에서 시작한다. */
@@ -44,6 +46,8 @@ const PLATE_TRAVEL = 0.06;
 const PLATE_GLOW_RATE = 7;
 const PLATE_GLOW_STRENGTH = 0.55;
 const COLOR_TRANSITION_SECONDS = 0.3;
+/** 완전히 달아오른 구가 스스로 내는 빛 (선형 RGB) */
+const HEAT_EMISSIVE: Vec3 = [0.5, 0.05, 0.008];
 
 export const STUDIO_ENVIRONMENT: Environment = {
   // 기본 시점에서 그림자가 구의 앞쪽 옆으로 떨어져 잘 보이는 방향
@@ -102,6 +106,7 @@ export class World {
   private readonly plates: readonly PlateInstance[];
   private readonly sphereColor = new ColorTransition(DEFAULT_SPHERE_COLOR, COLOR_TRANSITION_SECONDS);
   readonly water = new WaterFill();
+  readonly heat = new SphereHeat();
 
   constructor(
     entries: readonly ContentEntry[] = CONTENT_ENTRIES,
@@ -138,12 +143,13 @@ export class World {
       ),
     ];
 
-    const { sphereColor, water } = this;
+    const { sphereColor, water, heat } = this;
     this.content = new ContentManager(
       {
         sphere: {
           setColor: (color) => sphereColor.setTarget(color),
           setWaterFilled: (filled) => water.setFilled(filled),
+          setHeated: (heated) => heat.setHeated(heated),
         },
       },
       entries.map((entry) => entry.content),
@@ -159,6 +165,7 @@ export class World {
     this.player.step(dt, command, PLANET);
     const up = normalize(sub(this.player.position, PLANET.center));
     this.water.update(dt, sub(this.player.velocity, previousVelocity), up);
+    this.heat.update(dt, this.player.position, PLAYER_RADIUS, PLANET.center);
 
     for (const instance of this.plates) {
       if (instance.plate.update(dt, this.player.position, PLAYER_RADIUS)) {
@@ -208,6 +215,8 @@ export class World {
     const frames: ContentFrame[] = [];
     const water = this.buildWaterSphere(alpha);
     if (water) frames.push(water);
+    const heat = this.buildHeatSphere(alpha);
+    if (heat) frames.push(heat);
     return frames;
   }
 
@@ -229,13 +238,32 @@ export class World {
     };
   }
 
+  /** 구가 달아올라 있거나 연기가 남아 있을 때만 값을 반환한다. */
+  buildHeatSphere(alpha: number): HeatSphere | null {
+    const { heat } = this;
+    if (!heat.visible) return null;
+    return {
+      kind: 'heat-sphere',
+      item: this.sphereDrawItem(alpha),
+      center: this.interpolatedPlayerPosition(alpha),
+      radius: PLAYER_RADIUS,
+      heat: heat.amount,
+      time: heat.time,
+      smoke: heat.smokeData(PLAYER_RADIUS),
+      smokeCount: heat.smokeCount,
+    };
+  }
+
   private sphereDrawItem(alpha: number): DrawItem {
     const orientation = quatNlerp(this.player.previousOrientation, this.player.orientation, alpha);
     return drawItem(
       'sphere',
       this.interpolatedPlayerPosition(alpha),
       [PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS],
-      material(this.sphereColor.current, 0.32, { pattern: SurfacePattern.SphereBands }),
+      material(this.sphereColor.current, 0.32, {
+        pattern: SurfacePattern.SphereBands,
+        emissive: scale(HEAT_EMISSIVE, this.heat.amount),
+      }),
       orientation,
     );
   }
