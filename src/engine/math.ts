@@ -45,6 +45,18 @@ export function quatMultiply(a: Quat, b: Quat): Quat {
   ];
 }
 
+/** 단위 벡터 from을 단위 벡터 to로 옮기는 가장 짧은 회전 */
+export function quatFromUnitVectors(from: Vec3, to: Vec3): Quat {
+  const d = dot(from, to);
+  if (d < -0.999999) {
+    // 정반대 방향이면 수직인 축 아무거나로 반 바퀴 돈다.
+    const axis = normalize(cross(Math.abs(from[0]) > 0.9 ? [0, 1, 0] : [1, 0, 0], from));
+    return [axis[0], axis[1], axis[2], 0];
+  }
+  const axis = cross(from, to);
+  return quatNormalize([axis[0], axis[1], axis[2], 1 + d]);
+}
+
 export function quatNormalize(q: Quat): Quat {
   const len = Math.hypot(q[0], q[1], q[2], q[3]);
   return len > 0 ? [q[0] / len, q[1] / len, q[2] / len, q[3] / len] : QUAT_IDENTITY;

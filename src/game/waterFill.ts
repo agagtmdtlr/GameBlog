@@ -1,4 +1,4 @@
-import { length, normalize, type Vec3 } from '../engine/math';
+import { add, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 
 const FILL_SECONDS = 1.1;
 const FADE_PORTION = 0.35;
@@ -20,8 +20,9 @@ function smoothstep(edge0: number, edge1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-function clamp(value: number, limit: number): number {
-  return Math.min(limit, Math.max(-limit, value));
+function clampLength(v: Vec3, limit: number): Vec3 {
+  const len = length(v);
+  return len > limit ? scale(v, limit / len) : v;
 }
 
 /** 구 안에 차오르는 물의 상태. 차오름, 출렁임, 물결을 진행한다. */
@@ -32,17 +33,20 @@ export class WaterFill {
   ripple = 0;
 
   private target = 0;
-  private tiltX = 0;
-  private tiltZ = 0;
-  private tiltVelocityX = 0;
-  private tiltVelocityZ = 0;
+  private up: Vec3 = [0, 1, 0];
+  /** 수면 법선이 `up`에서 기운 정도. 항상 `up`에 수직이다. */
+  private tilt: Vec3 = [0, 0, 0];
+  private tiltVelocity: Vec3 = [0, 0, 0];
 
   setFilled(filled: boolean): void {
     this.target = filled ? 1 : 0;
   }
 
-  /** @param velocityChange 이번 스텝 동안 바뀐 구의 속도 */
-  update(dt: number, velocityChange: Vec3): void {
+  /**
+   * @param velocityChange 이번 스텝 동안 바뀐 구의 속도
+   * @param up 중력의 반대 방향 (단위 벡터)
+   */
+  update(dt: number, velocityChange: Vec3, up: Vec3 = [0, 1, 0]): void {
     this.time += dt;
     const step = dt / FILL_SECONDS;
     this.amount =
@@ -50,14 +54,19 @@ export class WaterFill {
         ? Math.min(this.target, this.amount + step)
         : Math.max(this.target, this.amount - step);
 
-    const targetTiltX = clamp(velocityChange[0] / dt, MAX_ACCELERATION) * ACCELERATION_TO_TILT;
-    const targetTiltZ = clamp(velocityChange[2] / dt, MAX_ACCELERATION) * ACCELERATION_TO_TILT;
-    this.tiltVelocityX +=
-      (SPRING_STIFFNESS * (targetTiltX - this.tiltX) - SPRING_DAMPING * this.tiltVelocityX) * dt;
-    this.tiltVelocityZ +=
-      (SPRING_STIFFNESS * (targetTiltZ - this.tiltZ) - SPRING_DAMPING * this.tiltVelocityZ) * dt;
-    this.tiltX = clamp(this.tiltX + this.tiltVelocityX * dt, MAX_TILT);
-    this.tiltZ = clamp(this.tiltZ + this.tiltVelocityZ * dt, MAX_TILT);
+    // 행성 위를 구르면 위쪽이 계속 바뀐다. 기울기를 새 수평면으로 옮긴 뒤 진행한다.
+    this.up = up;
+    const horizontal = (v: Vec3): Vec3 => sub(v, scale(up, dot(v, up)));
+    const acceleration = clampLength(horizontal(scale(velocityChange, 1 / dt)), MAX_ACCELERATION);
+    const targetTilt = scale(acceleration, ACCELERATION_TO_TILT);
+    const tilt = horizontal(this.tilt);
+    const tiltVelocity = horizontal(this.tiltVelocity);
+    const force = sub(
+      scale(sub(targetTilt, tilt), SPRING_STIFFNESS),
+      scale(tiltVelocity, SPRING_DAMPING),
+    );
+    this.tiltVelocity = add(tiltVelocity, scale(force, dt));
+    this.tilt = clampLength(add(tilt, scale(this.tiltVelocity, dt)), MAX_TILT);
 
     this.ripple = Math.min(1, this.ripple + length(velocityChange) * IMPULSE_TO_RIPPLE);
     this.ripple *= Math.exp(-RIPPLE_DECAY * dt);
@@ -65,7 +74,7 @@ export class WaterFill {
 
   /** 수면 법선. 구의 회전과 무관하게 중력을 따르고, 가속 방향으로 기운다. */
   get surfaceNormal(): Vec3 {
-    return normalize([this.tiltX, 1, this.tiltZ]);
+    return normalize(add(this.up, this.tilt));
   }
 
   /** 수면 높이 (구 반지름 기준, -1이 바닥) */

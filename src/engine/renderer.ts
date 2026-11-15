@@ -1,5 +1,4 @@
 import {
-  BoxGeometry,
   Color,
   CylinderGeometry,
   DepthTexture,
@@ -88,8 +87,8 @@ export class Renderer {
     };
 
     this.geometries = {
-      sphere: new SphereGeometry(1, 48, 32),
-      box: new BoxGeometry(1, 1, 1),
+      // 행성에도 쓰므로 촘촘하게 나눈다. 성기면 구가 행성 표면에 살짝 묻혀 보인다.
+      sphere: new SphereGeometry(1, 96, 64),
       cylinder: new CylinderGeometry(1, 1, 1, 64),
     };
 
@@ -124,6 +123,7 @@ export class Renderer {
       uViewProj: { value: new Matrix4() },
       uSceneColor: { value: null },
       uBall: { value: new Vector4() },
+      uGround: { value: new Vector4() },
       uSurface: { value: new Vector4() },
       uOpacity: { value: 0 },
       uRipple: { value: 0 },
@@ -197,6 +197,7 @@ export class Renderer {
     camera.far = view.far;
     camera.updateProjectionMatrix();
     camera.position.fromArray(view.position);
+    camera.up.fromArray(view.up);
     camera.lookAt(view.target[0], view.target[1], view.target[2]);
     camera.updateMatrixWorld();
 
@@ -265,7 +266,7 @@ export class Renderer {
         uPattern: { value: 0 },
       },
     });
-    const mesh = new Mesh(this.geometries.box, material);
+    const mesh = new Mesh(this.geometries.sphere, material);
     // 모델 행렬은 World가 계산해 넘겨 준다.
     mesh.matrixAutoUpdate = false;
     return mesh;
@@ -315,6 +316,8 @@ export class Renderer {
     u.uViewProj.value.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
     u.uSceneColor.value = this.sceneColor;
     u.uBall.value.set(water.center[0], water.center[1], water.center[2], water.radius);
+    const ground = water.ground;
+    u.uGround.value.set(ground.center[0], ground.center[1], ground.center[2], ground.radius);
     const n = water.surfaceNormal;
     u.uSurface.value.set(n[0], n[1], n[2], water.level);
     u.uOpacity.value = water.opacity;

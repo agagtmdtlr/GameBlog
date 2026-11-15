@@ -5,7 +5,7 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * three.js에 의존하지 않으므로 `World`와 테스트가 GPU 없이 쓸 수 있다.
  */
 
-export type MeshKind = 'sphere' | 'box' | 'cylinder';
+export type MeshKind = 'sphere' | 'cylinder';
 
 export const SurfacePattern = { None: 0, SphereBands: 1, Grid: 2 } as const;
 export type SurfacePattern = (typeof SurfacePattern)[keyof typeof SurfacePattern];
@@ -41,6 +41,8 @@ export interface Environment {
 export interface CameraView {
   position: Vec3;
   target: Vec3;
+  /** 화면의 위쪽이 되는 방향. 행성 위에서는 위치마다 다르다. */
+  up: Vec3;
   /** 세로 시야각 (라디안) */
   fovY: number;
   near: number;
@@ -52,6 +54,8 @@ export interface WaterSphere {
   item: DrawItem;
   center: Vec3;
   radius: number;
+  /** 구가 놓인 행성. 굴절된 광선이 닿는 바닥을 찾는 데 쓴다. */
+  ground: { center: Vec3; radius: number };
   surfaceNormal: Vec3;
   /** 수면 높이 (구 반지름 기준) */
   level: number;

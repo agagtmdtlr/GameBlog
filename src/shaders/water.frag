@@ -15,6 +15,8 @@ uniform vec3 uGroundColor;
 uniform sampler2D uSceneColor;
 /** xyz: 중심, w: 반지름 */
 uniform vec4 uBall;
+/** 구가 놓인 행성. xyz: 중심, w: 반지름 */
+uniform vec4 uGround;
 /** xyz: 수면 법선, w: 수면 높이 (구 반지름 기준) */
 uniform vec4 uSurface;
 uniform float uOpacity;
@@ -56,11 +58,15 @@ vec3 surfaceNormal(vec3 point, vec3 up) {
   vec2 d1 = vec2(0.83, 0.56);
   vec2 d2 = vec2(-0.45, 0.89);
   vec2 d3 = vec2(0.2, -0.98);
+  // 수면 위의 좌표축. 행성 위에서는 up이 어느 방향이든 될 수 있다.
+  vec3 axisU = normalize(cross(up, abs(up.x) > 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+  vec3 axisV = cross(up, axisU);
+  vec2 q = vec2(dot(point, axisU), dot(point, axisV));
   vec2 slope =
-    d1 * cos(dot(point.xz, d1) * 7.0 + uTime * 3.1) +
-    d2 * cos(dot(point.xz, d2) * 11.0 - uTime * 4.3) * 0.6 +
-    d3 * cos(dot(point.xz, d3) * 17.0 + uTime * 5.7) * 0.3;
-  return normalize(up - vec3(slope.x, 0.0, slope.y) * amplitude);
+    d1 * cos(dot(q, d1) * 7.0 + uTime * 3.1) +
+    d2 * cos(dot(q, d2) * 11.0 - uTime * 4.3) * 0.6 +
+    d3 * cos(dot(q, d3) * 17.0 + uTime * 5.7) * 0.3;
+  return normalize(up - (axisU * slope.x + axisV * slope.y) * amplitude);
 }
 
 /** 구 안의 한 점에서 출발한 광선이 구 표면에 닿기까지의 거리 */
@@ -69,10 +75,14 @@ float distanceToShell(vec3 origin, vec3 direction) {
   return -b + sqrt(max(b * b - dot(origin, origin) + 1.0, 0.0));
 }
 
-/** 구를 빠져나간 광선 뒤에 보이는 장면. 바닥(y = 0)을 기준으로 화면 좌표를 찾는다. */
+/** 구를 빠져나간 광선 뒤에 보이는 장면. 광선이 행성 표면에 닿는 곳의 화면 좌표를 찾는다. */
 vec3 sampleScene(vec3 worldOrigin, vec3 direction) {
-  float travel = direction.y < -0.02 ? min(-worldOrigin.y / direction.y, 14.0) : 6.0;
-  vec4 clip = uViewProj * vec4(worldOrigin + direction * max(travel, 0.0), 1.0);
+  vec3 fromGround = worldOrigin - uGround.xyz;
+  float b = dot(fromGround, direction);
+  float discriminant = b * b - dot(fromGround, fromGround) + uGround.w * uGround.w;
+  float travel = 6.0;
+  if (b < 0.0 && discriminant > 0.0) travel = clamp(-b - sqrt(discriminant), 0.0, 14.0);
+  vec4 clip = uViewProj * vec4(worldOrigin + direction * travel, 1.0);
   if (clip.w <= 0.0) return environment(direction) * 0.25;
   vec2 uv = clip.xy / clip.w * 0.5 + 0.5;
   return srgbToLinear(texture(uSceneColor, uv).rgb);
@@ -155,7 +165,7 @@ void main() {
   added += vec3(0.1) * (1.0 - smoothstep(0.03 - bandWidth, 0.03 + bandWidth, bandDistance));
 
   vec3 absorbed = scene * exp(-waterPath * ABSORPTION);
-  vec3 scattered = SCATTER_COLOR * (1.0 - exp(-waterPath * 0.8)) * (0.55 + 0.45 * toLight.y);
+  vec3 scattered = SCATTER_COLOR * (1.0 - exp(-waterPath * 0.8)) * (0.55 + 0.45 * dot(toLight, up));
   vec3 color = (absorbed + scattered) * transmit + acesFilm(added);
   fragColor = vec4(linearToSrgb(clamp(color, 0.0, 1.0)), uOpacity);
 }

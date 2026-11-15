@@ -1,30 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import { reflectVelocity, sphereVsAabb, type AABB } from './collision';
+import { reflectVelocity, sphereVsSphere, type Sphere } from './collision';
 import { FixedStepper } from './fixedStepper';
 
-const BOX: AABB = { min: [-1, -1, -1], max: [1, 1, 1] };
+const PLANET: Sphere = { center: [0, 0, 0], radius: 10 };
 
-describe('구-상자 충돌', () => {
+describe('구-행성 충돌', () => {
   it('떨어져 있으면 충돌하지 않는다', () => {
-    expect(sphereVsAabb([0, 3, 0], 0.5, BOX)).toBeNull();
+    expect(sphereVsSphere([0, 11, 0], 0.5, PLANET)).toBeNull();
   });
 
-  it('면과 겹치면 면의 법선과 깊이를 돌려준다', () => {
-    const contact = sphereVsAabb([0, 1.3, 0], 0.5, BOX);
+  it('겹치면 행성 중심에서 바깥을 향하는 법선과 깊이를 돌려준다', () => {
+    const contact = sphereVsSphere([0, 10.3, 0], 0.5, PLANET);
     expect(contact?.normal).toEqual([0, 1, 0]);
     expect(contact?.depth).toBeCloseTo(0.2);
   });
 
-  it('모서리에서는 대각선 방향으로 밀어낸다', () => {
-    const contact = sphereVsAabb([1.2, 1.2, 0], 0.5, BOX);
-    expect(contact?.normal[0]).toBeCloseTo(Math.SQRT1_2);
-    expect(contact?.normal[1]).toBeCloseTo(Math.SQRT1_2);
+  it('행성의 옆이나 아래에서도 바깥으로 밀어낸다', () => {
+    expect(sphereVsSphere([-10.2, 0, 0], 0.5, PLANET)?.normal).toEqual([-1, 0, 0]);
+    const below = sphereVsSphere([0, -6, -8], 0.5, PLANET);
+    expect(below?.normal[1]).toBeCloseTo(-0.6);
+    expect(below?.normal[2]).toBeCloseTo(-0.8);
   });
 
-  it('중심이 상자 안이면 가장 가까운 면 밖으로 밀어낸다', () => {
-    const contact = sphereVsAabb([0.9, 0, 0], 0.5, BOX);
-    expect(contact?.normal).toEqual([1, 0, 0]);
-    expect(contact?.depth).toBeCloseTo(0.6);
+  it('중심이 겹쳐도 밀어낼 방향을 돌려준다', () => {
+    const contact = sphereVsSphere([0, 0, 0], 0.5, PLANET);
+    expect(contact?.depth).toBeCloseTo(10.5);
+    expect(Math.hypot(...contact!.normal)).toBeCloseTo(1);
   });
 });
 

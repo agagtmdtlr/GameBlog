@@ -6,6 +6,7 @@ import {
   mat4FromTRS,
   normalize,
   normalMatrix,
+  quatFromUnitVectors,
   quatNlerp,
   QUAT_IDENTITY,
   scale,
@@ -21,25 +22,23 @@ import {
   type MeshKind,
   type WaterSphere,
 } from '../engine/frame';
-import type { AABB } from '../physics/collision';
 import { ColorTransition } from './colorTransition';
+import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { PressurePlate } from './pressurePlate';
 import { WaterFill } from './waterFill';
 
-const ARENA_HALF_SIZE = 16;
-const PLATFORM_DEPTH = 1;
-const WALL_HEIGHT = 0.7;
-const WALL_THICKNESS = 0.5;
-/** 어둠 속으로 떨어지는 모습이 잠시 보인 뒤 다시 시작한다. */
-const RESPAWN_Y = -12;
-const SPAWN: Vec3 = [0, PLAYER_RADIUS, 9];
+/** 행성의 꼭대기에서 시작한다. */
+const SPAWN: Vec3 = [0, PLANET.radius + PLAYER_RADIUS, 0];
 
 const PLATE_RADIUS = 1.4;
 const PLATE_RING_RADIUS = 1.62;
-const PLATE_RING_HEIGHT = 0.02;
-const PLATE_CAP_HEIGHT = 0.08;
-const PLATE_CAP_TOP = 0.09;
+// 발판은 평평한 원판이라 가장자리로 갈수록 둥근 표면에서 뜬다.
+// 높이는 발판 중심의 표면을 기준으로 하고, 원판을 두껍게 만들어 아래쪽을 행성에 묻는다.
+const PLATE_RING_TOP = -0.03;
+const PLATE_RING_HEIGHT = 0.4;
+const PLATE_CAP_TOP = 0.08;
+const PLATE_CAP_HEIGHT = 0.4;
 const PLATE_TRAVEL = 0.06;
 const PLATE_GLOW_RATE = 7;
 const PLATE_GLOW_STRENGTH = 0.55;
@@ -78,39 +77,17 @@ function drawItem(
   return { mesh, model, normal: normalMatrix(model), material: mat, castShadow };
 }
 
-function aabb(center: Vec3, size: Vec3): AABB {
-  return {
-    min: [center[0] - size[0] / 2, center[1] - size[1] / 2, center[2] - size[2] / 2],
-    max: [center[0] + size[0] / 2, center[1] + size[1] / 2, center[2] + size[2] / 2],
-  };
-}
-
-interface BoxPart {
-  center: Vec3;
-  size: Vec3;
-  mat: Material;
-}
-
-function arenaParts(): BoxPart[] {
-  const outer = ARENA_HALF_SIZE * 2;
-  const wallCenter = ARENA_HALF_SIZE - WALL_THICKNESS / 2;
-  const wallY = WALL_HEIGHT / 2;
-  const wallMat = material([0.72, 0.72, 0.73], 0.6);
-  return [
-    {
-      center: [0, -PLATFORM_DEPTH / 2, 0],
-      size: [outer, PLATFORM_DEPTH, outer],
-      mat: material([0.74, 0.74, 0.75], 0.75, { pattern: SurfacePattern.Grid }),
-    },
-    { center: [0, wallY, -wallCenter], size: [outer, WALL_HEIGHT, WALL_THICKNESS], mat: wallMat },
-    { center: [0, wallY, wallCenter], size: [outer, WALL_HEIGHT, WALL_THICKNESS], mat: wallMat },
-    { center: [-wallCenter, wallY, 0], size: [WALL_THICKNESS, WALL_HEIGHT, outer], mat: wallMat },
-    { center: [wallCenter, wallY, 0], size: [WALL_THICKNESS, WALL_HEIGHT, outer], mat: wallMat },
-  ];
+/** 윗면이 발판 중심의 표면에서 `top`만큼 떨어진 원판의 중심 */
+function plateDiscCenter(normal: Vec3, top: number, height: number): Vec3 {
+  return scale(normal, PLANET.radius + top - height / 2);
 }
 
 interface PlateInstance {
   entry: ContentEntry;
+  /** 행성 중심에서 발판을 향하는 단위 벡터 */
+  normal: Vec3;
+  /** 원기둥의 축(+Y)을 `normal`로 돌리는 회전 */
+  rotation: Quat;
   plate: PressurePlate;
   glow: number;
 }
@@ -118,7 +95,6 @@ interface PlateInstance {
 /** 월드를 구성하고 게임 규칙을 진행한다. GPU와 DOM에 의존하지 않는다. */
 export class World {
   readonly player = new Player(SPAWN);
-  readonly colliders: readonly AABB[];
   readonly content: ContentManager;
 
   private readonly staticItems: readonly DrawItem[];
@@ -130,29 +106,36 @@ export class World {
     entries: readonly ContentEntry[] = CONTENT_ENTRIES,
     onContentChange?: (content: GraphicsContent) => void,
   ) {
-    const parts = arenaParts();
-    this.colliders = parts.map((part) => aabb(part.center, part.size));
+    this.plates = entries.map((entry) => {
+      const normal = surfaceDirection(entry.plate.latitude, entry.plate.longitude);
+      return {
+        entry,
+        normal,
+        rotation: quatFromUnitVectors([0, 1, 0], normal),
+        plate: new PressurePlate(scale(normal, PLANET.radius), normal, PLATE_RADIUS),
+        glow: 0,
+      };
+    });
 
     const ringMat = material([0.3, 0.3, 0.31], 0.55);
     this.staticItems = [
-      ...parts.map((part) => drawItem('box', part.center, part.size, part.mat)),
-      ...entries.map(({ plate }) =>
+      drawItem(
+        'sphere',
+        PLANET.center,
+        [PLANET.radius, PLANET.radius, PLANET.radius],
+        material([0.74, 0.74, 0.75], 0.75, { pattern: SurfacePattern.Grid }),
+      ),
+      ...this.plates.map(({ normal, rotation }) =>
         drawItem(
           'cylinder',
-          [plate.x, PLATE_RING_HEIGHT / 2, plate.z],
+          plateDiscCenter(normal, PLATE_RING_TOP, PLATE_RING_HEIGHT),
           [PLATE_RING_RADIUS, PLATE_RING_HEIGHT, PLATE_RING_RADIUS],
           ringMat,
-          QUAT_IDENTITY,
+          rotation,
           false,
         ),
       ),
     ];
-
-    this.plates = entries.map((entry) => ({
-      entry,
-      plate: new PressurePlate(entry.plate.x, entry.plate.z, PLATE_RADIUS),
-      glow: 0,
-    }));
 
     const { sphereColor, water } = this;
     this.content = new ContentManager(
@@ -172,9 +155,9 @@ export class World {
 
   fixedStep(dt: number, command: MoveCommand): void {
     const previousVelocity = this.player.velocity;
-    this.player.step(dt, command, this.colliders);
-    if (this.player.position[1] < RESPAWN_Y) this.player.respawn();
-    this.water.update(dt, sub(this.player.velocity, previousVelocity));
+    this.player.step(dt, command, PLANET);
+    const up = normalize(sub(this.player.position, PLANET.center));
+    this.water.update(dt, sub(this.player.velocity, previousVelocity), up);
 
     for (const instance of this.plates) {
       if (instance.plate.update(dt, this.player.position, PLAYER_RADIUS)) {
@@ -198,17 +181,17 @@ export class World {
 
   buildDrawList(alpha: number): DrawItem[] {
     const items: DrawItem[] = [...this.staticItems];
-    for (const { entry, plate, glow } of this.plates) {
+    for (const { entry, normal, rotation, plate, glow } of this.plates) {
       const top = PLATE_CAP_TOP - plate.depression * PLATE_TRAVEL;
       items.push(
         drawItem(
           'cylinder',
-          [entry.plate.x, top - PLATE_CAP_HEIGHT / 2, entry.plate.z],
+          plateDiscCenter(normal, top, PLATE_CAP_HEIGHT),
           [PLATE_RADIUS, PLATE_CAP_HEIGHT, PLATE_RADIUS],
           material(entry.plate.color, 0.42, {
             emissive: scale(entry.plate.color, glow * PLATE_GLOW_STRENGTH),
           }),
-          QUAT_IDENTITY,
+          rotation,
           false,
         ),
       );
@@ -227,6 +210,7 @@ export class World {
       item: this.sphereDrawItem(alpha),
       center: this.interpolatedPlayerPosition(alpha),
       radius: PLAYER_RADIUS,
+      ground: PLANET,
       surfaceNormal: water.surfaceNormal,
       level: water.level,
       opacity: water.opacity,

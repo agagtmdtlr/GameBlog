@@ -1,16 +1,19 @@
 import {
   add,
   cross,
+  dot,
   length,
+  normalize,
   quatFromAxisAngle,
   quatMultiply,
   quatNormalize,
   QUAT_IDENTITY,
   scale,
+  sub,
   type Quat,
   type Vec3,
 } from '../engine/math';
-import { reflectVelocity, sphereVsAabb, type AABB } from '../physics/collision';
+import { reflectVelocity, sphereVsSphere, type Sphere } from '../physics/collision';
 
 export const PLAYER_RADIUS = 0.65;
 
@@ -19,16 +22,14 @@ const AIR_ACCELERATION = 9;
 const GROUND_DRAG = 2.4;
 const AIR_DRAG = 0.25;
 const GRAVITY = 22;
-const JUMP_SPEED = 8.4;
 const RESTITUTION = 0.45;
 const REST_THRESHOLD = 2.0;
-const JUMP_GRACE_SECONDS = 0.1;
-const GROUND_NORMAL_MIN_Y = 0.7;
+/** 바닥에서 잠깐 떠도(튕김, 가장자리) 지면 가속과 감쇠를 유지하는 시간 */
+const GROUND_GRACE_SECONDS = 0.1;
 
 export interface MoveCommand {
-  /** 월드 기준 이동 방향. 크기는 1 이하 */
+  /** 월드 기준 이동 방향. 크기는 1 이하. 표면에 접하는 성분만 쓰인다. */
   direction: Vec3;
-  jumpPressed: boolean;
 }
 
 export class Player {
@@ -41,68 +42,56 @@ export class Player {
 
   /** 공중에서도 회전이 이어지도록 마지막 각속도를 기억한다. */
   private angularVelocity: Vec3 = [0, 0, 0];
-  private coyoteTime = 0;
-  private jumpBuffer = 0;
+  private groundGrace = 0;
 
-  constructor(private readonly spawn: Vec3) {
+  /** 마지막으로 닿은 표면의 법선. 구르는 회전축을 정한다. */
+  private groundNormal: Vec3 = [0, 1, 0];
+
+  constructor(spawn: Vec3) {
     this.position = spawn;
     this.previousPosition = spawn;
   }
 
-  respawn(): void {
-    this.position = this.spawn;
-    this.previousPosition = this.spawn;
-    this.velocity = [0, 0, 0];
-    this.angularVelocity = [0, 0, 0];
-    this.coyoteTime = 0;
-    this.jumpBuffer = 0;
-    this.grounded = false;
-  }
-
-  step(dt: number, command: MoveCommand, colliders: readonly AABB[]): void {
+  /** @param ground 구가 굴러다니는 행성. 중력은 그 중심을 향한다. */
+  step(dt: number, command: MoveCommand, ground: Sphere): void {
     this.previousPosition = this.position;
     this.previousOrientation = this.orientation;
 
-    const onGround = this.coyoteTime > 0;
+    const onGround = this.groundGrace > 0;
     const acceleration = onGround ? GROUND_ACCELERATION : AIR_ACCELERATION;
     const drag = onGround ? GROUND_DRAG : AIR_DRAG;
     const damping = Math.max(0, 1 - drag * dt);
-    let [vx, vy, vz] = this.velocity;
-    vx = (vx + command.direction[0] * acceleration * dt) * damping;
-    vz = (vz + command.direction[2] * acceleration * dt) * damping;
-    vy -= GRAVITY * dt;
 
-    if (command.jumpPressed) this.jumpBuffer = JUMP_GRACE_SECONDS;
-    if (this.jumpBuffer > 0 && this.coyoteTime > 0) {
-      vy = JUMP_SPEED;
-      this.jumpBuffer = 0;
-      this.coyoteTime = 0;
-    }
+    // 속도를 행성 중심 방향(수직)과 표면에 접하는 방향(수평)으로 나눠 다룬다.
+    const up = normalize(sub(this.position, ground.center));
+    const tangent = (v: Vec3): Vec3 => sub(v, scale(up, dot(v, up)));
+    const vertical = dot(this.velocity, up) - GRAVITY * dt;
+    const horizontal = scale(
+      add(tangent(this.velocity), scale(tangent(command.direction), acceleration * dt)),
+      damping,
+    );
 
-    this.velocity = [vx, vy, vz];
+    this.velocity = add(horizontal, scale(up, vertical));
     this.position = add(this.position, scale(this.velocity, dt));
-    this.resolveCollisions(colliders);
+    this.resolveCollision(ground);
 
-    this.coyoteTime = this.grounded ? JUMP_GRACE_SECONDS : Math.max(0, this.coyoteTime - dt);
-    this.jumpBuffer = Math.max(0, this.jumpBuffer - dt);
+    this.groundGrace = this.grounded ? GROUND_GRACE_SECONDS : Math.max(0, this.groundGrace - dt);
     this.integrateRotation(dt);
   }
 
-  private resolveCollisions(colliders: readonly AABB[]): void {
-    this.grounded = false;
-    for (const box of colliders) {
-      const contact = sphereVsAabb(this.position, PLAYER_RADIUS, box);
-      if (!contact) continue;
-      this.position = add(this.position, scale(contact.normal, contact.depth));
-      this.velocity = reflectVelocity(this.velocity, contact.normal, RESTITUTION, REST_THRESHOLD);
-      if (contact.normal[1] > GROUND_NORMAL_MIN_Y) this.grounded = true;
-    }
+  private resolveCollision(ground: Sphere): void {
+    const contact = sphereVsSphere(this.position, PLAYER_RADIUS, ground);
+    this.grounded = contact !== null;
+    if (!contact) return;
+    this.position = add(this.position, scale(contact.normal, contact.depth));
+    this.velocity = reflectVelocity(this.velocity, contact.normal, RESTITUTION, REST_THRESHOLD);
+    this.groundNormal = contact.normal;
   }
 
   private integrateRotation(dt: number): void {
     if (this.grounded) {
       // 미끄러짐 없는 구름: 각속도 = (접촉 법선 x 속도) / 반지름
-      this.angularVelocity = scale(cross([0, 1, 0], this.velocity), 1 / PLAYER_RADIUS);
+      this.angularVelocity = scale(cross(this.groundNormal, this.velocity), 1 / PLAYER_RADIUS);
     }
     const speed = length(this.angularVelocity);
     if (speed < 1e-5) return;

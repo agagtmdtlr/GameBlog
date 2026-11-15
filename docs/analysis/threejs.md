@@ -4,12 +4,12 @@
 
 - **규칙:** [rules/threejs.md](../rules/threejs.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `d7babfd` 다음의 three.js 포팅 변경
+- **분석 기준:** 커밋 `7b5a2ab` 다음의 점프 제거와 행성 변경
 - **버전:** `three` 0.187.0, `@types/three` 0.187.0 (개발용)
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline d7babfd..HEAD -- src/engine src/shaders src/main.ts package.json
+git log --oneline 7b5a2ab..HEAD -- src/engine src/shaders src/main.ts package.json
 ```
 
 ## 포팅 방침
@@ -42,7 +42,7 @@ git log --oneline d7babfd..HEAD -- src/engine src/shaders src/main.ts package.js
 | `canvas.getContext('webgl2')` | `new WebGLRenderer({ canvas, alpha: false, antialias: true })` |
 | WebGL2 미지원 시 `null` 확인 | `three/addons/capabilities/WebGL.js`의 `isWebGL2Available()` |
 | `ShaderProgram` (컴파일, 링크, uniform 위치 캐시) | `RawShaderMaterial` (`glslVersion: GLSL3`) |
-| `uploadMesh`의 VAO와 버퍼 | `SphereGeometry(1, 48, 32)`, `BoxGeometry(1, 1, 1)`, `CylinderGeometry(1, 1, 1, 64)` |
+| `uploadMesh`의 VAO와 버퍼 | `SphereGeometry(1, 96, 64)`, `CylinderGeometry(1, 1, 1, 64)`. 포팅 직후에는 `BoxGeometry`도 썼으나 행성으로 바꾸면서 뺐다 |
 | `DrawItem` 배열을 순서대로 `drawElements` | `Scene`에 넣은 `Mesh` 풀. 프레임마다 행렬과 uniform을 덮어쓴다 |
 | `viewProj` 행렬을 uniform으로 전달 | `PerspectiveCamera`. 셰이더는 `projectionMatrix * viewMatrix`를 쓴다 |
 | `computeLightViewProj` | `OrthographicCamera`를 광원 위치에 두고 원점을 보게 한다 |
@@ -60,7 +60,7 @@ git log --oneline d7babfd..HEAD -- src/engine src/shaders src/main.ts package.js
 
 - `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
 - `waterScene`: 물이 든 구 전용. 불투명한 구(`waterBase`)와 물 셰이더 메시(`waterMesh`)가 들어 있다.
-- `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`
+- `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
 - `lightCamera`: 그림자용 `OrthographicCamera`
 
 프레임 순서는 포팅 전과 같다. `renderer.autoClear = false`로 두고 지우기를 직접 호출한다.
@@ -106,7 +106,7 @@ three.js의 톤 매핑과 출력 색공간 변환은 내장 재질과 셰이더 
 
 | 항목 | 포팅 전 | 포팅 후 |
 |---|---|---|
-| TypeScript (테스트 제외) | 1,746줄 | 1,547줄 |
+| TypeScript (테스트 제외) | 1,746줄 | 1,620줄 |
 | 셰이더 | 369줄 (5개) | 355줄 (3개) |
 | 자동 테스트 | 53개 | 45개 (메시 테스트 8개 삭제) |
 | 빌드 JS | 37.49KB (gzip 13.86KB) | 562.65KB (gzip 143.92KB) |

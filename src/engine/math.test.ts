@@ -10,6 +10,7 @@ import {
   normalMatrix,
   normalize,
   quatFromAxisAngle,
+  quatFromUnitVectors,
   quatMultiply,
   quatNlerp,
   quatRotateVec3,
@@ -49,6 +50,13 @@ describe('쿼터니언', () => {
     const negated = [-q[0], -q[1], -q[2], -q[3]] as const;
     const mid = quatNlerp(q, negated, 0.5);
     expectVec(quatRotateVec3(mid, [1, 0, 0]), quatRotateVec3(q, [1, 0, 0]));
+  });
+
+  it('한 방향을 다른 방향으로 옮기는 회전을 만든다', () => {
+    const to = normalize([1, 2, -3]);
+    expectVec(quatRotateVec3(quatFromUnitVectors([0, 1, 0], to), [0, 1, 0]), to);
+    expectVec(quatRotateVec3(quatFromUnitVectors([0, 1, 0], [0, 1, 0]), [1, 0, 0]), [1, 0, 0]);
+    expectVec(quatRotateVec3(quatFromUnitVectors([0, 1, 0], [0, -1, 0]), [0, 1, 0]), [0, -1, 0]);
   });
 });
 

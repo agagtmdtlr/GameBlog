@@ -4,11 +4,11 @@
 
 - **규칙:** [rules/content.md](../rules/content.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `d7babfd` 다음의 three.js 포팅 변경
+- **분석 기준:** 커밋 `7b5a2ab` 다음의 점프 제거와 행성 변경
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline d7babfd..HEAD -- src/content src/game src/engine/renderer.ts src/shaders src/main.ts
+git log --oneline 7b5a2ab..HEAD -- src/content src/game src/engine/renderer.ts src/shaders src/main.ts
 ```
 
 ## 작업 유형별 수정 파일
@@ -36,7 +36,7 @@ interface GraphicsContent {
   deactivate(ctx): void;
   update?(dt, ctx): void; // 활성 중 120Hz 고정 간격으로 호출
 }
-interface ContentEntry { content: GraphicsContent; plate: { x; z; color: Vec3 } }
+interface ContentEntry { content: GraphicsContent; plate: { latitude; longitude; color: Vec3 } }
 ```
 
 `ctx.sphere`가 제공하는 기능:
@@ -52,9 +52,17 @@ interface ContentEntry { content: GraphicsContent; plate: { x; z; color: Vec3 } 
 
 ## 발판 위치
 
-사용 중인 위치: `(0,2)` 기본색, `(-9,-5)` 코랄, `(-3,-7)` 앰버, `(3,-7)` 틸, `(9,-5)` 블루. 시작 지점은 `(0,9)`이다.
+행성은 원점이 중심이고 반지름이 18이다(`game/planet.ts`의 `PLANET`). 발판 위치는 위도와 경도(도)로 적고, `surfaceDirection(위도, 경도)`가 행성 중심에서 발판을 향하는 단위 벡터로 바꾼다.
 
-`game.test.ts`가 위치 조건을 검사하고, `color-default`, `color-coral`, `water-blue` id를 직접 참조한다.
+- 위도 90이 시작 지점(+Y)이다. 경도 180이 시작할 때 바라보는 방향(-Z)이고, 경도 90이 오른쪽(+X)이다.
+- 표면 거리는 각도 1도에 약 0.31이다.
+- 해는 경도 115, 위도 46 쪽에 있다. 그 반대쪽 절반은 밤이다.
+
+사용 중인 위치(위도, 경도): `(70, 180)` 기본색, `(35, 215)` 코랄, `(30, 150)` 앰버, `(-5, 115)` 틸, `(35, 60)` 블루.
+
+`game.test.ts`가 위치 조건(간격, 시작 지점과의 거리, 해가 드는 쪽)을 검사하고, `color-default`, `color-coral`, `water-blue` id를 직접 참조한다.
+
+발판은 `World`가 원기둥을 `quatFromUnitVectors([0, 1, 0], 방향)`으로 돌려 표면에 놓는다. 판정(`PressurePlate`)은 발판 면의 중심과 법선을 받아, 구가 축에서 반경 안에 있고 발판 면 가까이 있는지를 본다.
 
 ## 월드 상태 추가 순서
 
@@ -63,6 +71,7 @@ interface ContentEntry { content: GraphicsContent; plate: { x; z; color: Vec3 } 
 3. `World` 생성자의 `ctx` 객체에서 연결하고, `fixedStep`에서 갱신한다.
 4. `game.test.ts`의 가짜 `ctx`(`콘텐츠 관리` 블록)에도 메서드를 더한다. 빠뜨리면 `tsc`가 실패한다.
 5. 상태 클래스 단위 테스트와, 발판까지 굴러가는 월드 통합 테스트(`rollTo` 사용)를 더한다.
+6. 방향이 있는 상태라면 위쪽이 `[0, 1, 0]`이라고 가정하지 않는다. 위쪽은 `normalize(구 위치 - PLANET.center)`이며 구가 움직이면 계속 바뀐다. `WaterFill.update`가 `up`을 받는 방식을 참고한다.
 
 렌더링에는 `World`의 값을 프레임마다 넘긴다. 위치는 `alpha`로 보간한 `interpolatedPlayerPosition`을 쓴다.
 
@@ -84,6 +93,8 @@ three.js로 그린다. 구조와 three.js 규약은 [analysis/threejs.md](threej
 - **색공간:** 프레임 버퍼에는 ACES와 sRGB 변환을 마친 값이 들어 있다. 복사한 장면(`uSceneColor`)은 `srgbToLinear`로 풀어서 쓰고, ACES는 새로 더하는 빛에만 적용한다.
 - **uniform:** 프레임 단위 값은 `Renderer.shared`의 객체를 함께 참조한다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
 - **시간:** 전역 시계는 없다. `uTime`은 `WaterFill.time`을 쓰고, 물이 없으면 0이다.
+- **위쪽:** 셰이더에서도 위쪽을 +Y로 가정하지 않는다. `water.frag`는 수면 법선(`uSurface`)을 기준으로 좌표축을 만들고, 굴절된 배경은 행성(`uGround`)과의 교차점에서 찾는다.
+- **격자:** `SurfacePattern.Grid`는 구 메시 전용이다. 오브젝트 공간 방향을 정육면체 면에 투영해 격자를 그린다.
 - **그림자:** 물이 든 구는 `items`에서 빠져 그림자 맵에 그려지지 않는다. `pbr.frag`의 `waterBallLight`가 옅은 그림자와 커스틱을 대신 그린다.
 
 ## 현재 구조의 한계
@@ -99,7 +110,9 @@ three.js로 그린다. 구조와 three.js 규약은 [analysis/threejs.md](threej
 
    ```js
    const g = window.__game;
-   const p = [9, 0.65, -5]; // 발판의 x, 구 반지름, 발판의 z
+   const [lat, lon] = [35, 60].map((d) => (d * Math.PI) / 180); // 발판의 위도, 경도
+   const r = 18.65; // 행성 반지름 + 구 반지름
+   const p = [r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon)];
    g.world.player.position = p;
    g.world.player.previousPosition = p;
    g.world.player.velocity = [0, 0, 0];

@@ -31,6 +31,8 @@ out vec4 fragColor;
 const float PI = 3.14159265359;
 const int PATTERN_SPHERE_BANDS = 1;
 const int PATTERN_GRID = 2;
+/** 정육면체 한 면의 절반에 들어가는 격자 칸 수 */
+const float GRID_CELLS = 7.0;
 
 float distributionGGX(float NoH, float a) {
   float a2 = a * a;
@@ -117,8 +119,13 @@ vec3 applySurfacePattern(vec3 albedo, vec3 N) {
     float band = 1.0 - smoothstep(0.05 - aa, 0.05 + aa, d);
     return mix(albedo, vec3(0.92), band * 0.5);
   }
-  if (uPattern == PATTERN_GRID && N.y > 0.9) {
-    vec2 c = vWorldPos.xz / 2.0;
+  if (uPattern == PATTERN_GRID) {
+    // 구를 정육면체의 여섯 면으로 나눠 격자를 그린다. 위도·경도 격자와 달리 극점에서 선이 몰리지 않는다.
+    vec3 p = normalize(vObjectPos);
+    vec3 a = abs(p);
+    vec2 uv = a.x >= a.y && a.x >= a.z ? p.yz / a.x : (a.y >= a.z ? p.xz / a.y : p.xy / a.z);
+    // atan으로 펴서 면의 가운데와 가장자리의 칸 크기를 비슷하게 맞춘다.
+    vec2 c = atan(uv) * (4.0 / PI) * GRID_CELLS;
     vec2 g = abs(fract(c - 0.5) - 0.5) / max(fwidth(c), vec2(1e-4));
     float line = 1.0 - min(min(g.x, g.y), 1.0);
     return albedo * mix(1.0, 0.86, line);

@@ -1,16 +1,14 @@
-const PREVENT_DEFAULT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+const PREVENT_DEFAULT = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
 /** 키보드와 마우스 입력을 모은다. 게임 규칙은 모른다. */
 export class Input {
   private readonly keys = new Set<string>();
-  private readonly pressedSinceLastConsume = new Set<string>();
   private lookX = 0;
   private lookY = 0;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     window.addEventListener('keydown', (event) => {
       if (PREVENT_DEFAULT.has(event.code)) event.preventDefault();
-      if (!event.repeat) this.pressedSinceLastConsume.add(event.code);
       this.keys.add(event.code);
     });
     window.addEventListener('keyup', (event) => this.keys.delete(event.code));
@@ -32,11 +30,6 @@ export class Input {
     return codes.some((code) => this.keys.has(code));
   }
 
-  /** 지난 호출 이후 눌렸다면 true를 반환하고 기록을 지운다. */
-  consumePress(code: string): boolean {
-    return this.pressedSinceLastConsume.delete(code);
-  }
-
   consumeLook(): { x: number; y: number } {
     const look = { x: this.lookX, y: this.lookY };
     this.lookX = 0;
@@ -46,7 +39,6 @@ export class Input {
 
   clear(): void {
     this.keys.clear();
-    this.pressedSinceLastConsume.clear();
     this.lookX = 0;
     this.lookY = 0;
   }

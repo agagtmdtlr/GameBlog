@@ -22,8 +22,9 @@ export interface GraphicsContent {
 export interface ContentEntry {
   content: GraphicsContent;
   plate: {
-    x: number;
-    z: number;
+    /** 행성 위의 위치 (도). 위도 90이 시작 지점, 경도 180이 시작할 때 바라보는 방향이다. */
+    latitude: number;
+    longitude: number;
     /** 발판 색 (선형 RGB) */
     color: Vec3;
   };

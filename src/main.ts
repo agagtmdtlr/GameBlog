@@ -4,6 +4,7 @@ import { Input } from './engine/input';
 import { add, length, scale, type Vec3 } from './engine/math';
 import { Renderer } from './engine/renderer';
 import { CameraRig } from './game/cameraRig';
+import { PLANET } from './game/planet';
 import { PLAYER_RADIUS } from './game/player';
 import { STUDIO_ENVIRONMENT, World } from './game/world';
 import { FixedStepper } from './physics/fixedStepper';
@@ -61,7 +62,7 @@ function main(): void {
   const world = new World(CONTENT_ENTRIES, (content) => {
     overlay.setActiveContent(content.label, accentById.get(content.id) ?? [1, 1, 1]);
   });
-  const camera = new CameraRig(world.player.position);
+  const camera = new CameraRig(world.player.position, PLANET.center);
 
   let hadPointerLock = false;
   let lastTime = performance.now();
@@ -120,11 +121,7 @@ function main(): void {
       const look = input.consumeLook();
       camera.applyLook(look.x, look.y);
       const direction = readMoveDirection();
-      let jumpPressed = input.consumePress('Space');
-      alpha = stepper.advance(frameSeconds, (dt) => {
-        world.fixedStep(dt, { direction, jumpPressed });
-        jumpPressed = false;
-      });
+      alpha = stepper.advance(frameSeconds, (dt) => world.fixedStep(dt, { direction }));
       camera.follow(world.interpolatedPlayerPosition(alpha), frameSeconds);
     }
 
