@@ -20,7 +20,7 @@ import {
   type Material,
   type MeshKind,
   type WaterSphere,
-} from '../engine/renderer';
+} from '../engine/frame';
 import type { AABB } from '../physics/collision';
 import { ColorTransition } from './colorTransition';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';

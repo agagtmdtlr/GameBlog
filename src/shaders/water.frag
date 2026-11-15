@@ -1,4 +1,3 @@
-#version 300 es
 precision highp float;
 
 // 물이 든 투명한 구. 메시는 외곽만 제공하고, 내부는 단위 구 공간에서 광선을 추적한다.

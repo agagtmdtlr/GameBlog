@@ -1,306 +1,326 @@
-import depthFrag from '../shaders/depth.frag?raw';
-import depthVert from '../shaders/depth.vert?raw';
+import {
+  BoxGeometry,
+  Color,
+  CylinderGeometry,
+  DepthTexture,
+  FramebufferTexture,
+  GLSL3,
+  LessEqualCompare,
+  LinearFilter,
+  Matrix3,
+  Matrix4,
+  Mesh,
+  MeshBasicMaterial,
+  OrthographicCamera,
+  PerspectiveCamera,
+  RawShaderMaterial,
+  RGBFormat,
+  Scene,
+  SphereGeometry,
+  SRGBColorSpace,
+  Vector2,
+  Vector3,
+  Vector4,
+  WebGLRenderer,
+  WebGLRenderTarget,
+  type BufferGeometry,
+  type IUniform,
+} from 'three';
 import meshVert from '../shaders/mesh.vert?raw';
 import pbrFrag from '../shaders/pbr.frag?raw';
 import waterFrag from '../shaders/water.frag?raw';
-import {
-  mat4LookAt,
-  mat4Multiply,
-  mat4Ortho,
-  scale,
-  type Mat3,
-  type Mat4,
-  type Vec3,
-} from './math';
-import {
-  createBoxData,
-  createCylinderData,
-  createPlaneData,
-  createSphereData,
-  uploadMesh,
-  type Mesh,
-} from './mesh';
-import { ShaderProgram } from './shader';
-
-export type MeshKind = 'sphere' | 'box' | 'cylinder' | 'plane';
-
-export const SurfacePattern = { None: 0, SphereBands: 1, Grid: 2 } as const;
-export type SurfacePattern = (typeof SurfacePattern)[keyof typeof SurfacePattern];
-
-export interface Material {
-  baseColor: Vec3;
-  metallic: number;
-  roughness: number;
-  emissive: Vec3;
-  pattern: SurfacePattern;
-}
-
-export interface DrawItem {
-  mesh: MeshKind;
-  model: Mat4;
-  normal: Mat3;
-  material: Material;
-  castShadow: boolean;
-}
-
-export interface Environment {
-  /** 표면에서 광원을 향하는 단위 벡터 */
-  lightDirection: Vec3;
-  lightColor: Vec3;
-  skyColor: Vec3;
-  groundColor: Vec3;
-  /** 화면 출력값(sRGB) 기준 배경색 */
-  background: Vec3;
-  /** 그림자 맵이 덮는 원점 기준 반경 */
-  shadowRadius: number;
-}
-
-export interface FrameData {
-  items: readonly DrawItem[];
-  viewProj: Mat4;
-  cameraPosition: Vec3;
-  environment: Environment;
-  /** 앰비언트 오클루전을 만드는 구 */
-  occluder: { center: Vec3; radius: number };
-  /** 물이 든 투명한 구. 나머지 장면을 모두 그린 뒤에 그린다. */
-  water: WaterSphere | null;
-}
-
-export interface WaterSphere {
-  /** 투명해지기 전의 불투명한 구. 그림자 맵에는 들어가지 않는다. */
-  item: DrawItem;
-  center: Vec3;
-  radius: number;
-  surfaceNormal: Vec3;
-  /** 수면 높이 (구 반지름 기준) */
-  level: number;
-  /** 0이면 불투명한 구만, 1이면 물이 든 구만 보인다. */
-  opacity: number;
-  /** 물결의 세기 (0~1) */
-  ripple: number;
-  time: number;
-}
+import type { DrawItem, Environment, FrameData, MeshKind, WaterSphere } from './frame';
 
 const SHADOW_MAP_SIZE = 2048;
 const MAX_DEVICE_PIXEL_RATIO = 2;
+/** 그림자를 드리우는 메시만 켜는 레이어. 광원 카메라는 이 레이어만 본다. */
+const SHADOW_LAYER = 1;
+
+type Uniforms = Record<string, IUniform>;
+type PbrMesh = Mesh<BufferGeometry, RawShaderMaterial>;
 
 /**
- * GPU 리소스를 소유한다. 컨텍스트가 손실되면 버리고 새로 만들면 되도록,
- * 게임 상태는 전혀 들고 있지 않다.
+ * three.js로 장면을 그린다. 게임 상태는 들고 있지 않고, 매 프레임 `FrameData`를 받아
+ * 메시 풀과 uniform에 옮겨 적는다. 컨텍스트 손실과 복구는 `WebGLRenderer`가 처리한다.
  */
 export class Renderer {
-  private readonly pbr: ShaderProgram;
-  private readonly depth: ShaderProgram;
-  private readonly water: ShaderProgram;
-  private readonly meshes: Record<MeshKind, Mesh>;
-  private readonly shadowMap: WebGLTexture;
-  private readonly shadowFramebuffer: WebGLFramebuffer;
-  private readonly sceneColor: WebGLTexture;
-  private sceneColorWidth = 0;
-  private sceneColorHeight = 0;
+  private readonly renderer: WebGLRenderer;
+  private readonly scene = new Scene();
+  /** 장면을 복사한 뒤에 그리는 물이 든 구 */
+  private readonly waterScene = new Scene();
+  private readonly camera = new PerspectiveCamera();
+  private readonly lightCamera = new OrthographicCamera();
+  private readonly geometries: Record<MeshKind, BufferGeometry>;
+  private readonly depthMaterial: MeshBasicMaterial;
+  private readonly shadowTarget: WebGLRenderTarget;
+  private readonly pool: PbrMesh[] = [];
+  private readonly waterBase: PbrMesh;
+  private readonly waterMesh: Mesh<BufferGeometry, RawShaderMaterial>;
+  private sceneColor: FramebufferTexture | null = null;
 
-  constructor(private readonly gl: WebGL2RenderingContext) {
-    this.pbr = new ShaderProgram(gl, meshVert, pbrFrag);
-    this.depth = new ShaderProgram(gl, depthVert, depthFrag);
-    this.water = new ShaderProgram(gl, meshVert, waterFrag);
-    this.meshes = {
-      sphere: uploadMesh(gl, createSphereData()),
-      box: uploadMesh(gl, createBoxData()),
-      cylinder: uploadMesh(gl, createCylinderData()),
-      plane: uploadMesh(gl, createPlaneData()),
+  private readonly clearColor = new Color();
+  private readonly bufferSize = new Vector2();
+  /** 모든 재질이 같은 객체를 참조하는 프레임 단위 uniform */
+  private readonly shared = {
+    uLightViewProj: { value: new Matrix4() },
+    uCameraPos: { value: new Vector3() },
+    uLightDir: { value: new Vector3() },
+    uLightColor: { value: new Vector3() },
+    uSkyColor: { value: new Vector3() },
+    uGroundColor: { value: new Vector3() },
+  };
+  private readonly pbrShared: Uniforms;
+  private readonly waterUniforms: Uniforms;
+
+  /** `onShaderError`는 셰이더 컴파일이나 링크가 실패했을 때 한 번 이상 호출된다. */
+  constructor(canvas: HTMLCanvasElement, onShaderError: () => void) {
+    this.renderer = new WebGLRenderer({
+      canvas,
+      alpha: false,
+      antialias: true,
+      powerPreference: 'high-performance',
+    });
+    // 지우기와 그리기 순서를 직접 제어한다 (그림자 → 장면 → 복사 → 물이 든 구).
+    this.renderer.autoClear = false;
+    this.renderer.debug.onShaderError = (gl, program) => {
+      console.error(`셰이더 오류:\n${gl.getProgramInfoLog(program)}`);
+      onShaderError();
     };
 
-    this.shadowMap = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, this.shadowMap);
-    gl.texStorage2D(gl.TEXTURE_2D, 1, gl.DEPTH_COMPONENT24, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
+    this.geometries = {
+      sphere: new SphereGeometry(1, 48, 32),
+      box: new BoxGeometry(1, 1, 1),
+      cylinder: new CylinderGeometry(1, 1, 1, 64),
+    };
 
-    this.shadowFramebuffer = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFramebuffer);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.shadowMap, 0);
-    gl.drawBuffers([gl.NONE]);
-    gl.readBuffer(gl.NONE);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    // 비교 함수를 지정하면 sampler2DShadow로 읽을 수 있고, 선형 필터가 하드웨어 PCF가 된다.
+    shadowMap.compareFunction = LessEqualCompare;
+    shadowMap.minFilter = LinearFilter;
+    shadowMap.magFilter = LinearFilter;
+    this.shadowTarget = new WebGLRenderTarget(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE, {
+      depthTexture: shadowMap,
+    });
+    this.depthMaterial = new MeshBasicMaterial({
+      colorWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: 2,
+      polygonOffsetUnits: 4,
+    });
+    this.lightCamera.layers.set(SHADOW_LAYER);
 
-    this.sceneColor = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, this.sceneColor);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.pbrShared = {
+      ...this.shared,
+      uShadowMap: { value: shadowMap },
+      uShadowTexel: { value: 1 / SHADOW_MAP_SIZE },
+      uOccluder: { value: new Vector4() },
+      uWaterBall: { value: new Vector4() },
+      uWaterOpacity: { value: 0 },
+      uTime: { value: 0 },
+    };
+    this.waterUniforms = {
+      ...this.shared,
+      uNormalMatrix: { value: new Matrix3() },
+      uViewProj: { value: new Matrix4() },
+      uSceneColor: { value: null },
+      uBall: { value: new Vector4() },
+      uSurface: { value: new Vector4() },
+      uOpacity: { value: 0 },
+      uRipple: { value: 0 },
+      uTime: { value: 0 },
+    };
 
-    gl.enable(gl.DEPTH_TEST);
-    gl.enable(gl.CULL_FACE);
+    this.waterBase = this.createPbrMesh();
+    this.waterMesh = new Mesh(
+      this.geometries.sphere,
+      new RawShaderMaterial({
+        glslVersion: GLSL3,
+        vertexShader: meshVert,
+        fragmentShader: waterFrag,
+        uniforms: this.waterUniforms,
+        // 불투명한 구와 깊이가 같다. 재질 기본값인 LessEqualDepth로 그 위에 겹쳐 그린다.
+        transparent: true,
+        depthWrite: false,
+      }),
+    );
+    this.waterMesh.matrixAutoUpdate = false;
+    this.waterScene.add(this.waterBase, this.waterMesh);
+  }
+
+  /** 개발용 확인(`getError`)에 쓰는 WebGL 컨텍스트 */
+  get context(): WebGLRenderingContext | WebGL2RenderingContext {
+    return this.renderer.getContext();
   }
 
   /** 캔버스 크기를 화면에 맞추고 가로세로 비율을 반환한다. */
   resizeToDisplay(): number {
-    const canvas = this.gl.canvas as HTMLCanvasElement;
+    const canvas = this.renderer.domElement;
     const ratio = Math.min(window.devicePixelRatio || 1, MAX_DEVICE_PIXEL_RATIO);
-    const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
-    const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
-    }
+    const width = Math.max(1, canvas.clientWidth);
+    const height = Math.max(1, canvas.clientHeight);
+    const size = this.renderer.getSize(this.bufferSize);
+    if (this.renderer.getPixelRatio() !== ratio) this.renderer.setPixelRatio(ratio);
+    if (size.x !== width || size.y !== height) this.renderer.setSize(width, height, false);
     return width / height;
   }
 
-  render(frame: FrameData): void {
-    const lightViewProj = computeLightViewProj(frame.environment);
-    this.renderShadowPass(frame, lightViewProj);
-    this.renderMainPass(frame, lightViewProj);
+  render(frame: FrameData, aspect: number): void {
+    const r = this.renderer;
+    this.updateCameras(frame, aspect);
+    this.updateSharedUniforms(frame);
+    this.syncItems(frame.items);
+
+    // 1. 그림자 패스: 그림자 레이어의 메시를 깊이만 그린다.
+    r.setRenderTarget(this.shadowTarget);
+    r.clear();
+    this.scene.overrideMaterial = this.depthMaterial;
+    r.render(this.scene, this.lightCamera);
+    this.scene.overrideMaterial = null;
+
+    // 2. 메인 패스
+    r.setRenderTarget(null);
+    const bg = frame.environment.background;
+    r.setClearColor(this.clearColor.setRGB(bg[0], bg[1], bg[2], SRGBColorSpace));
+    r.clear();
+    r.render(this.scene, this.camera);
+
+    // 3. 물이 든 구: 지금까지 그린 장면을 복사해 굴절된 배경으로 쓴다.
+    if (frame.water) this.renderWaterSphere(frame.water);
   }
 
-  private renderShadowPass(frame: FrameData, lightViewProj: Mat4): void {
-    const gl = this.gl;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFramebuffer);
-    gl.viewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
-    gl.clear(gl.DEPTH_BUFFER_BIT);
-    gl.enable(gl.POLYGON_OFFSET_FILL);
-    gl.polygonOffset(2, 4);
+  private updateCameras(frame: FrameData, aspect: number): void {
+    const view = frame.camera;
+    const camera = this.camera;
+    camera.fov = (view.fovY * 180) / Math.PI;
+    camera.aspect = aspect;
+    camera.near = view.near;
+    camera.far = view.far;
+    camera.updateProjectionMatrix();
+    camera.position.fromArray(view.position);
+    camera.lookAt(view.target[0], view.target[1], view.target[2]);
+    camera.updateMatrixWorld();
 
-    gl.useProgram(this.depth.program);
-    gl.uniformMatrix4fv(this.depth.uniform('uLightViewProj'), false, lightViewProj);
-    for (const item of frame.items) {
-      if (!item.castShadow) continue;
-      gl.uniformMatrix4fv(this.depth.uniform('uModel'), false, item.model);
-      this.drawMesh(item.mesh);
-    }
-
-    gl.disable(gl.POLYGON_OFFSET_FILL);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  }
-
-  private renderMainPass(frame: FrameData, lightViewProj: Mat4): void {
-    const gl = this.gl;
     const env = frame.environment;
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.clearColor(env.background[0], env.background[1], env.background[2], 1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const radius = env.shadowRadius;
+    const light = this.lightCamera;
+    light.left = -radius;
+    light.right = radius;
+    light.top = radius;
+    light.bottom = -radius;
+    light.near = 1;
+    light.far = radius * 4;
+    light.updateProjectionMatrix();
+    light.position.fromArray(env.lightDirection).multiplyScalar(radius * 2);
+    light.lookAt(0, 0, 0);
+    light.updateMatrixWorld();
+    this.shared.uLightViewProj.value.multiplyMatrices(light.projectionMatrix, light.matrixWorldInverse);
+  }
 
-    const p = this.pbr;
-    gl.useProgram(p.program);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.shadowMap);
-    gl.uniform1i(p.uniform('uShadowMap'), 0);
-    gl.uniform1f(p.uniform('uShadowTexel'), 1 / SHADOW_MAP_SIZE);
-    gl.uniformMatrix4fv(p.uniform('uViewProj'), false, frame.viewProj);
-    gl.uniformMatrix4fv(p.uniform('uLightViewProj'), false, lightViewProj);
-    gl.uniform3fv(p.uniform('uCameraPos'), frame.cameraPosition);
-    gl.uniform3fv(p.uniform('uLightDir'), env.lightDirection);
-    gl.uniform3fv(p.uniform('uLightColor'), env.lightColor);
-    gl.uniform3fv(p.uniform('uSkyColor'), env.skyColor);
-    gl.uniform3fv(p.uniform('uGroundColor'), env.groundColor);
-    gl.uniform4f(
-      p.uniform('uOccluder'),
-      frame.occluder.center[0],
-      frame.occluder.center[1],
-      frame.occluder.center[2],
-      frame.occluder.radius,
-    );
+  private updateSharedUniforms(frame: FrameData): void {
+    const env: Environment = frame.environment;
+    const shared = this.shared;
+    shared.uCameraPos.value.fromArray(frame.camera.position);
+    shared.uLightDir.value.fromArray(env.lightDirection);
+    shared.uLightColor.value.fromArray(env.lightColor);
+    shared.uSkyColor.value.fromArray(env.skyColor);
+    shared.uGroundColor.value.fromArray(env.groundColor);
+
+    const pbr = this.pbrShared;
+    const { center, radius } = frame.occluder;
+    pbr.uOccluder.value.set(center[0], center[1], center[2], radius);
     const water = frame.water;
-    gl.uniform4f(
-      p.uniform('uWaterBall'),
-      water ? water.center[0] : 0,
-      water ? water.center[1] : 0,
-      water ? water.center[2] : 0,
-      water ? water.radius : 0,
-    );
-    gl.uniform1f(p.uniform('uWaterOpacity'), water ? water.opacity : 0);
-    gl.uniform1f(p.uniform('uTime'), water ? water.time : 0);
-
-    for (const item of frame.items) this.drawPbrItem(item);
-    if (water) this.renderWaterSphere(frame, water, lightViewProj);
+    if (water) pbr.uWaterBall.value.set(water.center[0], water.center[1], water.center[2], water.radius);
+    else pbr.uWaterBall.value.set(0, 0, 0, 0);
+    pbr.uWaterOpacity.value = water ? water.opacity : 0;
+    pbr.uTime.value = water ? water.time : 0;
   }
 
-  private drawPbrItem(item: DrawItem): void {
-    const gl = this.gl;
-    const p = this.pbr;
-    const m = item.material;
-    gl.uniformMatrix4fv(p.uniform('uModel'), false, item.model);
-    gl.uniformMatrix3fv(p.uniform('uNormalMatrix'), false, item.normal);
-    gl.uniform3fv(p.uniform('uBaseColor'), m.baseColor);
-    gl.uniform3fv(p.uniform('uEmissive'), m.emissive);
-    gl.uniform1f(p.uniform('uMetallic'), m.metallic);
-    gl.uniform1f(p.uniform('uRoughness'), m.roughness);
-    gl.uniform1i(p.uniform('uPattern'), m.pattern);
-    this.drawMesh(item.mesh);
-  }
-
-  /** 지금까지 그린 장면을 복사해, 구 안에서 굴절된 배경으로 쓴다. */
-  private renderWaterSphere(frame: FrameData, water: WaterSphere, lightViewProj: Mat4): void {
-    const gl = this.gl;
-    const env = frame.environment;
-    this.copySceneColor();
-
-    if (water.opacity < 1) this.drawPbrItem(water.item);
-
-    const w = this.water;
-    gl.useProgram(w.program);
-    gl.uniform1i(w.uniform('uSceneColor'), 1);
-    gl.uniformMatrix4fv(w.uniform('uViewProj'), false, frame.viewProj);
-    gl.uniformMatrix4fv(w.uniform('uLightViewProj'), false, lightViewProj);
-    gl.uniformMatrix4fv(w.uniform('uModel'), false, water.item.model);
-    gl.uniformMatrix3fv(w.uniform('uNormalMatrix'), false, water.item.normal);
-    gl.uniform3fv(w.uniform('uCameraPos'), frame.cameraPosition);
-    gl.uniform3fv(w.uniform('uLightDir'), env.lightDirection);
-    gl.uniform3fv(w.uniform('uLightColor'), env.lightColor);
-    gl.uniform3fv(w.uniform('uSkyColor'), env.skyColor);
-    gl.uniform3fv(w.uniform('uGroundColor'), env.groundColor);
-    gl.uniform4f(w.uniform('uBall'), water.center[0], water.center[1], water.center[2], water.radius);
-    gl.uniform4f(
-      w.uniform('uSurface'),
-      water.surfaceNormal[0],
-      water.surfaceNormal[1],
-      water.surfaceNormal[2],
-      water.level,
-    );
-    gl.uniform1f(w.uniform('uOpacity'), water.opacity);
-    gl.uniform1f(w.uniform('uRipple'), water.ripple);
-    gl.uniform1f(w.uniform('uTime'), water.time);
-
-    // 같은 메시를 같은 정점 셰이더로 그리므로 깊이가 같다. 불투명한 구 위에 겹쳐 그린다.
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.depthFunc(gl.LEQUAL);
-    this.drawMesh(water.item.mesh);
-    gl.depthFunc(gl.LESS);
-    gl.disable(gl.BLEND);
-  }
-
-  private copySceneColor(): void {
-    const gl = this.gl;
-    const width = gl.drawingBufferWidth;
-    const height = gl.drawingBufferHeight;
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.sceneColor);
-    if (width !== this.sceneColorWidth || height !== this.sceneColorHeight) {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB8, width, height, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
-      this.sceneColorWidth = width;
-      this.sceneColorHeight = height;
+  /** 그리기 목록을 메시 풀에 옮긴다. 목록보다 남는 메시는 숨긴다. */
+  private syncItems(items: readonly DrawItem[]): void {
+    for (let i = 0; i < items.length; i++) {
+      let mesh = this.pool[i];
+      if (!mesh) {
+        mesh = this.createPbrMesh();
+        this.pool.push(mesh);
+        this.scene.add(mesh);
+      }
+      this.applyItem(mesh, items[i]);
+      mesh.visible = true;
     }
-    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
-    gl.activeTexture(gl.TEXTURE0);
+    for (let i = items.length; i < this.pool.length; i++) this.pool[i].visible = false;
   }
 
-  private drawMesh(kind: MeshKind): void {
-    const gl = this.gl;
-    const mesh = this.meshes[kind];
-    gl.bindVertexArray(mesh.vao);
-    gl.drawElements(gl.TRIANGLES, mesh.indexCount, gl.UNSIGNED_SHORT, 0);
+  private createPbrMesh(): PbrMesh {
+    const material = new RawShaderMaterial({
+      glslVersion: GLSL3,
+      vertexShader: meshVert,
+      fragmentShader: pbrFrag,
+      uniforms: {
+        ...this.pbrShared,
+        uNormalMatrix: { value: new Matrix3() },
+        uBaseColor: { value: new Vector3() },
+        uEmissive: { value: new Vector3() },
+        uMetallic: { value: 0 },
+        uRoughness: { value: 1 },
+        uPattern: { value: 0 },
+      },
+    });
+    const mesh = new Mesh(this.geometries.box, material);
+    // 모델 행렬은 World가 계산해 넘겨 준다.
+    mesh.matrixAutoUpdate = false;
+    return mesh;
   }
-}
 
-function computeLightViewProj(env: Environment): Mat4 {
-  const r = env.shadowRadius;
-  const eye = scale(env.lightDirection, r * 2);
-  const view = mat4LookAt(eye, [0, 0, 0], [0, 1, 0]);
-  const projection = mat4Ortho(-r, r, -r, r, 1, r * 4);
-  return mat4Multiply(projection, view);
+  private applyItem(mesh: PbrMesh, item: DrawItem): void {
+    mesh.geometry = this.geometries[item.mesh];
+    mesh.matrix.fromArray(item.model);
+    mesh.matrixWorldNeedsUpdate = true;
+    mesh.layers.set(0);
+    if (item.castShadow) mesh.layers.enable(SHADOW_LAYER);
+
+    const u = mesh.material.uniforms;
+    const m = item.material;
+    u.uNormalMatrix.value.fromArray(item.normal);
+    u.uBaseColor.value.fromArray(m.baseColor);
+    u.uEmissive.value.fromArray(m.emissive);
+    u.uMetallic.value = m.metallic;
+    u.uRoughness.value = m.roughness;
+    u.uPattern.value = m.pattern;
+  }
+
+  private renderWaterSphere(water: WaterSphere): void {
+    const r = this.renderer;
+    const size = r.getDrawingBufferSize(this.bufferSize);
+    if (!this.sceneColor || this.sceneColor.image.width !== size.x || this.sceneColor.image.height !== size.y) {
+      this.sceneColor?.dispose();
+      this.sceneColor = new FramebufferTexture(size.x, size.y);
+      // 캔버스가 alpha: false이므로 RGB로만 복사할 수 있다.
+      // three.js는 RGB + UNSIGNED_BYTE의 크기 있는 내부 형식을 고르지 않으므로 직접 지정한다.
+      this.sceneColor.format = RGBFormat;
+      this.sceneColor.internalFormat = 'RGB8';
+      this.sceneColor.minFilter = LinearFilter;
+      this.sceneColor.magFilter = LinearFilter;
+    }
+    r.copyFramebufferToTexture(this.sceneColor);
+
+    this.applyItem(this.waterBase, water.item);
+    this.waterBase.layers.set(0);
+    this.waterBase.visible = water.opacity < 1;
+
+    const mesh = this.waterMesh;
+    mesh.matrix.fromArray(water.item.model);
+    mesh.matrixWorldNeedsUpdate = true;
+    const u = this.waterUniforms;
+    u.uNormalMatrix.value.fromArray(water.item.normal);
+    u.uViewProj.value.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
+    u.uSceneColor.value = this.sceneColor;
+    u.uBall.value.set(water.center[0], water.center[1], water.center[2], water.radius);
+    const n = water.surfaceNormal;
+    u.uSurface.value.set(n[0], n[1], n[2], water.level);
+    u.uOpacity.value = water.opacity;
+    u.uRipple.value = water.ripple;
+    u.uTime.value = water.time;
+
+    r.render(this.waterScene, this.camera);
+  }
 }

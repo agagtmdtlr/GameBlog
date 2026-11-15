@@ -1,6 +1,6 @@
+import WebGL from 'three/addons/capabilities/WebGL.js';
 import { CONTENT_ENTRIES } from './content/registry';
 import { Input } from './engine/input';
-import { createContext } from './engine/gl';
 import { add, length, scale, type Vec3 } from './engine/math';
 import { Renderer } from './engine/renderer';
 import { CameraRig } from './game/cameraRig';
@@ -30,33 +30,29 @@ function main(): void {
     return;
   }
 
-  let renderer: Renderer | null = null;
-  const gl = createContext(canvas, {
-    onLost: () => {
-      renderer = null;
-    },
-    onRestored: () => {
-      renderer = createRenderer();
-    },
-  });
-  if (!gl) {
+  if (!WebGL.isWebGL2Available()) {
     overlay.showNotice(
       'WebGL2를 사용할 수 없습니다',
       '최신 브라우저에서 하드웨어 가속을 켠 뒤 다시 접속해 주세요.',
     );
     return;
   }
-  const context = gl;
 
-  function createRenderer(): Renderer | null {
-    try {
-      return new Renderer(context);
-    } catch (error) {
-      console.error(error);
-      running = false;
-      overlay.showNotice('그래픽을 초기화하지 못했습니다', '브라우저를 새로 고쳐 주세요.');
-      return null;
-    }
+  let running = true;
+
+  function showGraphicsFailure(): void {
+    running = false;
+    overlay.showNotice('그래픽을 초기화하지 못했습니다', '브라우저를 새로 고쳐 주세요.');
+  }
+
+  // 컨텍스트 손실과 복구는 three.js의 WebGLRenderer가 처리하므로 한 번만 만든다.
+  let renderer: Renderer;
+  try {
+    renderer = new Renderer(canvas, showGraphicsFailure);
+  } catch (error) {
+    console.error(error);
+    showGraphicsFailure();
+    return;
   }
 
   const input = new Input(canvas);
@@ -67,11 +63,8 @@ function main(): void {
   });
   const camera = new CameraRig(world.player.position);
 
-  let running = true;
   let hadPointerLock = false;
   let lastTime = performance.now();
-  renderer = createRenderer();
-  if (!running) return;
 
   function startPlaying(): void {
     if (state === 'playing') return;
@@ -135,24 +128,25 @@ function main(): void {
       camera.follow(world.interpolatedPlayerPosition(alpha), frameSeconds);
     }
 
-    if (!renderer) return;
     const aspect = renderer.resizeToDisplay();
     const playerPosition = world.interpolatedPlayerPosition(alpha);
-    renderer.render({
-      items: world.buildDrawList(alpha),
-      viewProj: camera.viewProjection(aspect),
-      cameraPosition: camera.position,
-      environment: STUDIO_ENVIRONMENT,
-      occluder: { center: playerPosition, radius: PLAYER_RADIUS },
-      water: world.buildWaterSphere(alpha),
-    });
+    renderer.render(
+      {
+        items: world.buildDrawList(alpha),
+        camera: camera.view,
+        environment: STUDIO_ENVIRONMENT,
+        occluder: { center: playerPosition, radius: PLAYER_RADIUS },
+        water: world.buildWaterSphere(alpha),
+      },
+      aspect,
+    );
   }
 
   overlay.showStart();
   requestAnimationFrame(frame);
 
   if (import.meta.env.DEV) {
-    Object.assign(window, { __game: { world, camera, input, gl: context, getState: () => state } });
+    Object.assign(window, { __game: { world, camera, input, gl: renderer.context, getState: () => state } });
   }
 }
 

@@ -2,23 +2,23 @@
 
 현재 구현된 구조와 기능을 기록하는 문서다. 결정 배경과 앞으로의 계획은 [개발 계획서](DEVELOPMENT_PLAN.md)에 둔다.
 
-- **분석 기준:** 커밋 `1d863db` (2026-11-09)
+- **분석 기준:** 커밋 `d7babfd` 다음의 three.js 포팅 변경 (2026-11-15)
 - **공개 URL:** <https://agagtmdtlr.github.io/GameBlog/>
 - **관리 규칙:** 폴더 구조, 기능, 조작, 알려진 한계가 바뀌면 같은 변경에서 이 문서도 고치고 기준 커밋을 갱신한다.
 
 ## 1. 컨셉
 
-사이트 전체가 하나의 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 구를 굴려 돌아다니고, 바닥 발판을 밟아 콘텐츠를 켠다. 자체 WebGL2 엔진도 작품의 일부다.
+사이트 전체가 하나의 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 구를 굴려 돌아다니고, 바닥 발판을 밟아 콘텐츠를 켠다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
 
 ## 2. 기술 구성
 
 | 항목 | 내용 |
 |---|---|
-| 그래픽스 | 직접 작성한 WebGL2 엔진. 런타임 라이브러리 없음 |
-| 개발 도구 | TypeScript, Vite, Vitest (모두 개발 시에만 사용) |
+| 그래픽스 | three.js 0.187 (WebGL2). 직접 작성한 PBR·물 셰이더를 `RawShaderMaterial`로 사용. 적용 내용은 [analysis/threejs.md](analysis/threejs.md) |
+| 개발 도구 | TypeScript, Vite, Vitest, `@types/three` (모두 개발 시에만 사용) |
 | 배포 | `main` 푸시 시 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 배포 |
-| 코드 규모 | TypeScript 1,746줄, 셰이더 369줄, CSS 166줄, 테스트 473줄 |
-| 빌드 크기 | JS 37.49KB (gzip 13.86KB), CSS 2.26KB (gzip 0.94KB) |
+| 코드 규모 | TypeScript 1,547줄, 셰이더 355줄, CSS 166줄, 테스트 438줄 |
+| 빌드 크기 | JS 562.65KB (gzip 143.92KB), CSS 2.26KB (gzip 0.94KB) |
 
 ### 명령어
 
@@ -38,11 +38,9 @@ GameBlog/
 │  ├─ main.ts                  진입점, 게임 루프, 게임 상태 전환
 │  ├─ style.css                오버레이와 HUD 스타일
 │  ├─ engine/                  게임을 모르는 범용 코드
-│  │  ├─ gl.ts                 컨텍스트 생성, 손실·복구 이벤트
-│  │  ├─ shader.ts             컴파일·링크, uniform 위치 캐시
-│  │  ├─ mesh.ts               구·박스·원기둥·평면 생성과 업로드
+│  │  ├─ frame.ts              렌더러 입력 타입 (three.js와 무관)
 │  │  ├─ math.ts               Vec3, Quat, Mat4 연산
-│  │  ├─ renderer.ts           그림자 패스, 메인 패스, 물이 든 구
+│  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스, 물이 든 구
 │  │  └─ input.ts              키보드, 마우스, 포인터 잠금 상태
 │  ├─ physics/
 │  │  ├─ collision.ts          구-상자 충돌과 반발
@@ -60,7 +58,7 @@ GameBlog/
 │  │  ├─ registry.ts           발판과 콘텐츠 등록 목록
 │  │  ├─ sphereColor.ts        구 색 변경 콘텐츠
 │  │  └─ waterSphere.ts        물이 든 구 콘텐츠
-│  ├─ shaders/                 mesh.vert, pbr.frag, water.frag, depth.vert, depth.frag
+│  ├─ shaders/                 mesh.vert, pbr.frag, water.frag
 │  └─ ui/overlay.ts            화면 안내와 HUD 제어
 ├─ docs/
 │  ├─ README.md                기능별 규칙과 분석 문서의 색인
@@ -85,7 +83,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 - `engine/`은 게임 규칙을 모른다.
 - `World`는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다.
-- `Renderer`는 게임 상태를 들고 있지 않아, 컨텍스트가 손실되면 새로 만들면 된다.
+- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`와 `main.ts`에서만 쓴다.
 - 콘텐츠는 `ContentContext`를 통해서만 월드에 영향을 준다. 발판은 콘텐츠의 내용을 모른다.
 
 ### 프레임 흐름
@@ -151,6 +149,7 @@ main.ts ─┬─ game/ ─┬─ content/
 ### 렌더링
 
 - **재질:** Cook-Torrance PBR (GGX, Smith, Schlick)과 방향광 1개
+- **three.js:** `WebGLRenderer`, `Scene`, 기본 지오메트리, 카메라, 렌더 타깃을 쓴다. 조명과 재질 계산은 내장 재질 대신 아래의 직접 작성한 셰이더가 한다
 - **그림자:** 2048px 깊이 맵, 3×3 PCF, 원점 기준 반경 24 고정
 - **간접광:** 하늘·지면 2색 반구광과 환경 맵 없는 반사 근사 (Karis 2014)
 - **접지감:** 구가 바닥에 만드는 해석적 앰비언트 오클루전
@@ -163,9 +162,9 @@ main.ts ─┬─ game/ ─┬─ content/
 | 상황 | 동작 |
 |---|---|
 | 터치 전용 기기 | "PC에서 플레이해 주세요" 안내 |
-| WebGL2 미지원 | 안내 화면 |
+| WebGL2 미지원 (`isWebGL2Available`) | 안내 화면 |
 | 셰이더·렌더러 초기화 실패 | 안내 화면, 루프 중단 |
-| 컨텍스트 손실과 복구 | 렌더러 폐기 후 재생성. 게임 상태 유지 |
+| 컨텍스트 손실과 복구 | three.js가 복구. 게임 상태 유지 |
 | 포인터 잠금 거부 | 드래그 시점 회전으로 플레이 지속 |
 | 탭 전환이나 긴 프레임 | 일시 정지, 물리 시간 제한 |
 
@@ -179,7 +178,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 1. `src/content/`에 `GraphicsContent`를 구현한 콘텐츠 파일을 추가한다.
 2. 필요한 기능을 [`ContentContext`](../src/content/types.ts)에 더하고 `World`에서 연결한다.
-3. 셰이더나 후처리를 바꾸는 콘텐츠라면 `Renderer`도 확장한다. 현재는 PBR과 물 프로그램, 그림자·메인 패스와 장면 복사 1회를 지원한다.
+3. 셰이더나 후처리를 바꾸는 콘텐츠라면 `Renderer`도 확장한다. 현재는 PBR과 물 재질, 그림자·메인 패스와 장면 복사 1회를 지원한다.
 4. `registry.ts`에 등록한다.
 
 발판 위치는 직접 지정하며, 기존 테스트가 벽 안쪽 여부와 발판 간 간격을 검사한다.
@@ -188,28 +187,27 @@ main.ts ─┬─ game/ ─┬─ content/
 
 ### 자동 테스트
 
-`npm test` 기준 53개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다.
+`npm test` 기준 45개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다.
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 11 | 벡터, 쿼터니언, 행렬 |
-| [`mesh.test.ts`](../src/engine/mesh.test.ts) | 8 | 인덱스 범위, 삼각형 방향 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 9 | 충돌, 반발, 고정 시간 간격 |
 | [`game.test.ts`](../src/game/game.test.ts) | 25 | 구 조작, 발판, 색 전환, 구 안의 물, 콘텐츠 관리, 월드 통합 |
 
 렌더러, 입력, UI, `main.ts`는 단위 테스트가 없다.
 
-### 브라우저 확인 (2026-11-09, 개발 서버)
+### 브라우저 확인 (2026-11-15, three.js 포팅 후, 개발 서버)
 
 | 항목 | 방법 | 결과 |
 |---|---|---|
 | 시작 화면과 렌더링 | 스크린샷 | 정상 |
 | 코랄 발판 작동 | 코드로 구 이동 | 활성 콘텐츠, 구 색, HUD 변경 |
 | Esc 일시 정지 | 키 이벤트 주입 | 일시 정지 화면 전환 |
-| 컨텍스트 손실과 복구 | `WEBGL_lose_context` | 복구 후 WebGL·콘솔 오류 없음 (물이 든 구 추가 전 확인) |
+| 컨텍스트 손실과 복구 | `WEBGL_lose_context` | 복구 후 물이 든 구까지 정상. WebGL·콘솔 오류 없음 |
 | 블루 발판과 물이 든 구 | 코드로 구 이동, 키 이벤트 주입 | 차오름, 수면 기울기, 다른 발판에서 복귀 정상. WebGL·콘솔 오류 없음 |
 
-공개 URL은 HTTP 200 응답과 최근 배포 성공까지 확인했다.
+공개 URL은 three.js 포팅 전 버전까지만 확인했다.
 
 ### 아직 확인하지 않은 것
 
@@ -224,7 +222,9 @@ main.ts ─┬─ game/ ─┬─ content/
 |---|---|
 | 콘텐츠 폭 | 콘텐츠가 구 색 변경과 물이 든 구뿐이다. `FrameData.water`와 `renderWaterSphere`는 물 전용이라, 구를 대체하는 두 번째 셰이더를 붙이려면 공통 경로로 빼내야 한다 |
 | 물의 굴절 | 굴절된 배경을 바닥 높이 기준으로 찾으므로 벽 근처에서는 비치는 위치가 약간 다를 수 있다. 물이 든 동안 매 프레임 장면을 복사하며, 그 부담은 측정하지 않았다 |
-| 안 쓰는 코드 | `plane` 메시는 GPU에 올리지만 그리지 않는다 |
+| 안 쓰는 코드 | `math.ts`의 투영·시점 행렬 함수는 런타임에서 쓰지 않고 테스트만 남아 있다 |
+| 빌드 크기 | three.js로 옮기면서 JS가 약 15배(gzip 143.92KB)로 늘었다 |
+| 그림자 메모리 | 그림자 렌더 타깃에 쓰지 않는 색 첨부(약 16MB)가 함께 잡힌다 |
 | 재질 | PBR 셰이더가 `metallic`을 지원하지만 모든 재질이 0을 쓴다 |
 | 프레임 비용 | 그림자 패스를 매 프레임 전부 다시 그린다. 실제 부담은 측정하지 않았다 |
 | 모바일 | 플레이할 수 없고 안내 화면만 제공한다 |

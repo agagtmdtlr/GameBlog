@@ -1,11 +1,13 @@
-#version 300 es
+// three.js의 RawShaderMaterial(GLSL3)로 쓴다. #version은 three.js가 붙인다.
+// position, normal 속성과 modelMatrix, viewMatrix, projectionMatrix는 three.js가 채운다.
 
-layout(location = 0) in vec3 aPosition;
-layout(location = 1) in vec3 aNormal;
+in vec3 position;
+in vec3 normal;
 
-uniform mat4 uModel;
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
+uniform mat4 projectionMatrix;
 uniform mat3 uNormalMatrix;
-uniform mat4 uViewProj;
 uniform mat4 uLightViewProj;
 
 out vec3 vWorldPos;
@@ -16,16 +18,16 @@ out vec3 vShadowCoord;
 const float NORMAL_OFFSET = 0.03;
 
 void main() {
-  vec4 world = uModel * vec4(aPosition, 1.0);
-  vec3 normal = normalize(uNormalMatrix * aNormal);
+  vec4 world = modelMatrix * vec4(position, 1.0);
+  vec3 worldNormal = normalize(uNormalMatrix * normal);
 
   vWorldPos = world.xyz;
-  vNormal = normal;
-  vObjectPos = aPosition;
+  vNormal = worldNormal;
+  vObjectPos = position;
 
   // 법선 방향으로 살짝 밀어 그림자 여드름(shadow acne)을 줄인다.
-  vec4 lightClip = uLightViewProj * vec4(world.xyz + normal * NORMAL_OFFSET, 1.0);
+  vec4 lightClip = uLightViewProj * vec4(world.xyz + worldNormal * NORMAL_OFFSET, 1.0);
   vShadowCoord = lightClip.xyz / lightClip.w * 0.5 + 0.5;
 
-  gl_Position = uViewProj * world;
+  gl_Position = projectionMatrix * viewMatrix * world;
 }

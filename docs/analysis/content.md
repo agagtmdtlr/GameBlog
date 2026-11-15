@@ -4,11 +4,11 @@
 
 - **규칙:** [rules/content.md](../rules/content.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `1d863db`
+- **분석 기준:** 커밋 `d7babfd` 다음의 three.js 포팅 변경
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline 1d863db..HEAD -- src/content src/game src/engine/renderer.ts src/shaders src/main.ts
+git log --oneline d7babfd..HEAD -- src/content src/game src/engine/renderer.ts src/shaders src/main.ts
 ```
 
 ## 작업 유형별 수정 파일
@@ -20,8 +20,8 @@ git log --oneline 1d863db..HEAD -- src/content src/game src/engine/renderer.ts s
 | A. 색 발판 | 구 색만 바꾼다 | `content/registry.ts` 한 줄 (`colorPlate`) |
 | B. 기존 기능 조합 | `ContentContext`로 충분하다 | `content/<이름>.ts` 추가, `registry.ts` |
 | C. 새 월드 상태 | 시간에 따라 변하는 상태나 새 동작이 필요하다 | B + `game/<이름>.ts`, `content/types.ts`, `game/world.ts`, `game/game.test.ts` |
-| D. PBR 표면 변형 | 불투명 재질의 무늬나 색 변화 | C(필요 시) + `shaders/pbr.frag`, `engine/renderer.ts`의 `SurfacePattern` |
-| E. 별도 셰이더 | 투명, 굴절 등 PBR로 안 되는 표현 | C + `shaders/<이름>.frag`, `engine/renderer.ts`, `main.ts`, 필요하면 `pbr.frag` |
+| D. PBR 표면 변형 | 불투명 재질의 무늬나 색 변화 | C(필요 시) + `shaders/pbr.frag`, `engine/frame.ts`의 `SurfacePattern` |
+| E. 별도 셰이더 | 투명, 굴절 등 PBR로 안 되는 표현 | C + `shaders/<이름>.frag`, `engine/frame.ts`, `engine/renderer.ts`, `main.ts`, 필요하면 `pbr.frag` |
 
 유형 E의 실제 예는 물이 든 구다. `content/waterSphere.ts`, `game/waterFill.ts`, `shaders/water.frag`, `renderer.ts`의 `renderWaterSphere`를 보면 된다.
 
@@ -68,20 +68,21 @@ interface ContentEntry { content: GraphicsContent; plate: { x; z; color: Vec3 } 
 
 ## 렌더러
 
+three.js로 그린다. 구조와 three.js 규약은 [analysis/threejs.md](threejs.md)에 있다.
+
 프레임 순서:
 
-1. 그림자 패스: `items` 중 `castShadow`인 것을 `depth` 프로그램으로 그린다.
-2. 메인 패스: `items`를 배열 순서대로 PBR로 그린다. 정렬은 없다.
-3. `frame.water`가 있으면 장면을 텍스처로 복사하고, 불투명한 구를 그린 뒤, 물 셰이더를 블렌딩해 겹쳐 그린다.
+1. 그림자 패스: `items` 중 `castShadow`인 것을 깊이만 그린다.
+2. 메인 패스: `items`를 PBR 재질로 그린다. 불투명한 물체의 순서는 three.js가 정한다.
+3. `frame.water`가 있으면 장면을 텍스처로 복사하고, `waterScene`의 불투명한 구와 물 셰이더 메시를 그린다.
 
-새 프로그램을 만들 때 알아 둘 점:
+새 재질을 만들 때 알아 둘 점:
 
-- **정점 셰이더:** `mesh.vert`를 재사용할 수 있다. 필수 uniform은 `uModel`, `uNormalMatrix`, `uViewProj`, `uLightViewProj`이고, 출력은 `vWorldPos`, `vNormal`, `vObjectPos`, `vShadowCoord`다.
-- **겹쳐 그리기:** 같은 메시를 `mesh.vert`로 그리면 깊이가 같으므로 `depthFunc(LEQUAL)`을 쓴다. 그린 뒤 `LESS`로 되돌리고 블렌딩을 끈다.
+- **정점 셰이더:** `mesh.vert`를 재사용할 수 있다. three.js가 채우는 `modelMatrix`, `viewMatrix`, `projectionMatrix` 외에 `uNormalMatrix`, `uLightViewProj`를 uniform으로 넘겨야 한다. 출력은 `vWorldPos`, `vNormal`, `vObjectPos`, `vShadowCoord`다.
+- **재질:** `RawShaderMaterial`에 `glslVersion: GLSL3`를 준다. 셰이더 파일에 `#version`은 쓰지 않는다.
+- **겹쳐 그리기:** 같은 메시를 `mesh.vert`로 그리면 깊이가 같다. 재질의 깊이 함수 기본값이 `LessEqualDepth`이므로 `transparent: true`, `depthWrite: false`만 주면 된다.
 - **색공간:** 프레임 버퍼에는 ACES와 sRGB 변환을 마친 값이 들어 있다. 복사한 장면(`uSceneColor`)은 `srgbToLinear`로 풀어서 쓰고, ACES는 새로 더하는 빛에만 적용한다.
-- **텍스처 유닛:** 0은 PBR의 그림자 맵, 1은 복사한 장면이다. 다른 유닛을 쓴 뒤 `TEXTURE0`으로 되돌린다.
-- **캔버스:** `alpha: false`이므로 복사 텍스처 형식은 RGB8이다. 면 컬링과 깊이 테스트는 항상 켜져 있다.
-- **uniform:** 위치를 캐시하며, 최적화로 제거된 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
+- **uniform:** 프레임 단위 값은 `Renderer.shared`의 객체를 함께 참조한다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
 - **시간:** 전역 시계는 없다. `uTime`은 `WaterFill.time`을 쓰고, 물이 없으면 0이다.
 - **그림자:** 물이 든 구는 `items`에서 빠져 그림자 맵에 그려지지 않는다. `pbr.frag`의 `waterBallLight`가 옅은 그림자와 커스틱을 대신 그린다.
 

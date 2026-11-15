@@ -1,14 +1,5 @@
-import {
-  add,
-  clamp,
-  lerp,
-  mat4LookAt,
-  mat4Multiply,
-  mat4Perspective,
-  scale,
-  type Mat4,
-  type Vec3,
-} from '../engine/math';
+import type { CameraView } from '../engine/frame';
+import { add, clamp, lerp, scale, type Vec3 } from '../engine/math';
 
 const DISTANCE = 10;
 const MIN_PITCH = 0.1;
@@ -60,8 +51,8 @@ export class CameraRig {
     this.target = lerp(this.target, target, 1 - Math.exp(-FOLLOW_RATE * frameSeconds));
   }
 
-  viewProjection(aspect: number): Mat4 {
-    const view = mat4LookAt(this.position, this.lookTarget, [0, 1, 0]);
-    return mat4Multiply(mat4Perspective(FOV_Y, aspect, 0.1, 400), view);
+  /** 렌더러가 카메라를 놓는 데 쓰는 값 */
+  get view(): CameraView {
+    return { position: this.position, target: this.lookTarget, fovY: FOV_Y, near: 0.1, far: 400 };
   }
 }
