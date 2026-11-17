@@ -42,7 +42,7 @@ git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.js
 | `canvas.getContext('webgl2')` | `new WebGLRenderer({ canvas, alpha: false, antialias: true })` |
 | WebGL2 미지원 시 `null` 확인 | `three/addons/capabilities/WebGL.js`의 `isWebGL2Available()` |
 | `ShaderProgram` (컴파일, 링크, uniform 위치 캐시) | `RawShaderMaterial` (`glslVersion: GLSL3`) |
-| `uploadMesh`의 VAO와 버퍼 | `SphereGeometry(1, 96, 64)`, `CylinderGeometry(1, 1, 1, 64)`. 포팅 직후에는 `BoxGeometry`도 썼으나 행성으로 바꾸면서 뺐다 |
+| `uploadMesh`의 VAO와 버퍼 | `SphereGeometry(1, 96, 64)`. 포팅 직후에는 `BoxGeometry`도, 발판에는 `CylinderGeometry`도 썼으나 행성과 표면 작동 영역으로 바꾸면서 뺐다 |
 | `DrawItem` 배열을 순서대로 `drawElements` | `Scene`에 넣은 `Mesh` 풀. 프레임마다 행렬과 uniform을 덮어쓴다 |
 | `viewProj` 행렬을 uniform으로 전달 | `PerspectiveCamera`. 셰이더는 `projectionMatrix * viewMatrix`를 쓴다 |
 | `computeLightViewProj` | `OrthographicCamera`를 광원 위치에 두고 원점을 보게 한다 |

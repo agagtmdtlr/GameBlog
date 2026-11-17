@@ -1,6 +1,5 @@
 import {
   Color,
-  CylinderGeometry,
   DepthTexture,
   FramebufferTexture,
   GLSL3,
@@ -28,7 +27,7 @@ import {
 import meshVert from '../shaders/mesh.vert?raw';
 import pbrFrag from '../shaders/pbr.frag?raw';
 import type { ContentRenderer, PbrMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
-import type { ContentFrame, DrawItem, Environment, FrameData, MeshKind } from './frame';
+import { MAX_SURFACE_ZONES, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
 
 const SHADOW_MAP_SIZE = 2048;
 const MAX_DEVICE_PIXEL_RATIO = 2;
@@ -95,7 +94,6 @@ export class Renderer {
     this.geometries = {
       // 행성에도 쓰므로 촘촘하게 나눈다. 성기면 구가 행성 표면에 살짝 묻혀 보인다.
       sphere: new SphereGeometry(1, 96, 64),
-      cylinder: new CylinderGeometry(1, 1, 1, 64),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -127,6 +125,10 @@ export class Renderer {
       uShadowMap: { value: shadowMap },
       uShadowTexel: { value: 1 / SHADOW_MAP_SIZE },
       uOccluder: { value: new Vector4() },
+      uZoneCount: { value: 0 },
+      uZoneDir: { value: Array.from({ length: MAX_SURFACE_ZONES }, () => new Vector3()) },
+      uZoneColor: { value: Array.from({ length: MAX_SURFACE_ZONES }, () => new Vector3()) },
+      uZoneParams: { value: Array.from({ length: MAX_SURFACE_ZONES }, () => new Vector4()) },
     };
     for (const content of contentRenderers) Object.assign(this.pbrShared, content.pbrUniforms);
 
@@ -232,6 +234,19 @@ export class Renderer {
 
     const { center, radius } = frame.occluder;
     this.pbrShared.uOccluder.value.set(center[0], center[1], center[2], radius);
+
+    const zones = frame.surfaceZones;
+    const count = Math.min(zones.length, MAX_SURFACE_ZONES);
+    const dirs = this.pbrShared.uZoneDir.value as Vector3[];
+    const colors = this.pbrShared.uZoneColor.value as Vector3[];
+    const params = this.pbrShared.uZoneParams.value as Vector4[];
+    for (let i = 0; i < count; i++) {
+      const zone = zones[i];
+      dirs[i].fromArray(zone.direction);
+      colors[i].fromArray(zone.color);
+      params[i].set(zone.angularRadius, zone.edgeWidth, zone.glow, zone.presence);
+    }
+    this.pbrShared.uZoneCount.value = count;
   }
 
   /** 그리기 목록을 메시 풀에 옮긴다. 목록보다 남는 메시는 숨긴다. */
@@ -262,6 +277,7 @@ export class Renderer {
         uMetallic: { value: 0 },
         uRoughness: { value: 1 },
         uPattern: { value: 0 },
+        uShowZones: { value: false },
       },
     });
     const mesh = new Mesh(this.geometries.sphere, material);
@@ -285,6 +301,7 @@ export class Renderer {
     u.uMetallic.value = m.metallic;
     u.uRoughness.value = m.roughness;
     u.uPattern.value = m.pattern;
+    u.uShowZones.value = m.showsZones;
   }
 
   /** 지금까지 그린 화면을 텍스처로 복사한다. 굴절처럼 뒤 장면을 읽는 콘텐츠가 쓴다. */

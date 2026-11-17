@@ -6,10 +6,8 @@ import {
   mat4FromTRS,
   normalize,
   normalMatrix,
-  quatFromUnitVectors,
   quatNlerp,
   QUAT_IDENTITY,
-  scale,
   type Quat,
   type Vec3,
 } from '../engine/math';
@@ -20,26 +18,23 @@ import {
   type Environment,
   type Material,
   type MeshKind,
+  type SurfaceZoneFrame,
 } from '../engine/frame';
 import { ColorTransition } from './colorTransition';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
-import { PressurePlate } from './pressurePlate';
+import { SurfaceZone } from './surfaceZone';
 
 /** 행성의 꼭대기에서 시작한다. */
 const SPAWN: Vec3 = [0, PLANET.radius + PLAYER_RADIUS, 0];
 
-const PLATE_RADIUS = 1.4;
-const PLATE_RING_RADIUS = 1.62;
-// 발판은 평평한 원판이라 가장자리로 갈수록 둥근 표면에서 뜬다.
-// 높이는 발판 중심의 표면을 기준으로 하고, 원판을 두껍게 만들어 아래쪽을 행성에 묻는다.
-const PLATE_RING_TOP = -0.03;
-const PLATE_RING_HEIGHT = 0.4;
-const PLATE_CAP_TOP = 0.08;
-const PLATE_CAP_HEIGHT = 0.4;
-const PLATE_TRAVEL = 0.06;
-const PLATE_GLOW_RATE = 7;
-const PLATE_GLOW_STRENGTH = 0.55;
+/** 작동 영역의 표면 반지름 */
+const ZONE_RADIUS = 1.5;
+/** 영역 경계에서 이만큼(표면 거리) 더 벗어나야 다시 작동한다. */
+const ZONE_REARM_MARGIN = PLAYER_RADIUS;
+/** 영역 경계선의 표면 폭 */
+const ZONE_EDGE_WIDTH = 0.12;
+const ZONE_FADE_RATE = 7;
 const COLOR_TRANSITION_SECONDS = 0.3;
 /** 플레이어 구의 색 (선형 RGB). 발판은 행성 표면의 색을 바꾸고 구는 그대로 둔다. */
 const PLAYER_COLOR: Vec3 = [0.02, 0.022, 0.028];
@@ -61,6 +56,7 @@ function material(baseColor: Vec3, roughness: number, overrides: Partial<Materia
     metallic: 0,
     emissive: [0, 0, 0],
     pattern: SurfacePattern.None,
+    showsZones: false,
     ...overrides,
   };
 }
@@ -77,19 +73,13 @@ function drawItem(
   return { mesh, model, normal: normalMatrix(model), material: mat, castShadow };
 }
 
-/** 윗면이 발판 중심의 표면에서 `top`만큼 떨어진 원판의 중심 */
-function plateDiscCenter(normal: Vec3, top: number, height: number): Vec3 {
-  return scale(normal, PLANET.radius + top - height / 2);
-}
-
-interface PlateInstance {
+interface ZoneInstance {
   entry: ContentEntry;
-  /** 행성 중심에서 발판을 향하는 단위 벡터 */
-  normal: Vec3;
-  /** 원기둥의 축(+Y)을 `normal`로 돌리는 회전 */
-  rotation: Quat;
-  plate: PressurePlate;
+  zone: SurfaceZone;
+  /** 활성 콘텐츠의 영역이면 1로 다가간다. */
   glow: number;
+  /** 구가 영역 위에 있으면 1로 다가간다. */
+  presence: number;
 }
 
 /** 월드를 구성하고 게임 규칙을 진행한다. GPU와 DOM에 의존하지 않는다. */
@@ -97,38 +87,23 @@ export class World {
   readonly player = new Player(SPAWN);
   readonly content: ContentManager;
 
-  private readonly staticItems: readonly DrawItem[];
-  private readonly plates: readonly PlateInstance[];
+  private readonly zones: readonly ZoneInstance[];
   private readonly planetColor = new ColorTransition(DEFAULT_PLANET_COLOR, COLOR_TRANSITION_SECONDS);
 
   constructor(
     entries: readonly ContentEntry[] = CONTENT_ENTRIES,
     onContentChange?: (content: GraphicsContent) => void,
   ) {
-    this.plates = entries.map((entry) => {
-      const normal = surfaceDirection(entry.plate.latitude, entry.plate.longitude);
-      return {
-        entry,
-        normal,
-        rotation: quatFromUnitVectors([0, 1, 0], normal),
-        plate: new PressurePlate(scale(normal, PLANET.radius), normal, PLATE_RADIUS),
-        glow: 0,
-      };
-    });
-
-    const ringMat = material([0.3, 0.3, 0.31], 0.55);
-    this.staticItems = [
-      ...this.plates.map(({ normal, rotation }) =>
-        drawItem(
-          'cylinder',
-          plateDiscCenter(normal, PLATE_RING_TOP, PLATE_RING_HEIGHT),
-          [PLATE_RING_RADIUS, PLATE_RING_HEIGHT, PLATE_RING_RADIUS],
-          ringMat,
-          rotation,
-          false,
-        ),
+    this.zones = entries.map((entry) => ({
+      entry,
+      zone: new SurfaceZone(
+        surfaceDirection(entry.zone.latitude, entry.zone.longitude),
+        ZONE_RADIUS / PLANET.radius,
+        ZONE_REARM_MARGIN / PLANET.radius,
       ),
-    ];
+      glow: 0,
+      presence: 0,
+    }));
 
     const { planetColor } = this;
     this.content = new ContentManager(
@@ -144,12 +119,14 @@ export class World {
   fixedStep(dt: number, command: MoveCommand): void {
     this.player.step(dt, command, PLANET);
 
-    for (const instance of this.plates) {
-      if (instance.plate.update(dt, this.player.position, PLAYER_RADIUS)) {
-        this.content.activate(instance.entry.content.id);
-      }
-      const targetGlow = this.content.activeId === instance.entry.content.id ? 1 : 0;
-      instance.glow += (targetGlow - instance.glow) * (1 - Math.exp(-PLATE_GLOW_RATE * dt));
+    const fade = 1 - Math.exp(-ZONE_FADE_RATE * dt);
+    for (const instance of this.zones) {
+      const { zone, entry } = instance;
+      if (zone.update(this.player.position, PLANET.center)) this.content.activate(entry.content.id);
+      const targetGlow = this.content.activeId === entry.content.id ? 1 : 0;
+      const targetPresence = zone.contains(this.player.position, PLANET.center) ? 1 : 0;
+      instance.glow += (targetGlow - instance.glow) * fade;
+      instance.presence += (targetPresence - instance.presence) * fade;
     }
     this.planetColor.update(dt);
     this.content.update(dt);
@@ -170,28 +147,23 @@ export class World {
         'sphere',
         PLANET.center,
         [PLANET.radius, PLANET.radius, PLANET.radius],
-        material(this.planetColor.current, 0.75, { pattern: SurfacePattern.Grid }),
+        material(this.planetColor.current, 0.75, { pattern: SurfacePattern.Grid, showsZones: true }),
       ),
-      ...this.staticItems,
+      this.sphereDrawItem(alpha),
     ];
-    for (const { entry, normal, rotation, plate, glow } of this.plates) {
-      const top = PLATE_CAP_TOP - plate.depression * PLATE_TRAVEL;
-      items.push(
-        drawItem(
-          'cylinder',
-          plateDiscCenter(normal, top, PLATE_CAP_HEIGHT),
-          [PLATE_RADIUS, PLATE_CAP_HEIGHT, PLATE_RADIUS],
-          material(entry.plate.color, 0.42, {
-            emissive: scale(entry.plate.color, glow * PLATE_GLOW_STRENGTH),
-          }),
-          rotation,
-          false,
-        ),
-      );
-    }
-
-    items.push(this.sphereDrawItem(alpha));
     return items;
+  }
+
+  /** 행성 표면에 그릴 작동 영역 */
+  buildSurfaceZones(): SurfaceZoneFrame[] {
+    return this.zones.map(({ entry, zone, glow, presence }) => ({
+      direction: zone.direction,
+      angularRadius: zone.angularRadius,
+      edgeWidth: ZONE_EDGE_WIDTH / PLANET.radius,
+      color: entry.zone.color,
+      glow,
+      presence,
+    }));
   }
 
   /** 전용 렌더러가 그릴 콘텐츠의 값. 이번 프레임에 보이는 것만 담는다. 지금은 없다. */

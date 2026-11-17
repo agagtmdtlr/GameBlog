@@ -19,6 +19,14 @@ uniform vec3 uSkyColor;
 uniform vec3 uGroundColor;
 uniform vec4 uOccluder;
 
+/** 표면 영역. uZoneParams x: 반지름(라디안), y: 경계선 폭(라디안), z: 빛남, w: 구가 위에 있음 */
+const int MAX_ZONES = 8;
+uniform bool uShowZones;
+uniform int uZoneCount;
+uniform vec3 uZoneDir[MAX_ZONES];
+uniform vec3 uZoneColor[MAX_ZONES];
+uniform vec4 uZoneParams[MAX_ZONES];
+
 uniform sampler2DShadow uShadowMap;
 uniform float uShadowTexel;
 
@@ -110,6 +118,25 @@ vec3 applySurfacePattern(vec3 albedo, vec3 N) {
   return albedo;
 }
 
+// 구 표면에 원형 영역을 칠한다. 안쪽은 영역 색으로 물들이고 경계에 선을 두른다.
+// 활성 영역은 빛나고, 구가 올라서 있으면 경계선이 밝아진다.
+void applySurfaceZones(vec3 N, inout vec3 albedo, inout vec3 emissive) {
+  if (!uShowZones) return;
+  for (int i = 0; i < MAX_ZONES; i++) {
+    if (i >= uZoneCount) break;
+    vec4 p = uZoneParams[i];
+    float angle = acos(clamp(dot(N, uZoneDir[i]), -1.0, 1.0));
+    float aa = fwidth(angle);
+    float inside = 1.0 - smoothstep(p.x - aa, p.x + aa, angle);
+    float edge = inside * (1.0 - smoothstep(p.y - aa, p.y + aa, p.x - angle));
+    vec3 color = uZoneColor[i];
+    albedo = mix(albedo, color, inside * 0.8);
+    // 영역 색이 바탕과 같아도 보이도록 경계선은 어둡게, 구가 올라서면 영역 색으로 밝힌다.
+    albedo = mix(albedo, albedo * 0.35, edge * (1.0 - p.w));
+    emissive += color * (inside * p.z * 0.35 + edge * (p.z * 0.6 + p.w * 1.2));
+  }
+}
+
 void main() {
   vec3 N = normalize(vNormal);
   vec3 V = normalize(uCameraPos - vWorldPos);
@@ -117,6 +144,8 @@ void main() {
   vec3 H = normalize(V + L);
 
   vec3 albedo = applySurfacePattern(uBaseColor, N);
+  vec3 emissive = uEmissive;
+  applySurfaceZones(N, albedo, emissive);
   float roughness = clamp(uRoughness, 0.04, 1.0);
   float a = roughness * roughness;
   vec3 f0 = mix(vec3(0.04), albedo, uMetallic);
@@ -138,5 +167,5 @@ void main() {
   vec3 envColor = mix(uGroundColor, uSkyColor, R.y * 0.5 + 0.5);
   vec3 ambient = (diffuseColor * irradiance + envBrdfApprox(f0, roughness, NoV) * envColor) * visibility;
 
-  fragColor = vec4(linearToSrgb(acesFilm(direct + ambient + uEmissive)), 1.0);
+  fragColor = vec4(linearToSrgb(acesFilm(direct + ambient + emissive)), 1.0);
 }

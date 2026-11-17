@@ -5,7 +5,7 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * three.js에 의존하지 않으므로 `World`와 테스트가 GPU 없이 쓸 수 있다.
  */
 
-export type MeshKind = 'sphere' | 'cylinder';
+export type MeshKind = 'sphere';
 
 export const SurfacePattern = { None: 0, SphereBands: 1, Grid: 2 } as const;
 export type SurfacePattern = (typeof SurfacePattern)[keyof typeof SurfacePattern];
@@ -16,6 +16,8 @@ export interface Material {
   roughness: number;
   emissive: Vec3;
   pattern: SurfacePattern;
+  /** `FrameData.surfaceZones`를 표면에 그린다. 원점 기준 구 메시(행성)에 쓴다. */
+  showsZones: boolean;
 }
 
 export interface DrawItem {
@@ -57,12 +59,32 @@ export interface ContentFrame {
   readonly kind: string;
 }
 
+/** 한 번에 그릴 수 있는 표면 영역 수. `pbr.frag`의 `MAX_ZONES`와 같아야 한다. */
+export const MAX_SURFACE_ZONES = 8;
+
+/** 구 표면에 칠하는 원형 영역 */
+export interface SurfaceZoneFrame {
+  /** 구 중심에서 영역 중심을 향하는 단위 벡터 */
+  direction: Vec3;
+  /** 영역의 반지름 (라디안) */
+  angularRadius: number;
+  /** 경계선의 폭 (라디안) */
+  edgeWidth: number;
+  color: Vec3;
+  /** 활성 영역의 빛남 (0~1) */
+  glow: number;
+  /** 구가 영역 위에 있을 때의 강조 (0~1) */
+  presence: number;
+}
+
 export interface FrameData {
   items: readonly DrawItem[];
   camera: CameraView;
   environment: Environment;
   /** 앰비언트 오클루전을 만드는 구 */
   occluder: { center: Vec3; radius: number };
+  /** `showsZones` 재질에 칠하는 영역. `MAX_SURFACE_ZONES`개까지만 그린다. */
+  surfaceZones: readonly SurfaceZoneFrame[];
   /** 전용 렌더러가 그리는 콘텐츠. 나머지 장면을 모두 그린 뒤에 순서대로 그린다. */
   contents: readonly ContentFrame[];
 }

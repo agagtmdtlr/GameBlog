@@ -19,11 +19,12 @@ export interface GraphicsContent {
 
 export interface ContentEntry {
   content: GraphicsContent;
-  plate: {
-    /** 행성 위의 위치 (도). 위도 90이 시작 지점, 경도 180이 시작할 때 바라보는 방향이다. */
+  /** 행성 표면의 작동 영역. 구가 이 원 안으로 들어오면 콘텐츠가 켜진다. */
+  zone: {
+    /** 영역 중심의 위치 (도). 위도 90이 시작 지점, 경도 180이 시작할 때 바라보는 방향이다. */
     latitude: number;
     longitude: number;
-    /** 발판 색 (선형 RGB) */
+    /** 영역 색 (선형 RGB) */
     color: Vec3;
   };
 }

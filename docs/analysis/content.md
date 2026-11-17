@@ -4,11 +4,11 @@
 
 - **규칙:** [rules/content.md](../rules/content.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `78247e5` 다음의 행성 표면 색 발판 전환
+- **분석 기준:** 커밋 `252920b` 다음의 발판을 표면 작동 영역으로 교체
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline 78247e5..HEAD -- src/content src/game src/engine/renderer.ts src/engine/contentRenderers src/shaders src/main.ts
+git log --oneline 252920b..HEAD -- src/content src/game src/engine/renderer.ts src/engine/contentRenderers src/shaders src/main.ts
 ```
 
 ## 작업 유형별 수정 파일
@@ -17,7 +17,7 @@ git log --oneline 78247e5..HEAD -- src/content src/game src/engine/renderer.ts s
 
 | 유형 | 언제 | 수정할 파일 |
 |---|---|---|
-| A. 색 발판 | 행성 표면 색만 바꾼다 | `content/registry.ts` 한 줄 (`colorPlate`) |
+| A. 색 영역 | 행성 표면 색만 바꾼다 | `content/registry.ts` 한 줄 (`colorZone`) |
 | B. 기존 기능 조합 | `ContentContext`로 충분하다 | `content/<이름>.ts` 추가, `registry.ts` |
 | C. 새 월드 상태 | 시간에 따라 변하는 상태나 새 동작이 필요하다 | B + `game/<이름>.ts`, `content/types.ts`, `game/world.ts`, `game/game.test.ts` |
 | D. PBR 표면 변형 | 불투명 재질의 무늬나 색 변화 | C(필요 시) + `shaders/pbr.frag`, `engine/frame.ts`의 `SurfacePattern` |
@@ -36,7 +36,7 @@ interface GraphicsContent {
   deactivate(ctx): void;
   update?(dt, ctx): void; // 활성 중 120Hz 고정 간격으로 호출
 }
-interface ContentEntry { content: GraphicsContent; plate: { latitude; longitude; color: Vec3 } }
+interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; color: Vec3 } }
 ```
 
 `ctx.planet`이 제공하는 기능:
@@ -47,13 +47,13 @@ interface ContentEntry { content: GraphicsContent; plate: { latitude; longitude;
 
 동작:
 
-- 활성 콘텐츠는 하나다. 다른 발판을 밟으면 이전 `deactivate`, 다음 `activate` 순서로 호출된다.
-- `CONTENT_ENTRIES`에 추가하면 발판, 판정, 빛남, HUD가 자동으로 따라온다. HUD 색은 `plate.color`에서 만들어진다.
+- 활성 콘텐츠는 하나다. 다른 영역에 들어가면 이전 `deactivate`, 다음 `activate` 순서로 호출된다.
+- `CONTENT_ENTRIES`에 추가하면 영역 표시, 판정, 빛남, HUD가 자동으로 따라온다. HUD 색은 `zone.color`에서 만들어진다.
 - 일시 정지 중에는 `update`와 `fixedStep`이 돌지 않고 렌더링만 계속된다.
 
-## 발판 위치
+## 작동 영역
 
-행성은 원점이 중심이고 반지름이 18이다(`game/planet.ts`의 `PLANET`). 발판 위치는 위도와 경도(도)로 적고, `surfaceDirection(위도, 경도)`가 행성 중심에서 발판을 향하는 단위 벡터로 바꾼다.
+행성은 원점이 중심이고 반지름이 18이다(`game/planet.ts`의 `PLANET`). 영역 위치는 위도와 경도(도)로 적고, `surfaceDirection(위도, 경도)`가 행성 중심에서 영역 중심을 향하는 단위 벡터로 바꾼다.
 
 - 위도 90이 시작 지점(+Y)이다. 경도 180이 시작할 때 바라보는 방향(-Z)이고, 경도 90이 오른쪽(+X)이다.
 - 표면 거리는 각도 1도에 약 0.31이다.
@@ -63,7 +63,12 @@ interface ContentEntry { content: GraphicsContent; plate: { latitude; longitude;
 
 `game.test.ts`가 위치 조건(간격, 시작 지점과의 거리, 해가 드는 쪽)을 검사하고, `color-default`, `color-coral`, `color-blue` id를 직접 참조한다.
 
-발판은 `World`가 원기둥을 `quatFromUnitVectors([0, 1, 0], 방향)`으로 돌려 표면에 놓는다. 판정(`PressurePlate`)은 발판 면의 중심과 법선을 받아, 구가 축에서 반경 안에 있고 발판 면 가까이 있는지를 본다.
+영역은 메시가 없다. 행성 표면에 칠한 원이다.
+
+- **판정:** `SurfaceZone`(`game/surfaceZone.ts`)이 행성 중심에서 구 중심을 향하는 방향과 영역 방향의 각도를 본다. 각도가 반지름(표면 1.5) 안이면 작동한다. 높이는 보지 않으므로 영역 위에서 점프 중이어도 작동한다. 경계에서 `PLAYER_RADIUS`만큼 더 벗어나야 다시 작동할 수 있다.
+- **상태:** `World`가 영역마다 `glow`(켜진 콘텐츠의 영역이면 1)와 `presence`(구가 영역 위에 있으면 1)를 지수적으로 따라가게 한다.
+- **그리기:** `World.buildSurfaceZones()`가 `SurfaceZoneFrame[]`을 만들고 `FrameData.surfaceZones`로 넘긴다. `Renderer`는 이를 PBR 공용 uniform 배열(`uZoneDir`, `uZoneColor`, `uZoneParams`, `uZoneCount`)에 옮기고, 재질의 `showsZones`가 켜진 메시(행성)만 `pbr.frag`의 `applySurfaceZones`로 칠한다. 안쪽은 영역 색을 80% 섞고, 경계선은 어둡게 칠한다. 켜진 영역은 안쪽과 경계가 빛나고, 구가 올라서면 경계선이 영역 색으로 밝아진다.
+- **한계:** 영역은 `MAX_SURFACE_ZONES`(8)개까지 그린다. `frame.ts`와 `pbr.frag`의 `MAX_ZONES`를 함께 바꿔야 한다. 평평하게 칠한 원이라 지평선 너머에서는 보이지 않는다.
 
 ## 월드 상태 추가 순서
 
@@ -71,7 +76,7 @@ interface ContentEntry { content: GraphicsContent; plate: { latitude; longitude;
 2. `content/types.ts`의 `ContentContext`에 메서드를 더한다.
 3. `World` 생성자의 `ctx` 객체에서 연결하고, `fixedStep`에서 갱신한다.
 4. `game.test.ts`의 가짜 `ctx`(`콘텐츠 관리` 블록)에도 메서드를 더한다. 빠뜨리면 `tsc`가 실패한다.
-5. 상태 클래스 단위 테스트와, 발판까지 굴러가는 월드 통합 테스트(`rollTo` 사용)를 더한다.
+5. 상태 클래스 단위 테스트와, 영역까지 굴러가는 월드 통합 테스트(`rollTo` 사용)를 더한다.
 6. 방향이 있는 상태라면 위쪽이 `[0, 1, 0]`이라고 가정하지 않는다. 위쪽은 `normalize(구 위치 - PLANET.center)`이며 구가 움직이면 계속 바뀐다.
 
 렌더링에는 `World`의 값을 프레임마다 넘긴다. 위치는 `alpha`로 보간한 `interpolatedPlayerPosition`을 쓴다.
@@ -107,10 +112,10 @@ abstract class ContentRenderer<T extends ContentFrame> {
 | `registry.ts` | `createContentRenderers()`. `main.ts`가 `Renderer` 생성자에 넘긴다. 지금은 빈 목록 |
 
 - **값 전달:** `World.buildContentFrames`가 이번 프레임에 보이는 콘텐츠의 값(`ContentFrame`)만 모아 `FrameData.contents`에 넣는다. `Renderer`는 `kind`가 같은 렌더러에 넘긴다. 같은 `kind`의 렌더러를 두 번 등록하면 생성자가 예외를 던진다.
-- **켜진 콘텐츠와 그리는 콘텐츠는 다르다:** 효과가 사라지는 동안에는 활성 콘텐츠가 이미 다른 발판일 수 있다. 그래서 활성 id가 아니라 값의 유무로 그린다.
+- **켜진 콘텐츠와 그리는 콘텐츠는 다르다:** 효과가 사라지는 동안에는 활성 콘텐츠가 이미 다른 영역일 수 있다. 그래서 활성 id가 아니라 값의 유무로 그린다.
 - **`RenderContext`:** `renderer`, `camera`, `geometries`, `shared`(프레임 단위 uniform), `createPbrMesh()`, `applyItem()`, `copySceneColor()`(지금까지 그린 화면 복사)를 제공한다.
 - **`pbrUniforms`:** `Renderer`가 PBR 재질을 만들기 전에 모든 렌더러의 값을 합친다. 그래서 필드 초기값으로 선언해야 하고, `init`에서 추가하면 반영되지 않는다. 값은 `prepare`에서 고치며, `data`가 `null`이면 효과를 끈다.
-- **행성 색 발판**은 그리기 목록의 재질 값만 바꾸므로 콘텐츠 렌더러가 없다.
+- **행성 색 영역**은 그리기 목록의 재질 값만 바꾸므로 콘텐츠 렌더러가 없다.
 
 새 콘텐츠 렌더러 추가 순서:
 
@@ -140,11 +145,11 @@ abstract class ContentRenderer<T extends ContentFrame> {
 서버는 `.claude/launch.json`의 `gameblog`다. 개발 서버에서만 `window.__game`(`world`, `camera`, `input`, `gl`, `getState`)을 쓸 수 있다.
 
 1. "시작하기" 버튼을 클릭한다. 상태가 `playing`이어야 물리가 돈다.
-2. 구를 발판으로 옮긴다.
+2. 구를 영역으로 옮긴다.
 
    ```js
    const g = window.__game;
-   const [lat, lon] = [35, 60].map((d) => (d * Math.PI) / 180); // 발판의 위도, 경도
+   const [lat, lon] = [35, 60].map((d) => (d * Math.PI) / 180); // 영역의 위도, 경도
    const r = 18.65; // 행성 반지름 + 구 반지름
    const p = [r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon)];
    g.world.player.position = p;

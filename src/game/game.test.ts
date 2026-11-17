@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { ContentManager } from '../content/manager';
 import { CONTENT_ENTRIES, DEFAULT_PLANET_COLOR } from '../content/registry';
+import { MAX_SURFACE_ZONES } from '../engine/frame';
 import type { GraphicsContent } from '../content/types';
 import { cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
 import { ColorTransition } from './colorTransition';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
-import { PressurePlate } from './pressurePlate';
+import { SurfaceZone } from './surfaceZone';
 import { STUDIO_ENVIRONMENT, World } from './world';
 
 const DT = 1 / 120;
@@ -107,53 +108,46 @@ describe('카메라', () => {
   });
 });
 
-describe('발판', () => {
-  const R = PLAYER_RADIUS;
+describe('작동 영역', () => {
+  const RADIUS = 1.5 / PLANET.radius;
+  const MARGIN = PLAYER_RADIUS / PLANET.radius;
+  const zone = (): SurfaceZone => new SurfaceZone([0, 1, 0], RADIUS, MARGIN);
+  /** 영역 중심에서 표면을 따라 `distance`만큼 떨어진 곳에 놓인 구의 중심 */
+  const at = (distance: number, height = REST_DISTANCE): Vec3 => {
+    const angle = distance / PLANET.radius;
+    return [Math.sin(angle) * height, Math.cos(angle) * height, 0];
+  };
 
-  it('구가 닿으면 한 번만 작동한다', () => {
-    const plate = new PressurePlate([0, 0, 0], [0, 1, 0], 1.4);
-    expect(plate.update(DT, [0, R, 0], R)).toBe(true);
-    for (let i = 0; i < 100; i++) expect(plate.update(DT, [0, R, 0], R)).toBe(false);
+  it('구가 영역 안으로 들어오면 한 번만 작동한다', () => {
+    const z = zone();
+    expect(z.update(at(2), PLANET.center)).toBe(false);
+    expect(z.update(at(1.4), PLANET.center)).toBe(true);
+    for (let i = 0; i < 100; i++) expect(z.update(at(0), PLANET.center)).toBe(false);
   });
 
-  it('공중의 구는 작동시키지 않는다', () => {
-    const plate = new PressurePlate([0, 0, 0], [0, 1, 0], 1.4);
-    expect(plate.update(DT, [0, R + 1, 0], R)).toBe(false);
+  it('영역 위의 공중에 있어도 작동한다', () => {
+    expect(zone().update(at(0, REST_DISTANCE + 2), PLANET.center)).toBe(true);
   });
 
-  it('제자리에서 튀어도 다시 작동하지 않는다', () => {
-    const plate = new PressurePlate([0, 0, 0], [0, 1, 0], 1.4);
-    plate.update(DT, [0, R, 0], R);
-    plate.update(DT, [0, R + 1, 0], R);
-    expect(plate.update(DT, [0, R, 0], R)).toBe(false);
+  it('경계를 오가도 충분히 벗어나기 전에는 다시 작동하지 않는다', () => {
+    const z = zone();
+    z.update(at(1.4), PLANET.center);
+    z.update(at(1.6), PLANET.center);
+    expect(z.update(at(1.4), PLANET.center)).toBe(false);
   });
 
-  it('경계를 오가도 완전히 벗어나기 전에는 작동하지 않는다', () => {
-    const plate = new PressurePlate([0, 0, 0], [0, 1, 0], 1.4);
-    plate.update(DT, [1.3, R, 0], R);
-    plate.update(DT, [1.5, R, 0], R);
-    expect(plate.update(DT, [1.3, R, 0], R)).toBe(false);
-  });
-
-  it('완전히 벗어난 뒤 돌아오면 다시 작동한다', () => {
-    const plate = new PressurePlate([0, 0, 0], [0, 1, 0], 1.4);
-    plate.update(DT, [0, R, 0], R);
-    plate.update(DT, [3, R, 0], R);
-    expect(plate.update(DT, [0, R, 0], R)).toBe(true);
+  it('충분히 벗어난 뒤 돌아오면 다시 작동한다', () => {
+    const z = zone();
+    z.update(at(0), PLANET.center);
+    z.update(at(3), PLANET.center);
+    expect(z.update(at(0), PLANET.center)).toBe(true);
   });
 
   it('행성 반대편에 있는 구는 작동시키지 않는다', () => {
-    const plate = new PressurePlate([0, PLANET.radius, 0], [0, 1, 0], 1.4);
-    expect(plate.update(DT, [0, -REST_DISTANCE, 0], R)).toBe(false);
-    expect(plate.update(DT, [0, REST_DISTANCE, 0], R)).toBe(true);
-  });
-
-  it('눌림 값은 밟으면 1로, 떠나면 0으로 돌아간다', () => {
-    const plate = new PressurePlate([0, 0, 0], [0, 1, 0], 1.4);
-    for (let i = 0; i < 120; i++) plate.update(DT, [0, R, 0], R);
-    expect(plate.depression).toBeGreaterThan(0.95);
-    for (let i = 0; i < 240; i++) plate.update(DT, [5, R, 0], R);
-    expect(plate.depression).toBeLessThan(0.05);
+    const z = zone();
+    expect(z.update([0, -REST_DISTANCE, 0], PLANET.center)).toBe(false);
+    expect(z.contains([0, -REST_DISTANCE, 0], PLANET.center)).toBe(false);
+    expect(z.contains(TOP, PLANET.center)).toBe(true);
   });
 });
 
@@ -214,7 +208,7 @@ describe('콘텐츠 관리', () => {
 describe('월드 통합', () => {
   type Entry = (typeof CONTENT_ENTRIES)[number];
   const find = (id: string): Entry => CONTENT_ENTRIES.find((e) => e.content.id === id)!;
-  const directionOf = ({ plate }: Entry): Vec3 => surfaceDirection(plate.latitude, plate.longitude);
+  const directionOf = ({ zone }: Entry): Vec3 => surfaceDirection(zone.latitude, zone.longitude);
 
   /** 발판을 향해 표면을 따라 굴러간다. */
   function rollTo(world: World, entry: Entry): void {
@@ -244,11 +238,38 @@ describe('월드 통합', () => {
     const surfaceDistance = (a: Vec3, b: Vec3): number =>
       Math.acos(Math.min(1, Math.max(-1, dot(a, b)))) * PLANET.radius;
     CONTENT_ENTRIES.forEach((entry, i) => {
-      expect(Math.abs(entry.plate.latitude)).toBeLessThanOrEqual(90);
+      expect(Math.abs(entry.zone.latitude)).toBeLessThanOrEqual(90);
       expect(surfaceDistance(directionOf(entry), [0, 1, 0])).toBeGreaterThan(3.4);
       CONTENT_ENTRIES.slice(i + 1).forEach((other) => {
         expect(surfaceDistance(directionOf(entry), directionOf(other))).toBeGreaterThan(3.4);
       });
+    });
+  });
+
+  it('영역 수는 렌더러가 그릴 수 있는 만큼이다', () => {
+    expect(CONTENT_ENTRIES.length).toBeLessThanOrEqual(MAX_SURFACE_ZONES);
+  });
+
+  it('구가 올라선 영역만 강조되고, 켜진 영역은 빛난다', () => {
+    const world = new World();
+    rollTo(world, find('color-teal'));
+    // 멈추지 않고 영역 위에 있는 동안 0.3초를 보낸다.
+    const p = world.player.position;
+    for (let i = 0; i < 36; i++) {
+      world.player.position = p;
+      world.player.velocity = [0, 0, 0];
+      world.fixedStep(DT, IDLE);
+    }
+    const zones = world.buildSurfaceZones();
+    const teal = CONTENT_ENTRIES.indexOf(find('color-teal'));
+    zones.forEach((zone, i) => {
+      if (i === teal) {
+        expect(zone.presence).toBeGreaterThan(0.8);
+        expect(zone.glow).toBeGreaterThan(0.8);
+      } else {
+        expect(zone.presence).toBeLessThan(0.2);
+        expect(zone.glow).toBeLessThan(0.2);
+      }
     });
   });
 
@@ -267,9 +288,9 @@ describe('월드 통합', () => {
     for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);
     const expectColor = (actual: Vec3, expected: Vec3): void =>
       actual.forEach((c, i) => expect(c).toBeCloseTo(expected[i], 9));
-    expectColor(world.currentPlanetColor, coral.plate.color);
+    expectColor(world.currentPlanetColor, coral.zone.color);
     const [planet] = world.buildDrawList(1);
-    expectColor(planet.material.baseColor, coral.plate.color);
+    expectColor(planet.material.baseColor, coral.zone.color);
 
     rollTo(world, find('color-default'));
     expect(world.content.activeId).toBe('color-default');

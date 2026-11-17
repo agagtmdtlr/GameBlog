@@ -61,7 +61,7 @@ function main(): void {
 
   const input = new Input(canvas);
   const stepper = new FixedStepper(PHYSICS_STEP_SECONDS, MAX_FRAME_SECONDS);
-  const accentById = new Map(CONTENT_ENTRIES.map((entry) => [entry.content.id, entry.plate.color]));
+  const accentById = new Map(CONTENT_ENTRIES.map((entry) => [entry.content.id, entry.zone.color]));
   const world = new World(CONTENT_ENTRIES, (content) => {
     overlay.setActiveContent(content.label, accentById.get(content.id) ?? [1, 1, 1]);
   });
@@ -141,6 +141,7 @@ function main(): void {
         camera: camera.view,
         environment: STUDIO_ENVIRONMENT,
         occluder: { center: playerPosition, radius: PLAYER_RADIUS },
+        surfaceZones: world.buildSurfaceZones(),
         contents: world.buildContentFrames(alpha),
       },
       aspect,
