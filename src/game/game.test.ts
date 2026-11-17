@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ContentManager } from '../content/manager';
-import { CONTENT_ENTRIES, DEFAULT_SPHERE_COLOR } from '../content/registry';
-import { SMOKE_CAPACITY, SMOKE_STRIDE } from '../engine/frame';
+import { CONTENT_ENTRIES, DEFAULT_PLANET_COLOR } from '../content/registry';
 import type { GraphicsContent } from '../content/types';
 import { cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
@@ -9,8 +8,6 @@ import { ColorTransition } from './colorTransition';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { PressurePlate } from './pressurePlate';
-import { SphereHeat } from './sphereHeat';
-import { WaterFill } from './waterFill';
 import { STUDIO_ENVIRONMENT, World } from './world';
 
 const DT = 1 / 120;
@@ -181,94 +178,6 @@ describe('색 전환', () => {
   });
 });
 
-describe('구 안의 물', () => {
-  it('서서히 차오르고 투명해진 뒤 다시 비워진다', () => {
-    const water = new WaterFill();
-    const emptyLevel = water.level;
-    water.setFilled(true);
-    water.update(0.55, [0, 0, 0]);
-    expect(water.amount).toBeCloseTo(0.5);
-    expect(water.level).toBeGreaterThan(emptyLevel);
-
-    water.update(0.55, [0, 0, 0]);
-    expect(water.amount).toBe(1);
-    expect(water.opacity).toBe(1);
-
-    water.setFilled(false);
-    water.update(1.1, [0, 0, 0]);
-    expect(water.amount).toBe(0);
-    expect(water.opacity).toBe(0);
-  });
-
-  it('수면은 가속 방향으로 기울었다가 멈추면 수평으로 돌아온다', () => {
-    const water = new WaterFill();
-    expect(water.surfaceNormal).toEqual([0, 1, 0]);
-    for (let i = 0; i < 12; i++) water.update(DT, [26 * DT, 0, 0]);
-    expect(water.surfaceNormal[0]).toBeGreaterThan(0.01);
-
-    for (let i = 0; i < 1200; i++) water.update(DT, [0, 0, 0]);
-    expect(Math.abs(water.surfaceNormal[0])).toBeLessThan(0.01);
-  });
-
-  it('위쪽이 바뀌면 수면도 따라 돌고, 위아래 방향 가속에는 기울지 않는다', () => {
-    const water = new WaterFill();
-    const up: Vec3 = [1, 0, 0];
-    for (let i = 0; i < 12; i++) water.update(DT, [26 * DT, 0, 0], up);
-    expect(water.surfaceNormal[0]).toBeCloseTo(1, 6);
-    for (let i = 0; i < 12; i++) water.update(DT, [0, 26 * DT, 0], up);
-    expect(water.surfaceNormal[1]).toBeGreaterThan(0.01);
-  });
-
-  it('충격을 받으면 물결이 일고 시간이 지나면 잦아든다', () => {
-    const water = new WaterFill();
-    water.update(DT, [0, 8, 0]);
-    const impact = water.ripple;
-    expect(impact).toBeGreaterThan(0.3);
-    for (let i = 0; i < 240; i++) water.update(DT, [0, 0, 0]);
-    expect(water.ripple).toBeLessThan(impact * 0.1);
-  });
-});
-
-describe('달아오른 구', () => {
-  const heatFor = (heat: SphereHeat, seconds: number, center: Vec3 = TOP): void => {
-    for (let i = 0; i < Math.round(seconds / DT); i++) heat.update(DT, center, PLAYER_RADIUS, PLANET.center);
-  };
-
-  it('서서히 달아오르며 연기를 뿜고, 식으면 연기가 모두 사라진다', () => {
-    const heat = new SphereHeat();
-    expect(heat.visible).toBe(false);
-    heat.setHeated(true);
-    heatFor(heat, 0.2);
-    expect(heat.amount).toBeGreaterThan(0);
-    expect(heat.amount).toBeLessThan(1);
-
-    heatFor(heat, 3);
-    expect(heat.amount).toBe(1);
-    expect(heat.smokeCount).toBeGreaterThan(20);
-    expect(heat.smokeCount).toBeLessThanOrEqual(SMOKE_CAPACITY);
-
-    heat.setHeated(false);
-    heatFor(heat, 5);
-    expect(heat.amount).toBe(0);
-    expect(heat.smokeCount).toBe(0);
-    expect(heat.visible).toBe(false);
-  });
-
-  it('연기는 행성 어디서나 표면 바깥쪽으로 떠오른다', () => {
-    const heat = new SphereHeat();
-    const side: Vec3 = [REST_DISTANCE, 0, 0];
-    heat.setHeated(true);
-    heatFor(heat, 3, side);
-    const smoke = heat.smokeData(PLAYER_RADIUS);
-    let outward = 0;
-    for (let i = 0; i < heat.smokeCount; i++) {
-      outward += smoke[i * SMOKE_STRIDE] - side[0];
-      expect(smoke[i * SMOKE_STRIDE + 4]).toBeGreaterThanOrEqual(0);
-    }
-    expect(outward / heat.smokeCount).toBeGreaterThan(PLAYER_RADIUS);
-  });
-});
-
 describe('콘텐츠 관리', () => {
   function fakeContent(id: string, log: string[]): GraphicsContent {
     return {
@@ -278,7 +187,7 @@ describe('콘텐츠 관리', () => {
       deactivate: () => log.push(`-${id}`),
     };
   }
-  const ctx = { sphere: { setColor: () => {}, setWaterFilled: () => {}, setHeated: () => {} } };
+  const ctx = { planet: { setSurfaceColor: () => {} } };
 
   it('새 콘텐츠를 켜기 전에 이전 콘텐츠를 끈다', () => {
     const log: string[] = [];
@@ -323,7 +232,7 @@ describe('월드 통합', () => {
   it('처음에는 기본색 콘텐츠가 켜져 있다', () => {
     const world = new World();
     expect(world.content.activeId).toBe('color-default');
-    expect(world.currentSphereColor).toEqual(DEFAULT_SPHERE_COLOR);
+    expect(world.currentPlanetColor).toEqual(DEFAULT_PLANET_COLOR);
   });
 
   it('구는 행성 꼭대기에서 시작한다', () => {
@@ -349,61 +258,32 @@ describe('월드 통합', () => {
     }
   });
 
-  it('발판까지 굴러가면 구의 색이 바뀌고, 기본 발판으로 돌아오면 복귀한다', () => {
+  it('발판까지 굴러가면 행성 표면의 색이 바뀌고, 기본 발판으로 돌아오면 복귀한다', () => {
     const world = new World();
     const coral = find('color-coral');
 
     rollTo(world, coral);
     expect(world.content.activeId).toBe('color-coral');
     for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);
-    expect(world.currentSphereColor).toEqual(coral.plate.color);
+    const expectColor = (actual: Vec3, expected: Vec3): void =>
+      actual.forEach((c, i) => expect(c).toBeCloseTo(expected[i], 9));
+    expectColor(world.currentPlanetColor, coral.plate.color);
+    const [planet] = world.buildDrawList(1);
+    expectColor(planet.material.baseColor, coral.plate.color);
 
     rollTo(world, find('color-default'));
     expect(world.content.activeId).toBe('color-default');
+    for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);
+    expectColor(world.currentPlanetColor, DEFAULT_PLANET_COLOR);
   });
 
-  it('코랄 발판을 밟으면 구가 달아올라 빛나고, 다른 발판을 밟으면 식는다', () => {
+  it('발판을 밟아도 플레이어 구의 재질은 바뀌지 않는다', () => {
     const world = new World();
-    expect(world.buildHeatSphere(1)).toBeNull();
-    const playerEmissive = (): number => world.buildDrawList(1).at(-1)!.material.emissive[0];
-
-    rollTo(world, find('color-coral'));
-    for (let i = 0; i < 240; i++) world.fixedStep(DT, IDLE);
-    expect(world.buildHeatSphere(1)?.heat).toBe(1);
-    expect(world.buildHeatSphere(1)?.smokeCount).toBeGreaterThan(0);
-    expect(playerEmissive()).toBeGreaterThan(0);
-
-    rollTo(world, find('color-default'));
-    for (let i = 0; i < 600; i++) world.fixedStep(DT, IDLE);
-    expect(world.buildHeatSphere(1)).toBeNull();
-    expect(playerEmissive()).toBe(0);
-  });
-
-  it('블루 발판을 밟으면 구에 물이 차고, 다른 발판을 밟으면 비워진다', () => {
-    const world = new World();
-    expect(world.buildWaterSphere(1)).toBeNull();
-    const isPlayer = (item: { model: Float32Array }): boolean =>
-      Math.abs(item.model[0] ** 2 + item.model[1] ** 2 + item.model[2] ** 2 - PLAYER_RADIUS ** 2) < 1e-6;
-
-    rollTo(world, find('water-blue'));
-    for (let i = 0; i < 240; i++) world.fixedStep(DT, IDLE);
-    expect(world.content.activeId).toBe('water-blue');
-    expect(world.water.amount).toBe(1);
-    expect(world.buildWaterSphere(1)?.opacity).toBe(1);
-    expect(world.buildDrawList(1).some(isPlayer)).toBe(false);
-
-    rollTo(world, find('color-default'));
-    for (let i = 0; i < 240; i++) world.fixedStep(DT, IDLE);
-    expect(world.content.activeId).toBe('color-default');
-    expect(world.buildWaterSphere(1)).toBeNull();
-    expect(world.buildDrawList(1).some(isPlayer)).toBe(true);
-  });
-
-  it('물이 든 구의 수면은 행성 어디서나 표면과 나란하다', () => {
-    const world = new World();
-    rollTo(world, find('water-blue'));
-    for (let i = 0; i < 600; i++) world.fixedStep(DT, IDLE);
-    const up = normalize(world.player.position);
-    expect(dot(world.water.surfaceNormal, up)).toBeGreaterThan(0.999);
+    const playerMaterial = () => world.buildDrawList(1).at(-1)!.material;
+    const before = playerMaterial();
+    rollTo(world, find('color-blue'));
+    for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);
+    expect(world.content.activeId).toBe('color-blue');
+    expect(playerMaterial()).toEqual(before);
   });
 });

@@ -1,5 +1,5 @@
 import { ContentManager } from '../content/manager';
-import { CONTENT_ENTRIES, DEFAULT_SPHERE_COLOR, INITIAL_CONTENT_ID } from '../content/registry';
+import { CONTENT_ENTRIES, DEFAULT_PLANET_COLOR, INITIAL_CONTENT_ID } from '../content/registry';
 import type { ContentEntry, GraphicsContent } from '../content/types';
 import {
   lerp,
@@ -10,7 +10,6 @@ import {
   quatNlerp,
   QUAT_IDENTITY,
   scale,
-  sub,
   type Quat,
   type Vec3,
 } from '../engine/math';
@@ -19,17 +18,13 @@ import {
   type ContentFrame,
   type DrawItem,
   type Environment,
-  type HeatSphere,
   type Material,
   type MeshKind,
-  type WaterSphere,
 } from '../engine/frame';
 import { ColorTransition } from './colorTransition';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { PressurePlate } from './pressurePlate';
-import { SphereHeat } from './sphereHeat';
-import { WaterFill } from './waterFill';
 
 /** 행성의 꼭대기에서 시작한다. */
 const SPAWN: Vec3 = [0, PLANET.radius + PLAYER_RADIUS, 0];
@@ -46,8 +41,8 @@ const PLATE_TRAVEL = 0.06;
 const PLATE_GLOW_RATE = 7;
 const PLATE_GLOW_STRENGTH = 0.55;
 const COLOR_TRANSITION_SECONDS = 0.3;
-/** 완전히 달아오른 구가 스스로 내는 빛 (선형 RGB) */
-const HEAT_EMISSIVE: Vec3 = [0.32, 0.02, 0.003];
+/** 플레이어 구의 색 (선형 RGB). 발판은 행성 표면의 색을 바꾸고 구는 그대로 둔다. */
+const PLAYER_COLOR: Vec3 = [0.02, 0.022, 0.028];
 
 export const STUDIO_ENVIRONMENT: Environment = {
   // 기본 시점에서 그림자가 구의 앞쪽 옆으로 떨어져 잘 보이는 방향
@@ -104,9 +99,7 @@ export class World {
 
   private readonly staticItems: readonly DrawItem[];
   private readonly plates: readonly PlateInstance[];
-  private readonly sphereColor = new ColorTransition(DEFAULT_SPHERE_COLOR, COLOR_TRANSITION_SECONDS);
-  readonly water = new WaterFill();
-  readonly heat = new SphereHeat();
+  private readonly planetColor = new ColorTransition(DEFAULT_PLANET_COLOR, COLOR_TRANSITION_SECONDS);
 
   constructor(
     entries: readonly ContentEntry[] = CONTENT_ENTRIES,
@@ -125,12 +118,6 @@ export class World {
 
     const ringMat = material([0.3, 0.3, 0.31], 0.55);
     this.staticItems = [
-      drawItem(
-        'sphere',
-        PLANET.center,
-        [PLANET.radius, PLANET.radius, PLANET.radius],
-        material([0.74, 0.74, 0.75], 0.75, { pattern: SurfacePattern.Grid }),
-      ),
       ...this.plates.map(({ normal, rotation }) =>
         drawItem(
           'cylinder',
@@ -143,15 +130,9 @@ export class World {
       ),
     ];
 
-    const { sphereColor, water, heat } = this;
+    const { planetColor } = this;
     this.content = new ContentManager(
-      {
-        sphere: {
-          setColor: (color) => sphereColor.setTarget(color),
-          setWaterFilled: (filled) => water.setFilled(filled),
-          setHeated: (heated) => heat.setHeated(heated),
-        },
-      },
+      { planet: { setSurfaceColor: (color) => planetColor.setTarget(color) } },
       entries.map((entry) => entry.content),
       onContentChange,
     );
@@ -161,11 +142,7 @@ export class World {
   }
 
   fixedStep(dt: number, command: MoveCommand): void {
-    const previousVelocity = this.player.velocity;
     this.player.step(dt, command, PLANET);
-    const up = normalize(sub(this.player.position, PLANET.center));
-    this.water.update(dt, sub(this.player.velocity, previousVelocity), up);
-    this.heat.update(dt, this.player.position, PLAYER_RADIUS, PLANET.center);
 
     for (const instance of this.plates) {
       if (instance.plate.update(dt, this.player.position, PLAYER_RADIUS)) {
@@ -174,7 +151,7 @@ export class World {
       const targetGlow = this.content.activeId === instance.entry.content.id ? 1 : 0;
       instance.glow += (targetGlow - instance.glow) * (1 - Math.exp(-PLATE_GLOW_RATE * dt));
     }
-    this.sphereColor.update(dt);
+    this.planetColor.update(dt);
     this.content.update(dt);
   }
 
@@ -183,12 +160,20 @@ export class World {
     return lerp(this.player.previousPosition, this.player.position, alpha);
   }
 
-  get currentSphereColor(): Vec3 {
-    return this.sphereColor.current;
+  get currentPlanetColor(): Vec3 {
+    return this.planetColor.current;
   }
 
   buildDrawList(alpha: number): DrawItem[] {
-    const items: DrawItem[] = [...this.staticItems];
+    const items: DrawItem[] = [
+      drawItem(
+        'sphere',
+        PLANET.center,
+        [PLANET.radius, PLANET.radius, PLANET.radius],
+        material(this.planetColor.current, 0.75, { pattern: SurfacePattern.Grid }),
+      ),
+      ...this.staticItems,
+    ];
     for (const { entry, normal, rotation, plate, glow } of this.plates) {
       const top = PLATE_CAP_TOP - plate.depression * PLATE_TRAVEL;
       items.push(
@@ -205,53 +190,13 @@ export class World {
       );
     }
 
-    // 물이 든 구는 뒤 장면을 굴절시켜 보여 주므로 렌더러가 따로 그린다.
-    if (this.water.amount === 0) items.push(this.sphereDrawItem(alpha));
+    items.push(this.sphereDrawItem(alpha));
     return items;
   }
 
-  /** 전용 렌더러가 그릴 콘텐츠의 값. 이번 프레임에 보이는 것만 담는다. */
-  buildContentFrames(alpha: number): ContentFrame[] {
-    const frames: ContentFrame[] = [];
-    const water = this.buildWaterSphere(alpha);
-    if (water) frames.push(water);
-    const heat = this.buildHeatSphere(alpha);
-    if (heat) frames.push(heat);
-    return frames;
-  }
-
-  /** 구에 물이 들어 있을 때만 값을 반환한다. */
-  buildWaterSphere(alpha: number): WaterSphere | null {
-    const { water } = this;
-    if (water.amount === 0) return null;
-    return {
-      kind: 'water-sphere',
-      item: this.sphereDrawItem(alpha),
-      center: this.interpolatedPlayerPosition(alpha),
-      radius: PLAYER_RADIUS,
-      ground: PLANET,
-      surfaceNormal: water.surfaceNormal,
-      level: water.level,
-      opacity: water.opacity,
-      ripple: water.ripple,
-      time: water.time,
-    };
-  }
-
-  /** 구가 달아올라 있거나 연기가 남아 있을 때만 값을 반환한다. */
-  buildHeatSphere(alpha: number): HeatSphere | null {
-    const { heat } = this;
-    if (!heat.visible) return null;
-    return {
-      kind: 'heat-sphere',
-      item: this.sphereDrawItem(alpha),
-      center: this.interpolatedPlayerPosition(alpha),
-      radius: PLAYER_RADIUS,
-      heat: heat.amount,
-      time: heat.time,
-      smoke: heat.smokeData(PLAYER_RADIUS),
-      smokeCount: heat.smokeCount,
-    };
+  /** 전용 렌더러가 그릴 콘텐츠의 값. 이번 프레임에 보이는 것만 담는다. 지금은 없다. */
+  buildContentFrames(_alpha: number): ContentFrame[] {
+    return [];
   }
 
   private sphereDrawItem(alpha: number): DrawItem {
@@ -260,10 +205,7 @@ export class World {
       'sphere',
       this.interpolatedPlayerPosition(alpha),
       [PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS],
-      material(this.sphereColor.current, 0.32, {
-        pattern: SurfacePattern.SphereBands,
-        emissive: scale(HEAT_EMISSIVE, this.heat.amount),
-      }),
+      material(PLAYER_COLOR, 0.32, { pattern: SurfacePattern.SphereBands }),
       orientation,
     );
   }

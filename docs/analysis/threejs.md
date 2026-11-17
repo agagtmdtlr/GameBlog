@@ -56,11 +56,10 @@ git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.js
 
 ## 렌더러 구조
 
-`Renderer`는 장면 하나와 카메라 두 개를 가지고, 콘텐츠 전용 그리기는 `engine/contentRenderers/`의 `ContentRenderer`들에 맡긴다 (포팅 직후에는 물이 든 구도 `Renderer` 안에 있었다). 인터페이스는 [analysis/content.md](content.md)의 "콘텐츠 렌더러"에 있다.
+`Renderer`는 장면 하나와 카메라 두 개를 가지고, 콘텐츠 전용 그리기는 `engine/contentRenderers/`의 `ContentRenderer`들에 맡긴다 (포팅 직후에는 물이 든 구도 `Renderer` 안에 있었고, 물이 든 구와 달아오른 구는 2026-11-17에 지웠다). 인터페이스는 [analysis/content.md](content.md)의 "콘텐츠 렌더러"에 있다.
 
 - `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
-- `WaterSphereRenderer`의 장면: 물이 든 구 전용. 불투명한 구(`base`)와 물 셰이더 메시(`mesh`)가 들어 있다.
-- `HeatSphereRenderer`의 장면: 달아오른 구 전용. 열 껍질 메시와 `InstancedBufferGeometry` 사각형(빛 번짐, 연기)이 들어 있다.
+- 콘텐츠 렌더러는 필요하면 자기 장면을 가진다. 지금은 등록된 렌더러가 없다.
 - `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
 - `lightCamera`: 그림자용 `OrthographicCamera`
 
@@ -68,7 +67,7 @@ git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.js
 
 1. `setRenderTarget(shadowTarget)` → `clear()` → `overrideMaterial`을 걸고 `render(scene, lightCamera)`
 2. `setRenderTarget(null)` → `setClearColor` → `clear()` → `render(scene, camera)`
-3. `frame.contents`에 값이 있는 콘텐츠 렌더러마다 `render()`. 물이 든 구는 `copySceneColor()`(`copyFramebufferToTexture`) → `render(자기 장면, camera)`
+3. `frame.contents`에 값이 있는 콘텐츠 렌더러마다 `render()`. 뒤 장면이 필요한 렌더러는 `copySceneColor()`(`copyFramebufferToTexture`) → `render(자기 장면, camera)` 순서로 그린다
 
 ### 행렬
 

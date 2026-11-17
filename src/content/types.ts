@@ -2,13 +2,9 @@ import type { Vec3 } from '../engine/math';
 
 /** 콘텐츠가 월드에 영향을 줄 수 있는 창구. 필요한 기능은 여기에 추가한다. */
 export interface ContentContext {
-  sphere: {
-    /** 구의 색을 선형 RGB 값으로 서서히 바꾼다. */
-    setColor(color: Vec3): void;
-    /** 구 안에 물을 채워 투명하게 만들거나, 다시 비워 불투명하게 되돌린다. */
-    setWaterFilled(filled: boolean): void;
-    /** 구를 달궈 표면을 빛내고 연기를 뿜게 하거나, 다시 식힌다. */
-    setHeated(heated: boolean): void;
+  planet: {
+    /** 행성 표면의 색을 선형 RGB 값으로 서서히 바꾼다. */
+    setSurfaceColor(color: Vec3): void;
   };
 }
 

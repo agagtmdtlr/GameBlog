@@ -57,43 +57,6 @@ export interface ContentFrame {
   readonly kind: string;
 }
 
-export interface WaterSphere extends ContentFrame {
-  kind: 'water-sphere';
-  /** 투명해지기 전의 불투명한 구. 그림자 맵에는 들어가지 않는다. */
-  item: DrawItem;
-  center: Vec3;
-  radius: number;
-  /** 구가 놓인 행성. 굴절된 광선이 닿는 바닥을 찾는 데 쓴다. */
-  ground: { center: Vec3; radius: number };
-  surfaceNormal: Vec3;
-  /** 수면 높이 (구 반지름 기준) */
-  level: number;
-  /** 0이면 불투명한 구만, 1이면 물이 든 구만 보인다. */
-  opacity: number;
-  /** 물결의 세기 (0~1) */
-  ripple: number;
-  time: number;
-}
-
-/** 연기 입자 하나가 차지하는 값의 개수: x, y, z, 크기, 불투명도, 무늬 씨앗, 열기 */
-export const SMOKE_STRIDE = 7;
-/** 한 번에 그릴 수 있는 연기 입자 수 */
-export const SMOKE_CAPACITY = 96;
-
-export interface HeatSphere extends ContentFrame {
-  kind: 'heat-sphere';
-  /** 달아오른 구. 같은 자리에 빛나는 껍질을 겹쳐 그린다. */
-  item: DrawItem;
-  center: Vec3;
-  radius: number;
-  /** 0이면 식어 있고 1이면 완전히 달아올랐다. */
-  heat: number;
-  time: number;
-  /** 입자마다 `SMOKE_STRIDE`개씩 들어 있는 연기 값. 앞의 `smokeCount`개만 유효하다. */
-  smoke: Float32Array;
-  smokeCount: number;
-}
-
 export interface FrameData {
   items: readonly DrawItem[];
   camera: CameraView;
