@@ -1,6 +1,6 @@
 # 입력과 조작 분석
 
-기준 커밋: `47a98e7` 이후 작업 트리 (터치 조작 추가). 규칙 문서는 아직 없다.
+기준 커밋: `2954526` 다음의 터치 입력을 Touch Events로 변경. 규칙 문서는 아직 없다.
 
 ## 구조
 
@@ -22,10 +22,11 @@
 | Esc, 포인터 잠금 해제, 탭 전환 | 일시 정지 |
 | 일시 정지 버튼 | 일시 정지. `(pointer: coarse)`일 때만 보인다 |
 
-- 터치는 Pointer Events로 받고 `pointerType`이 `mouse`가 아닌 것만 다룬다. `pointerdown`에서 `preventDefault`해 호환용 마우스 이벤트를 막는다.
-- 조이스틱과 시점 드래그는 각각 손가락 하나씩 `pointerId`로 추적하므로 동시에 쓸 수 있다.
+- 터치는 캔버스의 Touch Events(`touchstart`·`touchmove`·`touchend`·`touchcancel`, `passive: false`)로 받는다. `touchstart`와 `touchmove`에서 `preventDefault`해 스크롤, 확대, 호환용 마우스 이벤트를 막는다. 터치 대상은 처음 누른 요소로 고정되므로 포인터 캡처가 필요 없다.
+- 처음에는 Pointer Events와 `setPointerCapture`를 썼지만, 실제 휴대폰 세로 화면에서 조이스틱이 나타나기만 하고 움직이지 않아 2026-11-17에 바꿨다. 원인은 기기에서 확인하지 못했다.
+- 조이스틱과 시점 드래그는 각각 손가락 하나씩 `Touch.identifier`로 추적하므로 동시에 쓸 수 있다.
 - `main.ts`의 `readMoveDirection`은 키 입력과 `moveAxis`를 더한 뒤 길이가 1을 넘으면 정규화한다. 플레이어는 길이 1 이하의 방향을 그대로 가속에 쓴다.
-- 포인터 잠금은 `(any-pointer: fine)`일 때만 요청한다.
+- 포인터 잠금은 주 입력이 정밀한 포인터(`(pointer: fine)`)일 때만 요청한다. 휴대폰에서 잠금이 걸리면 터치 좌표가 고정되어 조이스틱이 움직이지 않을 수 있기 때문이다.
 - `Input.clear()`는 키, 시점 누적, 터치 추적을 모두 지운다. 일시 정지와 창 포커스 해제 때 불린다.
 - 조이스틱은 `main.ts`가 매 프레임 `overlay.setJoystick(input.joystick)`으로 그린다. CSS의 원 크기는 `JOYSTICK_RADIUS`와 맞춰 둔다.
 
@@ -37,9 +38,9 @@
 
 ## 확인 방법
 
-단위 테스트가 없다. 개발 서버에서 모바일 뷰포트로 열고, 캔버스에 `pointerType: 'touch'`인 `PointerEvent`를 보내 `window.__game.input.moveAxis`, 구 위치, `camera.forward` 변화를 본다. 합성 이벤트는 실제 포인터가 없어 `setPointerCapture`가 실패하므로 코드에서 예외를 삼킨다.
+단위 테스트가 없다. 개발 서버에서 모바일 뷰포트로 열고, 캔버스에 `new Touch(...)`로 만든 `TouchEvent`를 보내 `window.__game.input.moveAxis`, 구 위치, `camera.forward` 변화를 본다. 브라우저 창이 가려져 있으면 프레임이 돌지 않아 구가 움직이지 않고, 창이 다시 보일 때 일시 정지된다.
 
 ## 확인하지 않은 것
 
-- 실제 휴대폰에서의 조작감과 성능. 렌더러 설정(그림자 2048px, devicePixelRatio 최대 2)은 모바일용으로 따로 낮추지 않았다
+- 실제 휴대폰에서의 조작감과 성능. Touch Events로 바꾼 뒤의 동작도 기기에서는 아직 확인하지 않았다. 렌더러 설정(그림자 2048px, devicePixelRatio 최대 2)은 모바일용으로 따로 낮추지 않았다
 - iOS Safari의 주소창, 노치 영역, 가로 화면

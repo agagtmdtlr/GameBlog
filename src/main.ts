@@ -17,9 +17,12 @@ type GameState = 'start' | 'playing' | 'paused';
 const PHYSICS_STEP_SECONDS = 1 / 120;
 const MAX_FRAME_SECONDS = 0.1;
 
-/** 마우스나 터치패드가 있으면 포인터 잠금으로 시점을 돌린다. */
+/**
+ * 주 입력이 마우스나 터치패드일 때만 포인터 잠금으로 시점을 돌린다.
+ * 휴대폰에서 잠금이 걸리면 터치 좌표가 고정되어 조이스틱이 움직이지 않는다.
+ */
 function hasFinePointer(): boolean {
-  return window.matchMedia('(any-pointer: fine)').matches;
+  return window.matchMedia('(pointer: fine)').matches;
 }
 
 function main(): void {

@@ -45,10 +45,13 @@ export class Input {
       }
     });
 
-    canvas.addEventListener('pointerdown', (event) => this.onTouchStart(event));
-    canvas.addEventListener('pointermove', (event) => this.onTouchMove(event));
-    canvas.addEventListener('pointerup', (event) => this.onTouchEnd(event));
-    canvas.addEventListener('pointercancel', (event) => this.onTouchEnd(event));
+    // 휴대폰 브라우저마다 Pointer Events의 캡처·잠금 동작이 달라 터치는 Touch Events로 받는다.
+    // 터치 대상은 처음 누른 요소로 고정되므로 손가락이 캔버스 밖으로 나가도 계속 받는다.
+    const touchOptions: AddEventListenerOptions = { passive: false };
+    canvas.addEventListener('touchstart', (event) => this.onTouchStart(event), touchOptions);
+    canvas.addEventListener('touchmove', (event) => this.onTouchMove(event), touchOptions);
+    canvas.addEventListener('touchend', (event) => this.onTouchEnd(event), touchOptions);
+    canvas.addEventListener('touchcancel', (event) => this.onTouchEnd(event), touchOptions);
   }
 
   get isPointerLocked(): boolean {
@@ -89,42 +92,40 @@ export class Input {
     this.lookTouch = null;
   }
 
-  private onTouchStart(event: PointerEvent): void {
-    if (event.pointerType === 'mouse') return;
-    // 호환용 마우스 이벤트와 스크롤, 확대를 막는다.
+  private onTouchStart(event: TouchEvent): void {
+    // 스크롤, 확대, 호환용 마우스 이벤트를 막는다.
     event.preventDefault();
-    const point = { x: event.clientX, y: event.clientY };
-    const onLeft = point.x < window.innerWidth / 2;
-    if (onLeft && !this.stick) {
-      this.stick = { id: event.pointerId, origin: point, knob: { x: 0, y: 0 } };
-    } else if (!onLeft && !this.lookTouch) {
-      this.lookTouch = { id: event.pointerId, last: point };
-    } else {
-      return;
-    }
-    // 손가락이 HUD 위로 지나가도 이벤트를 계속 받는다. 캡처가 실패해도 조작은 된다.
-    try {
-      this.canvas.setPointerCapture(event.pointerId);
-    } catch {
-      // 이미 끝난 포인터처럼 캡처할 수 없는 경우
+    for (const touch of Array.from(event.changedTouches)) {
+      const point = { x: touch.clientX, y: touch.clientY };
+      const onLeft = point.x < window.innerWidth / 2;
+      if (onLeft && !this.stick) {
+        this.stick = { id: touch.identifier, origin: point, knob: { x: 0, y: 0 } };
+      } else if (!onLeft && !this.lookTouch) {
+        this.lookTouch = { id: touch.identifier, last: point };
+      }
     }
   }
 
-  private onTouchMove(event: PointerEvent): void {
-    if (this.stick?.id === event.pointerId) {
-      const dx = event.clientX - this.stick.origin.x;
-      const dy = event.clientY - this.stick.origin.y;
-      const limit = Math.min(1, JOYSTICK_RADIUS / Math.max(Math.hypot(dx, dy), 1e-6));
-      this.stick.knob = { x: dx * limit, y: dy * limit };
-    } else if (this.lookTouch?.id === event.pointerId) {
-      this.lookX += (event.clientX - this.lookTouch.last.x) * TOUCH_LOOK_SCALE;
-      this.lookY += (event.clientY - this.lookTouch.last.y) * TOUCH_LOOK_SCALE;
-      this.lookTouch.last = { x: event.clientX, y: event.clientY };
+  private onTouchMove(event: TouchEvent): void {
+    event.preventDefault();
+    for (const touch of Array.from(event.changedTouches)) {
+      if (this.stick?.id === touch.identifier) {
+        const dx = touch.clientX - this.stick.origin.x;
+        const dy = touch.clientY - this.stick.origin.y;
+        const limit = Math.min(1, JOYSTICK_RADIUS / Math.max(Math.hypot(dx, dy), 1e-6));
+        this.stick.knob = { x: dx * limit, y: dy * limit };
+      } else if (this.lookTouch?.id === touch.identifier) {
+        this.lookX += (touch.clientX - this.lookTouch.last.x) * TOUCH_LOOK_SCALE;
+        this.lookY += (touch.clientY - this.lookTouch.last.y) * TOUCH_LOOK_SCALE;
+        this.lookTouch.last = { x: touch.clientX, y: touch.clientY };
+      }
     }
   }
 
-  private onTouchEnd(event: PointerEvent): void {
-    if (this.stick?.id === event.pointerId) this.stick = null;
-    if (this.lookTouch?.id === event.pointerId) this.lookTouch = null;
+  private onTouchEnd(event: TouchEvent): void {
+    for (const touch of Array.from(event.changedTouches)) {
+      if (this.stick?.id === touch.identifier) this.stick = null;
+      if (this.lookTouch?.id === touch.identifier) this.lookTouch = null;
+    }
   }
 }
