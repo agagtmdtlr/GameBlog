@@ -21,7 +21,9 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
   background: var(--background);
+  -webkit-tap-highlight-color: transparent;
 }
 
 #game {
@@ -31,6 +33,11 @@ body {
   width: 100%;
   height: 100%;
   outline: none;
+  /* 터치 드래그를 스크롤·확대 대신 조작으로 받는다. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 [hidden] {
@@ -125,8 +132,8 @@ kbd {
 
 #hud {
   position: fixed;
-  left: 20px;
-  bottom: 20px;
+  left: calc(20px + env(safe-area-inset-left));
+  bottom: calc(20px + env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
   gap: 10px;
@@ -163,4 +170,88 @@ kbd {
   .hud--changed {
     animation: none;
   }
+}
+
+/* 터치가 주 입력이면 터치 조작 안내를, 아니면 키보드·마우스 안내를 보여 준다. */
+.controls-touch {
+  display: none !important;
+}
+
+#pause-button {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .controls-pointer {
+    display: none !important;
+  }
+
+  #screen-controls .controls-touch {
+    display: flex !important;
+  }
+
+  #screen-controls dd.controls-touch {
+    display: block !important;
+  }
+
+  #pause-button {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top));
+    right: calc(16px + env(safe-area-inset-right));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--surface);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  #pause-button span {
+    width: 4px;
+    height: 14px;
+    border-radius: 1px;
+    background: var(--text);
+  }
+}
+
+#joystick {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+#joystick::before,
+#joystick-knob {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+}
+
+/* 원점이 손가락 위치이므로 원을 가운데로 옮긴다. 지름은 JOYSTICK_RADIUS의 2배다. */
+#joystick::before {
+  left: -56px;
+  top: -56px;
+  width: 112px;
+  height: 112px;
+  /* 밝은 행성 표면과 검은 하늘 위에서 모두 보이도록 어두운 바탕에 밝은 테두리를 둔다. */
+  border: 2px solid rgb(255 255 255 / 0.7);
+  background: rgb(0 0 0 / 0.22);
+}
+
+#joystick-knob {
+  left: -24px;
+  top: -24px;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgb(0 0 0 / 0.25);
+  background: rgb(255 255 255 / 0.9);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
 }

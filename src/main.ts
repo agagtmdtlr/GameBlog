@@ -17,20 +17,19 @@ type GameState = 'start' | 'playing' | 'paused';
 const PHYSICS_STEP_SECONDS = 1 / 120;
 const MAX_FRAME_SECONDS = 0.1;
 
-function isTouchOnlyDevice(): boolean {
-  return !window.matchMedia('(any-pointer: fine)').matches;
+/** 마우스나 터치패드가 있으면 포인터 잠금으로 시점을 돌린다. */
+function hasFinePointer(): boolean {
+  return window.matchMedia('(any-pointer: fine)').matches;
 }
 
 function main(): void {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
   let state: GameState = 'start';
 
-  const overlay = new Overlay(() => startPlaying());
-
-  if (isTouchOnlyDevice()) {
-    overlay.showNotice('PC에서 플레이해 주세요', '이 사이트는 키보드와 마우스로 구를 조작합니다.');
-    return;
-  }
+  const overlay = new Overlay(
+    () => startPlaying(),
+    () => pause(),
+  );
 
   if (!WebGL.isWebGL2Available()) {
     overlay.showNotice(
@@ -75,13 +74,14 @@ function main(): void {
     overlay.hideScreen();
     canvas.focus({ preventScroll: true });
     // 잠금이 거부되어도(예: Esc 직후) 드래그로 시점을 돌리며 계속 플레이할 수 있다.
-    canvas.requestPointerLock()?.catch?.(() => {});
+    if (hasFinePointer()) canvas.requestPointerLock()?.catch?.(() => {});
   }
 
   function pause(): void {
     if (state !== 'playing') return;
     state = 'paused';
     input.clear();
+    overlay.setJoystick(null);
     overlay.showPaused();
     if (input.isPointerLocked) document.exitPointerLock();
   }
@@ -103,8 +103,11 @@ function main(): void {
   });
 
   function readMoveDirection(): Vec3 {
-    const forward = Number(input.isDown('KeyW', 'ArrowUp')) - Number(input.isDown('KeyS', 'ArrowDown'));
-    const strafe = Number(input.isDown('KeyD', 'ArrowRight')) - Number(input.isDown('KeyA', 'ArrowLeft'));
+    const stick = input.moveAxis;
+    const forward =
+      Number(input.isDown('KeyW', 'ArrowUp')) - Number(input.isDown('KeyS', 'ArrowDown')) + stick.y;
+    const strafe =
+      Number(input.isDown('KeyD', 'ArrowRight')) - Number(input.isDown('KeyA', 'ArrowLeft')) + stick.x;
     const direction = add(scale(camera.forward, forward), scale(camera.right, strafe));
     const magnitude = length(direction);
     return magnitude > 1 ? scale(direction, 1 / magnitude) : direction;
@@ -124,6 +127,7 @@ function main(): void {
       const direction = readMoveDirection();
       alpha = stepper.advance(frameSeconds, (dt) => world.fixedStep(dt, { direction }));
       camera.follow(world.interpolatedPlayerPosition(alpha), frameSeconds);
+      overlay.setJoystick(input.joystick);
     }
 
     const aspect = renderer.resizeToDisplay();

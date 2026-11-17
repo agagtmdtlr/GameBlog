@@ -1,3 +1,4 @@
+import type { JoystickState } from '../engine/input';
 import type { Vec3 } from '../engine/math';
 
 function element<T extends HTMLElement>(id: string): T {
@@ -24,9 +25,13 @@ export class Overlay {
   private readonly hud = element('hud');
   private readonly swatch = element('hud-swatch');
   private readonly label = element('hud-label');
+  private readonly pauseButton = element<HTMLButtonElement>('pause-button');
+  private readonly joystick = element('joystick');
+  private readonly joystickKnob = element('joystick-knob');
 
-  constructor(onAction: () => void) {
+  constructor(onAction: () => void, onPause: () => void) {
     this.action.addEventListener('click', onAction);
+    this.pauseButton.addEventListener('click', onPause);
   }
 
   showStart(): void {
@@ -34,7 +39,7 @@ export class Overlay {
   }
 
   showPaused(): void {
-    this.show('일시 정지', '클릭하면 이어서 플레이합니다.', '계속하기');
+    this.show('일시 정지', '버튼을 누르면 이어서 플레이합니다.', '계속하기');
   }
 
   /** 플레이할 수 없는 환경을 알린다. 버튼 없이 안내만 보여준다. */
@@ -44,12 +49,20 @@ export class Overlay {
     this.controls.hidden = true;
     this.action.hidden = true;
     this.screen.hidden = false;
-    this.hud.hidden = true;
+    this.setPlaying(false);
   }
 
   hideScreen(): void {
     this.screen.hidden = true;
-    this.hud.hidden = false;
+    this.setPlaying(true);
+  }
+
+  /** 터치 조이스틱을 손가락 위치에 그린다. `null`이면 숨긴다. */
+  setJoystick(state: JoystickState | null): void {
+    this.joystick.hidden = !state;
+    if (!state) return;
+    this.joystick.style.transform = `translate(${state.origin.x}px, ${state.origin.y}px)`;
+    this.joystickKnob.style.transform = `translate(${state.knob.x}px, ${state.knob.y}px)`;
   }
 
   setActiveContent(label: string, color: Vec3): void {
@@ -68,7 +81,13 @@ export class Overlay {
     this.controls.hidden = false;
     this.action.hidden = false;
     this.screen.hidden = false;
-    this.hud.hidden = true;
+    this.setPlaying(false);
     this.action.focus({ preventScroll: true });
+  }
+
+  private setPlaying(playing: boolean): void {
+    this.hud.hidden = !playing;
+    this.pauseButton.hidden = !playing;
+    if (!playing) this.joystick.hidden = true;
   }
 }

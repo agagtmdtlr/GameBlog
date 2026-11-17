@@ -7,6 +7,7 @@
 | 기능 | 해당 작업 | 규칙 | 분석 |
 |---|---|---|---|
 | 콘텐츠와 셰이더 | 발판(버튼), 콘텐츠, 셰이더, 구의 재질이나 연출 | [rules/content.md](rules/content.md) | [analysis/content.md](analysis/content.md) |
+| 입력과 조작 | 키보드·마우스·터치 입력, 가상 조이스틱, 일시 정지, 조작 안내 | 없음 | [analysis/input.md](analysis/input.md) |
 | three.js 렌더러 | 렌더러, 그림자·장면 복사 패스, 셰이더 규약, three.js 버전 변경 | [rules/threejs.md](rules/threejs.md) | [analysis/threejs.md](analysis/threejs.md) |
 
 ## 프로젝트 전체
