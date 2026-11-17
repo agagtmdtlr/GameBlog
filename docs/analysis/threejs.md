@@ -60,6 +60,7 @@ git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.js
 
 - `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
 - `WaterSphereRenderer`의 장면: 물이 든 구 전용. 불투명한 구(`base`)와 물 셰이더 메시(`mesh`)가 들어 있다.
+- `HeatSphereRenderer`의 장면: 달아오른 구 전용. 열 껍질 메시와 `InstancedBufferGeometry` 사각형(빛 번짐, 연기)이 들어 있다.
 - `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
 - `lightCamera`: 그림자용 `OrthographicCamera`
 

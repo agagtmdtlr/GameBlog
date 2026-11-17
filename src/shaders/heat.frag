@@ -61,8 +61,8 @@ void main() {
   float veins = smoothstep(0.42, 0.78, n);
 
   float pulse = 0.88 + 0.12 * sin(uTime * 4.3);
-  float glow = (0.04 + 0.5 * veins + 0.55 * rim) * pulse;
-  vec3 ember = mix(vec3(1.0, 0.1, 0.015), vec3(1.0, 0.45, 0.08), clamp(veins * 0.7 + rim * 0.3, 0.0, 1.0));
+  float glow = (0.02 + 0.24 * veins + 0.2 * rim) * pulse;
+  vec3 ember = mix(vec3(1.0, 0.035, 0.006), vec3(1.0, 0.17, 0.02), clamp(veins * 0.6, 0.0, 1.0));
 
   fragColor = vec4(linearToSrgb(acesFilm(ember * glow)), uHeat);
 }

@@ -47,7 +47,7 @@ const PLATE_GLOW_RATE = 7;
 const PLATE_GLOW_STRENGTH = 0.55;
 const COLOR_TRANSITION_SECONDS = 0.3;
 /** 완전히 달아오른 구가 스스로 내는 빛 (선형 RGB) */
-const HEAT_EMISSIVE: Vec3 = [0.5, 0.05, 0.008];
+const HEAT_EMISSIVE: Vec3 = [0.32, 0.02, 0.003];
 
 export const STUDIO_ENVIRONMENT: Environment = {
   // 기본 시점에서 그림자가 구의 앞쪽 옆으로 떨어져 잘 보이는 방향

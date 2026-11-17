@@ -22,7 +22,7 @@ import { ContentRenderer, type RenderContext, type Uniforms } from './contentRen
 
 /** 구 반지름 기준 빛 번짐의 크기와 가장 밝을 때의 세기 */
 const HALO_SIZE = 3.4;
-const HALO_STRENGTH = 0.32;
+const HALO_STRENGTH = 0.22;
 
 interface Billboards {
   mesh: Mesh<InstancedBufferGeometry, RawShaderMaterial>;

@@ -2,7 +2,7 @@
 
 현재 구현된 구조와 기능을 기록하는 문서다. 결정 배경과 앞으로의 계획은 [개발 계획서](DEVELOPMENT_PLAN.md)에 둔다.
 
-- **분석 기준:** 커밋 `7b5a2ab` 다음의 점프 제거와 행성 변경 (2026-11-15)
+- **분석 기준:** 커밋 `47a98e7` 다음의 발열 구 색 조정 (2026-11-17)
 - **공개 URL:** <https://agagtmdtlr.github.io/GameBlog/>
 - **관리 규칙:** 폴더 구조, 기능, 조작, 알려진 한계가 바뀌면 같은 변경에서 이 문서도 고치고 기준 커밋을 갱신한다.
 
@@ -17,8 +17,8 @@
 | 그래픽스 | three.js 0.187 (WebGL2). 직접 작성한 PBR·물 셰이더를 `RawShaderMaterial`로 사용. 적용 내용은 [analysis/threejs.md](analysis/threejs.md) |
 | 개발 도구 | TypeScript, Vite, Vitest, `@types/three` (모두 개발 시에만 사용) |
 | 배포 | `main` 푸시 시 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 배포 |
-| 코드 규모 | TypeScript 1,657줄, 셰이더 372줄, CSS 166줄, 테스트 514줄 |
-| 빌드 크기 | JS 563.38KB (gzip 144.25KB), CSS 2.26KB (gzip 0.94KB) |
+| 코드 규모 | TypeScript 2,181줄, 셰이더 520줄, CSS 166줄, 테스트 573줄 |
+| 빌드 크기 | JS 579.88KB (gzip 148.53KB), CSS 2.26KB (gzip 0.94KB) |
 
 ### 명령어
 
@@ -44,6 +44,7 @@ GameBlog/
 │  │  ├─ contentRenderers/     콘텐츠 전용 그리기
 │  │  │  ├─ contentRenderer.ts   공통 기반 클래스와 RenderContext
 │  │  │  ├─ waterSphere.ts       물이 든 구
+│  │  │  ├─ heatSphere.ts        달아오른 구: 빛나는 껍질, 빛 번짐, 연기
 │  │  │  └─ registry.ts          콘텐츠 렌더러 등록 목록
 │  │  └─ input.ts              키보드, 마우스, 포인터 잠금 상태
 │  ├─ physics/
@@ -56,14 +57,16 @@ GameBlog/
 │  │  ├─ cameraRig.ts          행성 표면을 따라가는 3인칭 궤도 카메라
 │  │  ├─ pressurePlate.ts      발판의 작동 판정과 눌림
 │  │  ├─ colorTransition.ts    색 전환
-│  │  └─ waterFill.ts          구 안의 물: 차오름, 출렁임, 물결
+│  │  ├─ waterFill.ts          구 안의 물: 차오름, 출렁임, 물결
+│  │  └─ sphereHeat.ts         구의 열과 연기 입자
 │  ├─ content/
 │  │  ├─ types.ts              콘텐츠 인터페이스
 │  │  ├─ manager.ts            활성 콘텐츠 관리
 │  │  ├─ registry.ts           발판과 콘텐츠 등록 목록
 │  │  ├─ sphereColor.ts        구 색 변경 콘텐츠
-│  │  └─ waterSphere.ts        물이 든 구 콘텐츠
-│  ├─ shaders/                 mesh.vert, pbr.frag, water.frag
+│  │  ├─ waterSphere.ts        물이 든 구 콘텐츠
+│  │  └─ heatSphere.ts         달아오른 구 콘텐츠
+│  ├─ shaders/                 mesh.vert, pbr.frag, water.frag, heat.frag, billboard.vert, puff.frag
 │  └─ ui/overlay.ts            화면 안내와 HUD 제어
 ├─ docs/
 │  ├─ README.md                기능별 규칙과 분석 문서의 색인
@@ -96,7 +99,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 1. `main.ts`가 입력을 읽어 카메라 기준 이동 방향을 계산한다.
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `fixedStep`은 구 이동과 충돌, 물 상태, 발판 판정, 색 전환, 활성 콘텐츠 갱신을 순서대로 처리한다.
+3. `fixedStep`은 구 이동과 충돌, 물 상태, 열과 연기, 발판 판정, 색 전환, 활성 콘텐츠 갱신을 순서대로 처리한다.
 4. 카메라가 보간된 구 위치를 따라간다.
 5. `World.buildDrawList`와 `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 구에 물이 있으면 물이 든 구 렌더러가 장면을 복사한 뒤 구를 마지막에 그린다.
 
@@ -144,7 +147,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | 콘텐츠 id | 이름 | 위치 (위도, 경도) |
 |---|---|---|
 | `color-default` | 기본색 | (70, 180) |
-| `color-coral` | 코랄 | (35, 215) |
+| `color-coral` | 코랄 (달아올라 빛나며 연기를 뿜는 구) | (35, 215) |
 | `color-amber` | 앰버 | (30, 150) |
 | `color-teal` | 틸 | (-5, 115) |
 | `water-blue` | 블루 (물이 든 투명한 구) | (35, 60) |
@@ -168,6 +171,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - **출력:** ACES 톤 매핑, sRGB 변환, 안티에일리어싱, devicePixelRatio 최대 2
 - **표면 무늬:** 구의 대원 줄무늬로 회전을 보여 주고, 행성의 격자로 이동감을 준다. 격자는 구를 정육면체 여섯 면으로 나눠 그려 극점에서 선이 몰리지 않는다
 - **물이 든 구:** 불투명한 장면을 복사한 뒤 구 내부를 광선 추적해 굴절과 수면을 그린다. 수면은 구가 회전해도 그 자리의 표면과 나란하고, 가속과 충격에 출렁인다. 그림자는 그림자 맵 대신 해석적인 옅은 그림자와 커스틱으로 대신한다
+- **달아오른 구:** 구 재질의 자체 발광에 불씨 무늬 껍질과 빛 번짐을 더하고, 표면에서 뿜어져 행성 바깥으로 떠오르는 연기를 인스턴스 사각형으로 그린다
 
 ### 예외 처리
 
@@ -186,7 +190,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 **색 발판:** [`registry.ts`](../src/content/registry.ts)의 `CONTENT_ENTRIES`에 한 줄을 추가하면 된다. 발판, 판정, HUD 표시가 자동으로 따라온다.
 
-**새로운 종류의 콘텐츠:** 현재 `ContentContext`가 제공하는 기능은 `sphere.setColor`와 `sphere.setWaterFilled`다. 다음 작업이 함께 필요하다.
+**새로운 종류의 콘텐츠:** 현재 `ContentContext`가 제공하는 기능은 `sphere.setColor`, `sphere.setWaterFilled`, `sphere.setHeated`다. 다음 작업이 함께 필요하다.
 
 1. `src/content/`에 `GraphicsContent`를 구현한 콘텐츠 파일을 추가한다.
 2. 필요한 기능을 [`ContentContext`](../src/content/types.ts)에 더하고 `World`에서 연결한다.
@@ -199,13 +203,13 @@ main.ts ─┬─ game/ ─┬─ content/
 
 ### 자동 테스트
 
-`npm test` 기준 52개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다.
+`npm test` 기준 55개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다.
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 12 | 벡터, 쿼터니언, 행렬 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 9 | 구-행성 충돌, 반발, 고정 시간 간격 |
-| [`game.test.ts`](../src/game/game.test.ts) | 31 | 구 조작(중력, 한 바퀴 돌기), 카메라, 발판, 색 전환, 구 안의 물, 콘텐츠 관리, 월드 통합 |
+| [`game.test.ts`](../src/game/game.test.ts) | 34 | 구 조작(중력, 한 바퀴 돌기), 카메라, 발판, 색 전환, 구 안의 물, 달아오른 구, 콘텐츠 관리, 월드 통합 |
 
 렌더러, 입력, UI, `main.ts`는 단위 테스트가 없다.
 
@@ -220,6 +224,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | Esc 일시 정지 | 키 이벤트 주입 | 일시 정지 화면 전환 |
 | 컨텍스트 손실과 복구 | `WEBGL_lose_context` | 복구 후 물이 든 구까지 정상. WebGL·콘솔 오류 없음 |
 | 블루 발판과 물이 든 구 | 코드로 구 이동, 키 이벤트 주입 | 차오름, 수면 기울기, 다른 발판에서 복귀 정상. WebGL·콘솔 오류 없음 |
+| 코랄 발판과 달아오른 구 (2026-11-17) | 코드로 구 이동, `fixedStep` 직접 호출 | 붉은 발광과 연기, 블루 발판으로 옮긴 뒤 열과 연기가 모두 사라짐. WebGL·콘솔 오류 없음. 식는 도중의 화면은 캡처하지 못함 |
 
 공개 URL은 three.js 포팅 전 버전까지만 확인했다.
 
@@ -234,7 +239,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 | 항목 | 내용 |
 |---|---|
-| 콘텐츠 폭 | 콘텐츠가 구 색 변경과 물이 든 구뿐이다. 전용 그리기는 콘텐츠 렌더러로 나뉘어 있지만, 불투명한 구 위에 겹쳐 그리는 절차는 물이 든 구 렌더러 안에 있고 콘텐츠 렌더러는 그림자 패스에 참여하지 못한다 |
+| 콘텐츠 폭 | 콘텐츠가 구 색 변경, 물이 든 구, 달아오른 구뿐이다. 전용 그리기는 콘텐츠 렌더러로 나뉘어 있지만, 불투명한 구 위에 겹쳐 그리는 절차는 물이 든 구 렌더러 안에 있고 콘텐츠 렌더러는 그림자 패스에 참여하지 못한다 |
 | 물의 굴절 | 굴절된 배경을 행성 표면 기준으로 찾으므로 발판 위에서는 비치는 위치가 약간 다를 수 있다. 물이 든 동안 매 프레임 장면을 복사하며, 그 부담은 측정하지 않았다 |
 | 안 쓰는 코드 | `math.ts`의 투영·시점 행렬 함수는 런타임에서 쓰지 않고 테스트만 남아 있다 |
 | 빌드 크기 | three.js로 옮기면서 JS가 약 15배(gzip 144.25KB)로 늘었다 |
