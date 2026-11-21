@@ -4,11 +4,11 @@
 
 - **규칙:** [rules/content.md](../rules/content.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `1c3831b` 다음의 행성 표면 색 변경 시스템 제거 (2026-11-21)
+- **분석 기준:** 커밋 `cc0d160` (2026-11-21, 전체 문서 재검토)
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline 1c3831b..HEAD -- src/content src/game src/engine/renderer.ts src/engine/contentRenderers src/shaders src/main.ts
+git log --oneline cc0d160..HEAD -- src/content src/game src/engine/renderer.ts src/engine/contentRenderers src/shaders src/main.ts
 ```
 
 ## 작업 유형별 수정 파일
@@ -54,7 +54,7 @@ interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; 
 
 - 위도 90이 시작 지점(+Y)이다. 경도 180이 시작할 때 바라보는 방향(-Z)이고, 경도 90이 오른쪽(+X)이다.
 - 표면 거리는 각도 1도에 약 0.31이다.
-- 해는 경도 115, 위도 46 쪽에 있다. 그 반대쪽 절반은 밤이다.
+- 해는 시작할 때 위도 약 47, 경도 약 115 쪽(`STUDIO_ENVIRONMENT.lightDirection`)에 있고, 120초에 한 바퀴 궤도를 돈다 ([analysis/sun.md](sun.md)). 그래서 낮과 밤이 바뀐다. "해가 드는 쪽" 검사는 시작할 때의 방향 기준이다.
 
 사용 중인 위치는 없다.
 
@@ -62,19 +62,19 @@ interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; 
 
 영역은 메시가 없다. 행성 표면에 칠한 원이다.
 
-- **판정:** `SurfaceZone`(`game/surfaceZone.ts`)이 행성 중심에서 구 중심을 향하는 방향과 영역 방향의 각도를 본다. 각도가 반지름(표면 1.5) 안이면 작동한다. 높이는 보지 않으므로 영역 위에서 점프 중이어도 작동한다. 경계에서 `PLAYER_RADIUS`만큼 더 벗어나야 다시 작동할 수 있다.
-- **상태:** `World`가 영역마다 `glow`(켜진 콘텐츠의 영역이면 1)와 `presence`(구가 영역 위에 있으면 1)를 지수적으로 따라가게 한다.
-- **그리기:** `World.buildSurfaceZones()`가 `SurfaceZoneFrame[]`을 만들고 `FrameData.surfaceZones`로 넘긴다. `Renderer`는 이를 PBR 공용 uniform 배열(`uZoneDir`, `uZoneColor`, `uZoneParams`, `uZoneCount`)에 옮기고, 재질의 `showsZones`가 켜진 메시(행성)만 `pbr.frag`의 `applySurfaceZones`로 칠한다. 안쪽은 영역 색을 80% 섞고, 경계선은 어둡게 칠한다. 켜진 영역은 안쪽과 경계가 빛나고, 구가 올라서면 경계선이 영역 색으로 밝아진다.
+- **판정:** `SurfaceZone`(`game/surfaceZone.ts`)이 행성 중심에서 캐릭터 물리 몸체(충돌 구)의 중심을 향하는 방향과 영역 방향의 각도를 본다. 각도가 반지름(표면 1.5) 안이면 작동한다. 높이는 보지 않으므로 몸체가 떠 있어도 작동한다. 경계에서 `PLAYER_RADIUS`만큼 더 벗어나야 다시 작동할 수 있다.
+- **상태:** `World`가 영역마다 `glow`(켜진 콘텐츠의 영역이면 1)와 `presence`(캐릭터가 영역 위에 있으면 1)를 지수적으로 따라가게 한다.
+- **그리기:** `World.buildSurfaceZones()`가 `SurfaceZoneFrame[]`을 만들고 `FrameData.surfaceZones`로 넘긴다. `Renderer`는 이를 PBR 공용 uniform 배열(`uZoneDir`, `uZoneColor`, `uZoneParams`, `uZoneCount`)에 옮기고, 재질의 `showsZones`가 켜진 메시(행성)만 `pbr.frag`의 `applySurfaceZones`로 칠한다. 안쪽은 영역 색을 80% 섞고, 경계선은 어둡게 칠한다. 켜진 영역은 안쪽과 경계가 빛나고, 캐릭터가 올라서면 경계선이 영역 색으로 밝아진다.
 - **한계:** 영역은 `MAX_SURFACE_ZONES`(8)개까지 그린다. `frame.ts`와 `pbr.frag`의 `MAX_ZONES`를 함께 바꿔야 한다. 평평하게 칠한 원이라 지평선 너머에서는 보이지 않는다.
 
 ## 월드 상태 추가 순서
 
 1. `game/<이름>.ts`에 상태 클래스를 만들고 `update(dt, ...)`로 진행한다.
 2. `content/types.ts`의 `ContentContext`에 메서드를 더한다.
-3. `World` 생성자의 `ctx` 객체에서 연결하고, `fixedStep`에서 갱신한다.
+3. `World` 생성자가 `ContentManager`에 넘기는 `ctx`(지금은 빈 객체 `{}`)에서 연결하고, `fixedStep`에서 갱신한다.
 4. `game.test.ts`의 가짜 `ctx`(`콘텐츠 관리` 블록)에도 메서드를 더한다. 빠뜨리면 `tsc`가 실패한다.
 5. 상태 클래스 단위 테스트와, 영역까지 굴러가는 월드 통합 테스트(`rollTo` 사용)를 더한다.
-6. 방향이 있는 상태라면 위쪽이 `[0, 1, 0]`이라고 가정하지 않는다. 위쪽은 `normalize(구 위치 - PLANET.center)`이며 구가 움직이면 계속 바뀐다.
+6. 방향이 있는 상태라면 위쪽이 `[0, 1, 0]`이라고 가정하지 않는다. 위쪽은 `normalize(물리 몸체 위치 - PLANET.center)`이며 캐릭터가 움직이면 계속 바뀐다.
 
 렌더링에는 `World`의 값을 프레임마다 넘긴다. 위치는 `alpha`로 보간한 `interpolatedPlayerPosition`을 쓴다.
 
@@ -85,7 +85,7 @@ three.js로 그린다. 구조와 three.js 규약은 [analysis/threejs.md](threej
 프레임 순서:
 
 1. 그림자 패스: `items` 중 `castShadow`인 것을 깊이만 그린다.
-2. 메인 패스: `items`를 PBR 재질로 그린다. 불투명한 물체의 순서는 three.js가 정한다.
+2. 메인 패스: `items`를 PBR 재질로 그린다. 불투명한 물체의 순서는 three.js가 정한다. 이어서 별·햇살·해 눈 빌보드를 한 번에 그린다 ([analysis/billboard.md](billboard.md)).
 3. `frame.contents`에 값이 있는 콘텐츠 렌더러를 등록한 순서대로 그린다. 지금은 등록된 렌더러가 없고 `World.buildContentFrames`는 빈 배열을 반환한다.
 
 ### 콘텐츠 렌더러
@@ -141,19 +141,19 @@ abstract class ContentRenderer<T extends ContentFrame> {
 서버는 `.claude/launch.json`의 `gameblog`다. 개발 서버에서만 `window.__game`(`world`, `camera`, `input`, `gl`, `getState`)을 쓸 수 있다.
 
 1. "시작하기" 버튼을 클릭한다. 상태가 `playing`이어야 물리가 돈다.
-2. 구를 영역으로 옮긴다.
+2. 캐릭터의 물리 몸체를 영역으로 옮긴다. 다리(`Walker`)는 발이 멀어지면 회복 걸음으로 따라온다.
 
    ```js
    const g = window.__game;
    const [lat, lon] = [35, 60].map((d) => (d * Math.PI) / 180); // 영역의 위도, 경도
-   const r = 18.65; // 행성 반지름 + 구 반지름
+   const r = 18 + 1.32; // 행성 반지름 + 충돌 구 반지름(PLAYER_RADIUS)
    const p = [r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon)];
    g.world.player.position = p;
    g.world.player.previousPosition = p;
    g.world.player.velocity = [0, 0, 0];
    ```
 
-3. 이동은 캔버스에 키 이벤트를 보내 시험한다.
+3. 이동은 키 이벤트를 보내 시험한다. `Input`은 `window`에서 받으므로 캔버스에 보내도 버블링으로 전달된다.
 
    ```js
    document.getElementById('game').dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', bubbles: true }));

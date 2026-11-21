@@ -2,13 +2,13 @@
 
 현재 구현된 구조와 기능을 기록하는 문서다. 결정 배경과 앞으로의 계획은 [개발 계획서](DEVELOPMENT_PLAN.md)에 둔다.
 
-- **분석 기준:** 커밋 `61671b7` 다음의 해 추가 (2026-11-21)
+- **분석 기준:** 커밋 `cc0d160` (2026-11-21, 전체 문서 재검토)
 - **공개 URL:** <https://agagtmdtlr.github.io/GameBlog/>
 - **관리 규칙:** 폴더 구조, 기능, 조작, 알려진 한계가 바뀌면 같은 변경에서 이 문서도 고치고 기준 커밋을 갱신한다.
 
 ## 1. 컨셉
 
-사이트 전체가 하나의 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다니고, 표면에 칠해진 원형 영역에 들어가 콘텐츠를 켠다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
+사이트 전체가 하나의 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다니고, 표면에 칠해진 원형 영역에 들어가 콘텐츠를 켠다(지금은 등록된 콘텐츠가 없다). 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
 
 ## 2. 기술 구성
 
@@ -17,8 +17,8 @@
 | 그래픽스 | three.js 0.187 (WebGL2). 직접 작성한 PBR 셰이더를 `RawShaderMaterial`로 사용. 적용 내용은 [analysis/threejs.md](analysis/threejs.md) |
 | 개발 도구 | TypeScript, Vite, Vitest, `@types/three` (모두 개발 시에만 사용) |
 | 배포 | `main` 푸시 시 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 배포 |
-| 코드 규모 | TypeScript 1,680줄, 셰이더 204줄, CSS 257줄, 테스트 474줄 |
-| 빌드 크기 | JS 579.88KB (gzip 148.53KB), CSS 2.26KB (gzip 0.94KB) |
+| 코드 규모 | TypeScript 3,556줄, 셰이더 264줄, CSS 257줄, 테스트 1,233줄, Blender 스크립트 179줄 |
+| 빌드 크기 | JS 674.54KB (gzip 176.19KB), CSS 3.59KB (gzip 1.30KB), 캐릭터 모델 43.48KB. JS가 500KB를 넘어 Vite가 청크 크기 경고를 낸다 |
 
 ### 명령어
 
@@ -46,6 +46,7 @@ GameBlog/
 │  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
 │  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
+│  │  ├─ starfield.ts          별 배치와 별 얼굴 그림 ([analysis/starfield.md](analysis/starfield.md))
 │  │  ├─ sunRays.ts            해 둘레 삼각형 햇살의 모양 ([analysis/sun.md](analysis/sun.md))
 │  │  ├─ contentRenderers/     콘텐츠 전용 그리기
 │  │  │  ├─ contentRenderer.ts   공통 기반 클래스와 RenderContext
@@ -73,8 +74,9 @@ GameBlog/
 │  │  └─ registry.ts           작동 영역과 콘텐츠 등록 목록 (지금은 비어 있음)
 │  ├─ assets/character.glb     Blender에서 내보낸 다리 스킨 메시
 │  ├─ scenes/surface.json      행성 표면에 놓는 객체(집·로켓 자리)의 장면 파일
-│  ├─ shaders/                 mesh.vert, pbr.frag
+│  ├─ shaders/                 mesh.vert, pbr.frag, billboard.vert, billboard.frag
 │  └─ ui/overlay.ts            화면 안내와 HUD 제어
+├─ tools/blender/build_character.py  캐릭터 다리 모델(character.glb)을 만드는 Blender 스크립트
 ├─ docs/
 │  ├─ README.md                기능별 규칙과 분석 문서의 색인
 │  ├─ rules/                   기능별 규칙
@@ -106,8 +108,8 @@ main.ts ─┬─ game/ ─┬─ content/
 
 1. `main.ts`가 입력을 읽어 카메라 기준 이동 방향을 계산한다.
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `fixedStep`은 해의 궤도 진행, 위성 자전, 구 이동과 충돌, 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
-4. 카메라가 보간된 구 위치를 따라간다.
+3. `fixedStep`은 해의 궤도 진행, 위성 자전, 캐릭터 물리 몸체의 이동과 충돌, 걸음(`Walker`), 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
+4. 카메라가 보간된 물리 몸체 위치를 따라간다.
 5. `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광), `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 지금은 콘텐츠 렌더러가 없다.
 
 ### 게임 상태
@@ -151,7 +153,8 @@ main.ts ─┬─ game/ ─┬─ content/
 - 캐릭터 집이 놓일 자리에 푸른 회색 상자(폭 3.2, 높이 2.8, 깊이 3.2)를 둔다 (2026-11-21 사용자 요청). 위치는 위도 66, 경도 180으로, 시작 지점 정면 약 7.5 거리이고 해가 드는 쪽이다. 정면이 시작 지점을 향한다. 위치, 크기, 색은 장면 파일 `scenes/surface.json`의 `house`에서 바꾼다.
 - 로켓이 놓일 자리에 붉은 정육면체(한 변 2.4)를 둔다 (2026-11-21 사용자 요청). 위성으로 향하는 부근이라는 요청에 따라 위성 바로 아래 표면(위도 약 30, 경도 약 207.5)에 두었고, 위쪽이 위성을 향한다. 위치는 `MOON.direction`에서 계산하므로 위성을 옮기면 따라간다. 집 자리와 같이 충돌체다. 크기와 색은 장면 파일 `scenes/surface.json`의 `rocket`에서 바꾼다.
 - 행성 주변 하늘(시작 시점 왼쪽 위, 거리 40)에 충돌구가 패인 회색 위성이 떠서 제자리에서 자전한다 (2026-11-21 사용자 요청).
-- 해는 한 방향에 고정되어 있어 행성의 절반은 밤이다. 밤 쪽은 간접광으로만 보인다.
+- 주황색 해가 행성 중심에서 70 떨어진 궤도를 120초에 한 바퀴 돈다. 직사광이 해를 따라 움직여 낮과 밤이 바뀌고, 밤 쪽은 간접광으로만 보인다. 해는 둘레의 햇살과 캐릭터를 바라보는 눈을 가지며, 궤적이 가는 고리로 보인다 ([analysis/sun.md](analysis/sun.md)).
+- 행성 중심에서 110~200 떨어진 곳에 얼굴이 있는 별 48개가 카메라를 보며 떠 있다 ([analysis/starfield.md](analysis/starfield.md)).
 - 카메라의 위쪽은 캐릭터가 있는 곳의 표면 바깥 방향이다. 좌우 각도 대신 표면에 접하는 진행 방향을 들고 다녀 극점에서도 뒤집히지 않는다.
 - 검은 배경에 흰색에 가까운 무채색 행성을 둔다. 행성 색은 고정이다. 캐릭터는 노랑(#FCC812)으로 고정이다.
 
@@ -160,7 +163,7 @@ main.ts ─┬─ game/ ─┬─ content/
 지금은 등록된 콘텐츠가 없어 행성 표면에 영역이 없다. 예전의 행성 표면 색 변경 콘텐츠(기본색, 코랄, 앰버, 틸, 블루 영역)는 새 시스템을 넣기 전에 정리하려고 2026-11-21에 사용자 결정으로 지웠다. 참고 구현은 커밋 `1c3831b`의 `content/planetColor.ts`, `game/colorTransition.ts`에 있다. 아래는 콘텐츠를 등록하면 따라오는 영역 동작이다.
 
 - 위치는 도 단위다. 위도 90이 시작 지점이고, 경도 180이 시작할 때 바라보는 방향이다.
-- 영역은 해가 드는 쪽에 둔다.
+- 영역은 시작할 때 해가 드는 쪽에 둔다. 해가 궤도를 돌므로 플레이 중에는 영역이 밤 쪽에 놓일 수 있다.
 - 영역은 모델 없이 행성 표면에 칠한 원(표면 반지름 1.5)이다. 안쪽은 영역 색으로 물들고 경계에 어두운 선이 있다.
 - 캐릭터 몸의 중심이 원 안으로 들어오면 작동한다. 높이는 보지 않는다. 경계에서 충돌 구 반지름만큼 더 벗어나야 다시 작동하므로 경계를 오가도 반복 작동하지 않는다.
 - 켜진 영역은 빛나고, 캐릭터가 올라선 영역은 경계선이 밝아진다.
@@ -171,7 +174,9 @@ main.ts ─┬─ game/ ─┬─ content/
 
 - **재질:** Cook-Torrance PBR (GGX, Smith, Schlick)과 방향광 1개
 - **three.js:** `WebGLRenderer`, `Scene`, 기본 지오메트리, `GLTFLoader`(캐릭터 다리 스킨 메시, CPU 스키닝), 카메라, 렌더 타깃을 쓴다. 조명과 재질 계산은 내장 재질 대신 아래의 직접 작성한 셰이더가 한다
-- **그림자:** 2048px 깊이 맵, 3×3 PCF, 원점 기준 반경 24 고정
+- **그림자:** 2048px 깊이 맵, 3×3 PCF, 원점 기준 반경 24 고정. 광원 방향은 해를 따라 매 프레임 바뀐다. 해와 위성은 범위 밖이라 그림자를 드리우지 않는다
+- **빌보드:** 별, 햇살, 해 눈을 텍스처 아틀라스 한 장과 인스턴스 그리기 한 번으로 그린다 ([analysis/billboard.md](analysis/billboard.md))
+- **위성:** 정이십면체 구를 충돌구·바위 덩어리 모양으로 밀어 만든다 ([analysis/moon.md](analysis/moon.md))
 - **간접광:** 하늘·지면 2색 반구광과 환경 맵 없는 반사 근사 (Karis 2014)
 - **접지감:** 캐릭터 몸이 행성 표면에 만드는 해석적 앰비언트 오클루전
 - **출력:** ACES 톤 매핑, sRGB 변환, 안티에일리어싱, devicePixelRatio 최대 2
@@ -205,14 +210,18 @@ main.ts ─┬─ game/ ─┬─ content/
 
 ### 자동 테스트
 
-`npm test` 기준 70개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다.
+`npm test` 기준 8개 파일, 105개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 12 | 벡터, 쿼터니언, 행렬 |
+| [`billboard.test.ts`](../src/engine/billboard.test.ts) | 5 | 빌보드 아틀라스 배치와 텍스처 좌표, 그리기 순서 |
+| [`moonShape.test.ts`](../src/engine/moonShape.test.ts) | 4 | 위성의 충돌구·바위 덩어리 모양 |
+| [`starfield.test.ts`](../src/engine/starfield.test.ts) | 3 | 별 배치와 윤곽 |
+| [`sunRays.test.ts`](../src/engine/sunRays.test.ts) | 4 | 해 햇살 모양 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
-| [`game.test.ts`](../src/game/game.test.ts) | 43 | 구 조작(중력, 한 바퀴 돌기), 카메라, 작동 영역, 콘텐츠 관리, 월드 통합, 집 자리, 로켓 자리 |
-| [`walker.test.ts`](../src/game/walker.test.ts) | 17 | 캐릭터 다리와 걷기 |
+| [`game.test.ts`](../src/game/game.test.ts) | 47 | 구 조작(중력, 한 바퀴 돌기), 카메라, 작동 영역, 콘텐츠 관리, 월드 통합, 집 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
+| [`walker.test.ts`](../src/game/walker.test.ts) | 17 | 캐릭터 다리와 걷기, 키프레임, 스킨 메시 기본 자세 |
 
 렌더러, 입력, UI, `main.ts`는 단위 테스트가 없다.
 
@@ -247,12 +256,12 @@ main.ts ─┬─ game/ ─┬─ content/
 | 항목 | 내용 |
 |---|---|
 | 콘텐츠 폭 | 등록된 콘텐츠가 없다. 콘텐츠 렌더러 구조는 남아 있지만 등록된 렌더러가 없고, 그림자 패스에 참여하지 못한다 |
-| 안 쓰는 코드 | `math.ts`의 투영·시점 행렬 함수는 런타임에서 쓰지 않고 테스트만 남아 있다 |
-| 빌드 크기 | three.js로 옮기면서 JS가 약 15배(gzip 144.25KB)로 늘었다 |
+| 안 쓰는 코드 | `math.ts`의 `mat4Perspective`, `mat4LookAt`, `mat4Ortho`, `mat4TransformPoint`, `quatMultiply`, `quatNormalize`, `quatNlerp`, `quatFromUnitVectors`는 다른 런타임 코드에서 쓰지 않고 테스트만 남아 있다 |
+| 빌드 크기 | three.js로 옮기면서 JS가 크게 늘었고, 지금은 674.54KB(gzip 176.19KB)라 Vite가 500KB 청크 경고를 낸다 |
 | 그림자 메모리 | 그림자 렌더 타깃에 쓰지 않는 색 첨부(약 16MB)가 함께 잡힌다 |
 | 재질 | PBR 셰이더가 `metallic`을 지원하지만 모든 재질이 0을 쓴다 |
 | 프레임 비용 | 그림자 패스를 매 프레임 전부 다시 그린다. 실제 부담은 측정하지 않았다 |
 | 시야 | 행성이 작아 지평선이 가깝다. 구 앞쪽으로 약 7 거리까지만 보이고, 작동 영역은 표면에 칠한 원이라 지평선 너머에서는 전혀 보이지 않는다 |
-| 밤 쪽 | 해가 고정이라 행성의 절반이 어둡다. 작동 영역은 해가 드는 쪽에만 둔다 |
+| 낮과 밤 | 해가 120초에 한 바퀴 돌아 어느 곳이든 한동안 밤이 된다. 밤에는 간접광만 남는다. 작동 영역의 위치 검사는 시작할 때의 해 방향만 본다 |
 | 모바일 | 터치로 플레이할 수 있지만 그림자 해상도와 픽셀 비율은 PC와 같다. 성능을 측정하지 않았다 |
-| 문서 | README가 없고, 개발 계획서 7장은 구현 전 문구 그대로다 |
+| 문서 | 저장소 루트에 README가 없다 (문서 색인은 `docs/README.md`). 개발 계획서는 첫 버전 계획이며, 이후 바뀐 결정은 규칙 문서와 이 문서에 있다 |

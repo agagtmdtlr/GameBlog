@@ -4,13 +4,15 @@
 
 - **규칙:** [rules/threejs.md](../rules/threejs.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `0bb670f` 다음의 콘텐츠 렌더러 분리
+- **분석 기준:** 커밋 `cc0d160` (2026-11-21, 전체 문서 재검토)
 - **버전:** `three` 0.187.0, `@types/three` 0.187.0 (개발용)
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.json
+git log --oneline cc0d160..HEAD -- src/engine src/shaders src/main.ts package.json
 ```
+
+"포팅 방침", "바뀐 파일", "대응표", "포팅 중 확인한 점", "결과", 2026-11-15 브라우저 확인은 포팅 당시의 기록이다. 물이 든 구, 발판, 자체 엔진 파일처럼 지금은 없는 것이 나온다. 현재 구조는 "렌더러 구조"를 본다.
 
 ## 포팅 방침
 
@@ -42,7 +44,7 @@ git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.js
 | `canvas.getContext('webgl2')` | `new WebGLRenderer({ canvas, alpha: false, antialias: true })` |
 | WebGL2 미지원 시 `null` 확인 | `three/addons/capabilities/WebGL.js`의 `isWebGL2Available()` |
 | `ShaderProgram` (컴파일, 링크, uniform 위치 캐시) | `RawShaderMaterial` (`glslVersion: GLSL3`) |
-| `uploadMesh`의 VAO와 버퍼 | `SphereGeometry(1, 96, 64)`, 집 자리 상자의 `BoxGeometry(1, 1, 1)`(2026-11-21), 해 궤적의 `TorusGeometry`(2026-11-21, [analysis/sun.md](sun.md)), 위성의 `IcosahedronGeometry` + `mergeVertices`(2026-11-21, [analysis/moon.md](moon.md)), `GLTFLoader`로 불러온 캐릭터 다리 부품(2026-11-21, [analysis/character.md](character.md)). 포팅 직후에는 `BoxGeometry`도, 발판에는 `CylinderGeometry`도 썼으나 행성과 표면 작동 영역으로 바꾸면서 뺐다 |
+| `uploadMesh`의 VAO와 버퍼 | `SphereGeometry(1, 96, 64)`, 표면 장면 객체(집·로켓 자리, [analysis/surfaceScene.md](surfaceScene.md))의 `BoxGeometry(1, 1, 1)`(2026-11-21), 해 궤적의 `TorusGeometry`(2026-11-21, [analysis/sun.md](sun.md)), 위성의 `IcosahedronGeometry` + `mergeVertices`(2026-11-21, [analysis/moon.md](moon.md)), `GLTFLoader`로 불러온 캐릭터 다리 부품(2026-11-21, [analysis/character.md](character.md)). 포팅 직후에는 `BoxGeometry`도, 발판에는 `CylinderGeometry`도 썼으나 행성과 표면 작동 영역으로 바꾸면서 뺐다 |
 | `DrawItem` 배열을 순서대로 `drawElements` | `Scene`에 넣은 `Mesh` 풀. 프레임마다 행렬과 uniform을 덮어쓴다 |
 | `viewProj` 행렬을 uniform으로 전달 | `PerspectiveCamera`. 셰이더는 `projectionMatrix * viewMatrix`를 쓴다 |
 | `computeLightViewProj` | `OrthographicCamera`를 광원 위치에 두고 원점을 보게 한다 |
@@ -110,7 +112,7 @@ three.js의 톤 매핑과 출력 색공간 변환은 내장 재질과 셰이더 
 | TypeScript (테스트 제외) | 1,746줄 | 1,620줄 |
 | 셰이더 | 369줄 (5개) | 355줄 (3개) |
 | 자동 테스트 | 53개 | 45개 (메시 테스트 8개 삭제) |
-| 빌드 JS | 37.49KB (gzip 13.86KB) | 562.65KB (gzip 143.92KB) |
+| 빌드 JS | 37.49KB (gzip 13.86KB) | 562.65KB (gzip 143.92KB). 기능이 늘어 `cc0d160` 기준 674.54KB (gzip 176.19KB) |
 
 빌드 크기가 약 15배 늘었다. 0.187의 `WebGLRenderer`는 내장 재질과 셰이더 청크를 함께 포함하므로 이름으로 가져와도 크게 줄지 않는다.
 
@@ -129,5 +131,6 @@ three.js의 톤 매핑과 출력 색공간 변환은 내장 재질과 셰이더 
 
 ## 남은 일
 
-- `engine/math.ts`의 `mat4Perspective`, `mat4LookAt`, `mat4Ortho`, `mat4Multiply`는 런타임에서 쓰지 않고 테스트만 남아 있다.
+- `engine/math.ts`의 `mat4Perspective`, `mat4LookAt`, `mat4Ortho`, `mat4TransformPoint`, `quatMultiply`, `quatNormalize`, `quatNlerp`, `quatFromUnitVectors`는 다른 런타임 코드에서 쓰지 않고 테스트만 남아 있다. `mat4Multiply`는 캐릭터 스키닝 행렬에 쓴다.
+- 빌드 JS가 500KB를 넘어 Vite가 청크 크기 경고를 낸다.
 - 조명과 재질을 three.js 내장(`MeshStandardMaterial`, `DirectionalLight`, `renderer.shadowMap`)으로 바꾸면 코드는 더 줄지만, 줄무늬·격자 무늬, 해석적 앰비언트 오클루전, 커스틱을 `onBeforeCompile`로 다시 넣어야 하고 화면이 달라진다.

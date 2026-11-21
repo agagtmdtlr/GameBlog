@@ -4,7 +4,7 @@
 
 - **규칙:** 없음
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `a5ddf61` 다음의 빌보드 일괄 렌더링 도입 (2026-11-21)
+- **분석 기준:** 커밋 `cc0d160` (2026-11-21, 전체 문서 재검토)
 
 ## 동작
 
@@ -24,7 +24,7 @@
 |---|---|
 | `game/sun.ts` | `SUN` 상수, `SUN_EMISSIVE`, `SUN_ORBIT_EMISSIVE`, `Sun` 클래스(`step`, `direction(alpha)`, `position(alpha)`, 궤도 기저 `start`·`ahead`·`axis`) |
 | `game/world.ts` | `World.sun`을 `fixedStep`에서 진행하고, 그리기 목록 끝에 해 구체와 궤적 고리를, `buildBillboards`에 햇살과 눈(흰자·검은자 각 2개)을 넣고, `environment(alpha)`로 해 방향을 담은 조명 환경을 만든다 |
-| `main.ts` | 렌더러에 `STUDIO_ENVIRONMENT` 대신 `world.environment(alpha)`를 넘기고, `buildDrawList`에 카메라(`camera.view`)를 넘긴다 |
+| `main.ts` | 렌더러에 `STUDIO_ENVIRONMENT` 대신 `world.environment(alpha)`를 넘기고, `buildBillboards`에 카메라(`camera.view`)를 넘긴다 |
 | `game/sunFace.ts` | 해 빌보드 축(`sunBillboardBasis`), 눈 배치 값 `SUN_FACE`, 검은자 이동(`pupilOffset`), 두 눈의 흰자·검은자 위치(`sunEyes`) |
 | `engine/sunRays.ts` | 햇살 삼각형 정점을 만드는 `sunRayPositions`, 햇살 그림의 절반 크기 `sunRaysExtent`, 모양 값 `SUN_RAYS`. three.js를 쓰지 않는다 |
 | `engine/frame.ts` | `MeshKind`에 `ring`(XY 평면의 반지름 1 토러스)과 관 반지름 비율 `RING_TUBE_RATIO`(0.0015) |
