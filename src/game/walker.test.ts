@@ -17,6 +17,8 @@ import { skinVertices } from '../engine/skinning';
 import blenderScript from '../../tools/blender/build_character.py?raw';
 import { PLANET } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
+import { IDLE_CLIP, STEP_CLIP, WALK_CLIP } from './characterClips';
+import { sampleTrack, track } from './keyframes';
 import { LEG, LEG_REST, restBones, solveTwoBone, Walker, type BoneTransform, type Side } from './walker';
 
 const DT = 1 / 120;
@@ -59,6 +61,79 @@ describe('두 마디 IK', () => {
     const { ankle } = solveTwoBone(hip, target, LEG.thigh, LEG.shin, pole);
     expect(length(ankle)).toBeCloseTo(LEG.thigh + LEG.shin, 3);
     expect(ankle[1]).toBeLessThan(-1.5);
+  });
+});
+
+describe('키프레임 트랙', () => {
+  it('키에서는 키 값을 지나고 사이는 부드럽게 잇는다', () => {
+    const keys = track([0, 0], [0.5, 1], [1, 0]);
+    expect(sampleTrack(keys, 0, false)).toBeCloseTo(0, 6);
+    expect(sampleTrack(keys, 0.5, false)).toBeCloseTo(1, 6);
+    expect(sampleTrack(keys, 1, false)).toBeCloseTo(0, 6);
+    const quarter = sampleTrack(keys, 0.25, false);
+    expect(quarter).toBeGreaterThan(0.4);
+    expect(quarter).toBeLessThan(1);
+  });
+
+  it('반복 트랙은 1을 넘으면 처음부터 다시 재생하고 이음매에서 끊기지 않는다', () => {
+    const keys = WALK_CLIP.tracks.bob;
+    expect(sampleTrack(keys, 1.3, true)).toBeCloseTo(sampleTrack(keys, 0.3, true), 6);
+    expect(sampleTrack(keys, 0.9999, true)).toBeCloseTo(sampleTrack(keys, 0.0001, true), 2);
+  });
+
+  it('반복 클립의 트랙은 끝 값과 처음 값이 같고, 내딛기는 땅에서 시작해 땅에서 끝난다', () => {
+    for (const clip of [IDLE_CLIP, WALK_CLIP]) {
+      for (const keys of Object.values(clip.tracks)) {
+        expect(keys[0].time).toBe(0);
+        expect(keys[keys.length - 1].time).toBe(1);
+        expect(keys[keys.length - 1].value).toBe(keys[0].value);
+      }
+    }
+    expect(sampleTrack(STEP_CLIP.tracks.lift, 0, false)).toBe(0);
+    expect(sampleTrack(STEP_CLIP.tracks.lift, 1, false)).toBe(0);
+    expect(sampleTrack(STEP_CLIP.tracks.travel, 1, false)).toBe(1);
+  });
+});
+
+describe('서기와 걷기 애니메이션', () => {
+  it('서 있으면 숨쉬기 클립대로 몸만 오르내리고 발은 그대로다', () => {
+    const player = new Player(TOP);
+    const walker = new Walker(TOP, PLANET);
+    run(player, walker, 0.5, () => IDLE);
+    const feet = [walker.footPosition(-1), walker.footPosition(1)];
+    const heights: number[] = [];
+    for (let i = 0; i < IDLE_CLIP.duration / DT; i++) {
+      run(player, walker, DT, () => IDLE);
+      heights.push(dot(sub(walker.body, player.position), normalize(player.position)));
+    }
+    expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(0.03);
+    expect(walker.walkWeight).toBeLessThan(0.01);
+    expect(length(sub(walker.footPosition(-1), feet[0]))).toBeLessThan(1e-9);
+    expect(length(sub(walker.footPosition(1), feet[1]))).toBeLessThan(1e-9);
+  });
+
+  it('걸으면 걷기 클립으로 바뀌고, 딛고 있는 발은 땅에 고정된다', () => {
+    const player = new Player(TOP);
+    const walker = new Walker(TOP, PLANET);
+    run(player, walker, 1, alongEquator);
+    expect(walker.walkWeight).toBeGreaterThan(0.95);
+    let planted = 0;
+    for (let i = 0; i < 2 / DT; i++) {
+      const before = [walker.footPosition(-1), walker.footPosition(1)];
+      const wasStepping = walker.steppingCount;
+      run(player, walker, DT, alongEquator);
+      for (let leg = 0; leg < 2; leg++) {
+        const side: Side = leg === 0 ? -1 : 1;
+        const now = walker.footPosition(side);
+        const onGround = heightAboveSurface(before[leg]) < 1e-6 && heightAboveSurface(now) < 1e-6;
+        // 땅에 있던 발이 그대로 땅에 있으면 움직이지 않아야 한다 (착지 순간 제외).
+        if (onGround && wasStepping === walker.steppingCount) {
+          planted++;
+          expect(length(sub(now, before[leg]))).toBeLessThan(1e-9);
+        }
+      }
+    }
+    expect(planted).toBeGreaterThan(100);
   });
 });
 
@@ -163,7 +238,8 @@ describe('다리 스킨 메시의 기본 자세', () => {
   it('서 있는 자세의 스키닝은 기본 자세 발목을 IK가 푼 발목으로 옮긴다', () => {
     const player = new Player(TOP);
     const walker = new Walker(TOP, PLANET);
-    run(player, walker, 0.5, () => IDLE);
+    // 숨쉬기 클립이 한 바퀴 돌아 몸 높이와 기울기가 0인 순간을 본다.
+    run(player, walker, IDLE_CLIP.duration, () => IDLE);
     const bones = walker.solveLegs(walker.pose(1));
     const rest = restBones();
     for (let leg = 0; leg < 2; leg++) {

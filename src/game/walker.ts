@@ -13,6 +13,8 @@ import {
   type Vec3,
 } from '../engine/math';
 import type { Sphere } from '../physics/collision';
+import { IDLE_CLIP, STEP_CLIP, WALK_CLIP } from './characterClips';
+import { sampleClip } from './keyframes';
 
 /** 구체 몸의 반지름 */
 export const BODY_RADIUS = 0.5;
@@ -48,19 +50,31 @@ const KNEE_POLE_UP = 2.0;
 const TOE_OUT = (75 * Math.PI) / 180;
 
 /** 발을 드는 최대 높이 */
-const STEP_HEIGHT = 0.28;
-/** 움직이는 중에 발이 목표에서 이만큼 벗어나면 내딛는다. */
-const STEP_TRIGGER = 0.22;
-/** 멈춘 뒤 자세를 정리할 때의 기준. 작을수록 정확히 제자리로 모은다. */
-const SETTLE_TRIGGER = 0.05;
+const STEP_HEIGHT = 0.3;
 /** 이보다 느리면 멈춘 것으로 본다. */
 const IDLE_SPEED = 0.4;
-/** 한 걸음의 시간 = STRIDE_TIME / 속도. 빠를수록 잰걸음이 된다. */
-const STRIDE_TIME = 0.5;
-const MIN_STEP_SECONDS = 0.07;
-const MAX_STEP_SECONDS = 0.16;
-/** 한쪽 발이 이만큼 벗어나면 다른 발이 내딛는 중이어도 함께 내딛는다. */
-const EMERGENCY_FACTOR = 2.5;
+/** 걷기 한 주기(두 걸음)에 몸이 나아가는 거리 = STRIDE_BASE + STRIDE_PER_SPEED × 속도. 빠를수록 보폭이 길다. */
+const STRIDE_BASE = 0.9;
+const STRIDE_PER_SPEED = 0.16;
+const MAX_STRIDE = 2.6;
+/** 한 주기에서 발이 땅을 딛고 있는 비율. 0.5보다 조금 커서 두 발이 잠깐 함께 딛는다. */
+const DUTY = 0.55;
+const MIN_STEP_SECONDS = 0.08;
+const MAX_STEP_SECONDS = 0.4;
+/** 멈춘 뒤 발을 제자리로 모으는 걸음 */
+const SETTLE_TRIGGER = 0.05;
+const SETTLE_SECONDS = 0.22;
+const SETTLE_LIFT = 0.5;
+/** 딛고 있는 발이 쉬는 위치에서 이만큼 벗어나면 위상과 상관없이 바로 내딛는다 (급회전, 밀려남). */
+const REACH_LIMIT = 1.5;
+const RECOVER_SECONDS = 0.14;
+
+/** 걷기 클립의 진폭 (몸 높이, 옆, 앞, 엉덩이 기울기 라디안) */
+const WALK_AMPLITUDE = { bob: 0.07, sway: 0.08, surge: 0.035, roll: (7 * Math.PI) / 180 } as const;
+/** 숨쉬기 클립의 진폭 */
+const IDLE_AMPLITUDE = { bob: 0.045, sway: 0.025, roll: (2.5 * Math.PI) / 180 } as const;
+/** 서기와 걷기 클립을 섞는 비율이 따라가는 빠르기 */
+const BLEND_RATE = 7;
 
 /** 몸이 진행 방향으로 도는 빠르기 */
 const TURN_RATE = 12;
@@ -70,8 +84,6 @@ const AIR_DELAY = 0.12;
 const AIR_HANG_DOWN = 0.75;
 const AIR_HANG_SIDE = 0.8;
 const AIR_FOLLOW_RATE = 14;
-/** 발을 들 때 몸이 따라 올라가는 정도 */
-const BODY_BOB = 0.04;
 
 export type Side = -1 | 1;
 
@@ -80,12 +92,20 @@ interface Foot {
   /** 발바닥 중심. 땅에 있으면 행성 표면 위의 점이다. */
   position: Vec3;
   previousPosition: Vec3;
-  /** 걸음의 시작점 (표면 위) */
+  /** 발이 향하는 진행 방향. 딛고 있는 동안에는 고정된다. */
+  heading: Vec3;
+  previousHeading: Vec3;
+  /** 걸음의 시작점(표면 위)과 시작할 때의 방향 */
   from: Vec3;
+  fromHeading: Vec3;
   stepping: boolean;
   /** 걸음 진행도 0~1 */
   progress: number;
   duration: number;
+  /** 발 높이 배율 */
+  lift: number;
+  /** 이번 주기의 딛는 구간을 지나 다음 걸음을 시작할 수 있는지 */
+  armed: boolean;
 }
 
 /** 그리기에 쓰는 한 순간의 자세 */
@@ -93,8 +113,12 @@ export interface WalkerPose {
   body: Vec3;
   /** 몸이 바라보는 방향. 몸 위치의 표면 접평면에 있다. */
   forward: Vec3;
+  /** 엉덩이가 진행 방향 축으로 기운 각도(라디안). 양수면 오른쪽 엉덩이가 올라간다. */
+  roll: number;
   /** [왼발, 오른발]의 발바닥 중심 */
   feet: readonly [Vec3, Vec3];
+  /** [왼발, 오른발]이 향하는 방향 */
+  footHeadings: readonly [Vec3, Vec3];
 }
 
 /** 다리 뼈 하나의 원점과 정규직교 축 */
@@ -114,16 +138,29 @@ export interface WalkerBody {
 }
 
 /**
- * 구체 몸과 두 발의 절차적 걸음. 물리는 `Player`가 맡고, 이 클래스는 그 결과를 보고
- * 발을 언제 어디로 내디딜지 정한다. 다리 관절은 그릴 때 `solveLegs`로 푼다.
+ * 구체 몸과 두 발의 걸음. 물리는 `Player`가 맡고, 이 클래스는 그 결과를 보고 키프레임 클립을 재생한다.
+ *
+ * - 서기(`IDLE_CLIP`): 시간으로 재생하는 숨쉬기. 발은 제자리에 둔다.
+ * - 걷기(`WALK_CLIP`): 걸은 거리로 위상을 진행한다. 위상이 발을 들 때를 정하고, 몸은 걸음에 맞춰 오르내리고 흔들린다.
+ * - 내딛기(`STEP_CLIP`): 발 하나의 궤적. 딛고 있는 발은 땅에 고정되어 몸이 그 위로 지나간다.
+ *
+ * 두 몸 클립은 속도에 따라 섞는다. 다리 관절은 그릴 때 `solveLegs`가 IK로 푼다.
  */
 export class Walker {
   forward: Vec3;
   previousForward: Vec3;
   body: Vec3;
   previousBody: Vec3;
+  roll = 0;
+  previousRoll = 0;
+  /** 걷기 클립을 섞는 비율 0~1 */
+  walkWeight = 0;
+  /** 걷기 위상 0~1. 0에서 왼발이, 0.5에서 오른발이 땅에 닿는다. */
+  phase = 0;
   private readonly feet: [Foot, Foot];
   private airTime = 0;
+  private idleTime = 0;
+  private walking = false;
 
   constructor(
     position: Vec3,
@@ -137,7 +174,20 @@ export class Walker {
     this.previousBody = position;
     const foot = (side: Side): Foot => {
       const rest = this.restPoint(position, side);
-      return { side, position: rest, previousPosition: rest, from: rest, stepping: false, progress: 0, duration: 0 };
+      return {
+        side,
+        position: rest,
+        previousPosition: rest,
+        heading: this.forward,
+        previousHeading: this.forward,
+        from: rest,
+        fromHeading: this.forward,
+        stepping: false,
+        progress: 0,
+        duration: 0,
+        lift: 1,
+        armed: false,
+      };
     };
     this.feet = [foot(-1), foot(1)];
   }
@@ -159,7 +209,11 @@ export class Walker {
   step(dt: number, body: WalkerBody): void {
     this.previousBody = this.body;
     this.previousForward = this.forward;
-    for (const foot of this.feet) foot.previousPosition = foot.position;
+    this.previousRoll = this.roll;
+    for (const foot of this.feet) {
+      foot.previousPosition = foot.position;
+      foot.previousHeading = foot.heading;
+    }
 
     const up = this.upAt(body.position);
     const horizontal = sub(body.velocity, scale(up, dot(body.velocity, up)));
@@ -168,16 +222,19 @@ export class Walker {
 
     const wasAirborne = this.airborne;
     this.airTime = body.grounded ? 0 : this.airTime + dt;
+    const walking = !this.airborne && speed > IDLE_SPEED;
     if (this.airborne) {
       this.hangFeet(dt, body.position, up);
     } else {
       if (wasAirborne) this.land();
-      this.walk(dt, body.position, horizontal, speed);
+      if (walking && !this.walking) this.startWalking(body.position);
+      this.advanceSteps(dt, body.position, horizontal, speed, walking);
     }
+    this.walking = walking;
 
-    let lift = 0;
-    for (const foot of this.feet) if (foot.stepping) lift += Math.sin(Math.PI * foot.progress);
-    this.body = add(body.position, scale(up, BODY_BOB * Math.min(lift, 1)));
+    this.idleTime += dt;
+    this.walkWeight += ((walking ? 1 : 0) - this.walkWeight) * (1 - Math.exp(-BLEND_RATE * dt));
+    this.animateBody(body.position, up);
   }
 
   /** 렌더링 보간이 적용된 자세 */
@@ -185,10 +242,13 @@ export class Walker {
     const body = lerp(this.previousBody, this.body, alpha);
     const forward = tangentDirection(lerp(this.previousForward, this.forward, alpha), this.upAt(body));
     const [left, right] = this.feet;
+    const heading = (foot: Foot) => normalize(lerp(foot.previousHeading, foot.heading, alpha));
     return {
       body,
       forward,
+      roll: this.previousRoll + (this.roll - this.previousRoll) * alpha,
       feet: [lerp(left.previousPosition, left.position, alpha), lerp(right.previousPosition, right.position, alpha)],
+      footHeadings: [heading(left), heading(right)],
     };
   }
 
@@ -196,17 +256,20 @@ export class Walker {
   solveLegs(pose: WalkerPose): BoneTransform[] {
     const up = this.upAt(pose.body);
     const right = cross(pose.forward, up);
+    // 엉덩이 기울기: 진행 방향 축으로 오른쪽 축과 위쪽 축을 돌린다.
+    const hipRight = add(scale(right, Math.cos(pose.roll)), scale(up, Math.sin(pose.roll)));
+    const hipUp = sub(scale(up, Math.cos(pose.roll)), scale(right, Math.sin(pose.roll)));
     const bones: BoneTransform[] = [];
     for (let i = 0; i < 2; i++) {
       const side: Side = i === 0 ? -1 : 1;
       const sole = pose.feet[i];
       const footUp = this.upAt(sole);
-      const hip = add(pose.body, add(scale(right, side * HIP_SIDE), scale(up, HIP_UP)));
+      const hip = add(pose.body, add(scale(hipRight, side * HIP_SIDE), scale(hipUp, HIP_UP)));
       const pole = normalize(add(scale(right, side), scale(up, KNEE_POLE_UP)));
       const { knee, ankle } = solveTwoBone(hip, add(sole, scale(footUp, LEG.ankleHeight)), LEG.thigh, LEG.shin, pole);
       bones.push(segment('thigh', hip, knee, pole), segment('shin', knee, ankle, pole));
 
-      const footForward = tangentDirection(pose.forward, footUp);
+      const footForward = tangentDirection(pose.footHeadings[i], footUp);
       const footRight = cross(footForward, footUp);
       const toe = normalize(add(scale(footForward, Math.cos(TOE_OUT)), scale(footRight, side * Math.sin(TOE_OUT))));
       bones.push({ bone: 'foot', origin: ankle, x: cross(footUp, toe), y: footUp, z: toe });
@@ -225,43 +288,95 @@ export class Walker {
     this.forward = forward;
   }
 
-  private walk(dt: number, position: Vec3, horizontal: Vec3, speed: number): void {
-    const moving = speed > IDLE_SPEED;
-    const duration = clamp(STRIDE_TIME / Math.max(speed, 1e-3), MIN_STEP_SECONDS, MAX_STEP_SECONDS);
-    // 걷는 중에는 한 걸음 시간만큼 앞을 노려 발이 몸보다 늦지 않게 한다.
-    const lead = moving ? scale(horizontal, duration) : ([0, 0, 0] as Vec3);
-    const targets = this.feet.map((foot) => this.project(add(this.restPoint(position, foot.side), lead)));
+  /** 걷기 시작: 들려 있거나 목표에서 더 먼 발이 바로 내딛도록 위상을 맞춘다. */
+  private startWalking(position: Vec3): void {
+    const [left, right] = this.feet;
+    let leftFirst: boolean;
+    if (left.stepping || right.stepping) {
+      leftFirst = left.stepping;
+    } else {
+      const off = (foot: Foot) => distance(foot.position, this.restPoint(position, foot.side));
+      leftFirst = off(left) >= off(right);
+    }
+    // 왼발의 드는 구간은 위상 DUTY에서, 오른발은 DUTY - 0.5에서 시작한다.
+    const phase = leftFirst ? DUTY : DUTY - 0.5;
+    this.phase = phase - Math.floor(phase);
+    for (const foot of this.feet) foot.armed = !foot.stepping;
+  }
 
-    // 진행 중인 걸음을 이어간다. 목표가 움직이면 착지점도 따라간다.
-    this.feet.forEach((foot, i) => {
-      if (!foot.stepping) return;
+  private advanceSteps(dt: number, position: Vec3, horizontal: Vec3, speed: number, walking: boolean): void {
+    const stride = Math.min(STRIDE_BASE + STRIDE_PER_SPEED * speed, MAX_STRIDE);
+    const heading = walking ? scale(horizontal, 1 / speed) : this.forward;
+    if (walking) this.phase = (this.phase + (speed / stride) * dt) % 1;
+
+    /** 걸음이 끝날 때 발이 닿을 곳. 걷는 중이면 그때의 몸 위치에서 반 보 앞이다. */
+    const target = (foot: Foot): Vec3 => {
+      if (!walking) return this.restPoint(position, foot.side);
+      const remaining = foot.stepping ? (1 - foot.progress) * foot.duration : 0;
+      const landing = add(position, scale(horizontal, remaining));
+      return this.project(add(this.restPoint(landing, foot.side), scale(heading, (DUTY * stride) / 2)));
+    };
+
+    // 진행 중인 걸음을 클립대로 이어간다. 목표가 움직이면 착지점도 따라간다.
+    for (const foot of this.feet) {
+      if (!foot.stepping) continue;
       foot.progress = Math.min(1, foot.progress + dt / foot.duration);
-      const t = smoothstep(foot.progress);
-      const flat = this.project(lerp(foot.from, targets[i], t));
-      foot.position = add(flat, scale(this.upAt(flat), STEP_HEIGHT * Math.sin(Math.PI * foot.progress)));
+      const goal = target(foot);
+      const { travel, lift } = sampleClip(STEP_CLIP, foot.progress);
+      const flat = this.project(lerp(foot.from, goal, travel));
+      foot.position = add(flat, scale(this.upAt(flat), STEP_HEIGHT * foot.lift * Math.max(lift, 0)));
+      foot.heading = tangentDirection(lerp(foot.fromHeading, heading, Math.min(travel, 1)), this.upAt(flat));
       if (foot.progress >= 1) {
         foot.stepping = false;
-        foot.position = targets[i];
+        foot.position = goal;
       }
-    });
-
-    // 목표에서 가장 많이 벗어난 발부터 내딛는다. 보통은 한 번에 한 발만 든다.
-    const trigger = moving ? STEP_TRIGGER : SETTLE_TRIGGER;
-    const order = [0, 1].sort(
-      (a, b) => distance(this.feet[b].position, targets[b]) - distance(this.feet[a].position, targets[a]),
-    );
-    for (const i of order) {
-      const foot = this.feet[i];
-      if (foot.stepping) continue;
-      const off = distance(foot.position, targets[i]);
-      if (off < trigger) continue;
-      const otherStepping = this.feet[1 - i].stepping;
-      if (otherStepping && off < trigger * EMERGENCY_FACTOR) continue;
-      foot.stepping = true;
-      foot.progress = 0;
-      foot.duration = moving ? duration : MAX_STEP_SECONDS;
-      foot.from = foot.position;
     }
+
+    // 딛고 있는 발은 땅에 고정한다. 언제 들지만 정한다.
+    for (const foot of this.feet) {
+      if (foot.stepping) continue;
+      const other = this.feet[foot.side < 0 ? 1 : 0];
+      const off = distance(foot.position, this.restPoint(position, foot.side));
+      if (off > REACH_LIMIT) {
+        this.beginStep(foot, RECOVER_SECONDS, 1);
+      } else if (walking) {
+        // 위상이 이 발의 드는 구간에 들어서면 내딛고, 그 구간이 끝날 때 디딘다.
+        const footPhase = (this.phase + (foot.side < 0 ? 0 : 0.5)) % 1;
+        if (footPhase < DUTY) {
+          foot.armed = true;
+        } else if (foot.armed) {
+          const seconds = ((1 - footPhase) * stride) / speed;
+          this.beginStep(foot, clamp(seconds, MIN_STEP_SECONDS, MAX_STEP_SECONDS), 1);
+        }
+      } else if (!other.stepping && off > SETTLE_TRIGGER) {
+        this.beginStep(foot, SETTLE_SECONDS, SETTLE_LIFT);
+      }
+    }
+  }
+
+  private beginStep(foot: Foot, duration: number, lift: number): void {
+    foot.stepping = true;
+    foot.armed = false;
+    foot.progress = 0;
+    foot.duration = duration;
+    foot.lift = lift;
+    foot.from = this.project(foot.position);
+    foot.fromHeading = foot.heading;
+  }
+
+  /** 서기·걷기 클립을 섞어 몸의 위치와 엉덩이 기울기를 정한다. 공중에서는 쓰지 않는다. */
+  private animateBody(position: Vec3, up: Vec3): void {
+    const idle = sampleClip(IDLE_CLIP, this.idleTime);
+    const walk = sampleClip(WALK_CLIP, this.phase);
+    const w = this.walkWeight;
+    const onGround = this.airborne ? 0 : 1;
+    const mix = (idleValue: number, walkValue: number) => onGround * (idleValue * (1 - w) + walkValue * w);
+    const bob = mix(idle.bob * IDLE_AMPLITUDE.bob, walk.bob * WALK_AMPLITUDE.bob);
+    const sway = mix(idle.sway * IDLE_AMPLITUDE.sway, walk.sway * WALK_AMPLITUDE.sway);
+    const surge = mix(0, walk.surge * WALK_AMPLITUDE.surge);
+    this.roll = mix(idle.roll * IDLE_AMPLITUDE.roll, walk.roll * WALK_AMPLITUDE.roll);
+    const right = cross(this.forward, up);
+    this.body = add(position, add(scale(up, bob), add(scale(right, sway), scale(this.forward, surge))));
   }
 
   private hangFeet(dt: number, position: Vec3, up: Vec3): void {
@@ -270,6 +385,7 @@ export class Walker {
     for (const foot of this.feet) {
       const hang = add(position, add(scale(right, foot.side * STANCE_SIDE * AIR_HANG_SIDE), scale(up, -AIR_HANG_DOWN)));
       foot.position = lerp(foot.position, hang, follow);
+      foot.heading = this.forward;
       foot.stepping = false;
     }
   }
@@ -277,10 +393,8 @@ export class Walker {
   /** 착지하면 매달린 발을 걸음 중간에서 이어받아 땅으로 내린다. */
   private land(): void {
     for (const foot of this.feet) {
-      foot.from = this.project(foot.position);
-      foot.stepping = true;
+      this.beginStep(foot, SETTLE_SECONDS, 1);
       foot.progress = 0.5;
-      foot.duration = MAX_STEP_SECONDS;
     }
   }
 
@@ -352,8 +466,4 @@ function tangentDirection(v: Vec3, axis: Vec3): Vec3 {
 
 function distance(a: Vec3, b: Vec3): number {
   return length(sub(a, b));
-}
-
-function smoothstep(t: number): number {
-  return t * t * (3 - 2 * t);
 }

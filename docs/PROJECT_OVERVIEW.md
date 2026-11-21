@@ -53,7 +53,9 @@ GameBlog/
 │  │  ├─ world.ts              월드 조립, 게임 규칙, 그리기 목록
 │  │  ├─ planet.ts             행성의 크기, 위도·경도를 방향으로 바꾸는 함수
 │  │  ├─ player.ts             캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
-│  │  ├─ walker.ts             절차적 걸음과 다리 IK ([analysis/character.md](analysis/character.md))
+│  │  ├─ walker.ts             서기·걷기 애니메이션 재생, 발 고정, 다리 IK ([analysis/character.md](analysis/character.md))
+│  │  ├─ characterClips.ts     캐릭터 키프레임 클립 (서기, 걷기, 내딛기)
+│  │  ├─ keyframes.ts          키프레임 트랙 샘플링 (3차 Hermite)
 │  │  ├─ cameraRig.ts          행성 표면을 따라가는 3인칭 궤도 카메라
 │  │  ├─ surfaceZone.ts        행성 표면 원형 영역의 작동 판정
 │  │  └─ colorTransition.ts    색 전환
