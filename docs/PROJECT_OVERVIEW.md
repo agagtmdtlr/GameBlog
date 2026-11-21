@@ -46,6 +46,7 @@ GameBlog/
 │  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
 │  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
+│  │  ├─ rocketShape.ts        로켓 모형의 달걀 몸통·다리·창·옆문·리벳 자리 ([analysis/surfaceScene.md](analysis/surfaceScene.md))
 │  │  ├─ starfield.ts          별 배치와 별 얼굴 그림 ([analysis/starfield.md](analysis/starfield.md))
 │  │  ├─ sunRays.ts            해 둘레 삼각형 햇살의 모양 ([analysis/sun.md](analysis/sun.md))
 │  │  ├─ contentRenderers/     콘텐츠 전용 그리기
@@ -152,7 +153,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - 원점이 중심이고 반지름이 18인 행성 하나다 (둘레 약 113). 벽과 가장자리가 없어 떨어질 곳이 없고, 다시 시작하는 처리도 없다.
 - 캐릭터는 꼭대기 `(0, 18.88, 0)`에서 시작해 -Z 쪽을 바라본다.
 - 캐릭터 집이 놓일 자리에 푸른 회색 상자(폭 3.2, 높이 2.8, 깊이 3.2)를 둔다 (2026-11-21 사용자 요청). 위치는 위도 66, 경도 180으로, 시작 지점 정면 약 7.5 거리이고 해가 드는 쪽이다. 정면이 시작 지점을 향한다. 위치, 크기, 색은 장면 파일 `scenes/surface.json`의 `house`에서 바꾼다.
-- 로켓이 놓일 자리에 붉은 정육면체(한 변 2.4)를 둔다 (2026-11-21 사용자 요청). 위성으로 향하는 부근이라는 요청에 따라 위성 바로 아래 표면(위도 약 30, 경도 약 207.5)에 두었고, 위쪽이 위성을 향한다. 위치는 `MOON.direction`에서 계산하므로 위성을 옮기면 따라간다. 집 자리와 같이 충돌체다. 크기와 색은 장면 파일 `scenes/surface.json`의 `rocket`에서 바꾼다.
+- 로켓이 놓일 자리에 단순화한 주황색 로켓 모형(달걀 몸통, 짧은 다리 넷, 정면의 둥근 창, 옆문, 리벳 줄)을 세운다. 처음에는 붉은 정육면체였고, 사용자가 보여 준 리벳 박힌 달걀 모양 로켓 사진을 단순화해 바꿨다 (2026-11-21 사용자 요청). 충돌은 모형을 감싼 상자(폭 2.6, 높이 3.0)로 한다. 위성으로 향하는 부근이라는 요청에 따라 위성 바로 아래 표면(위도 약 30, 경도 약 207.5)에 두었고, 위쪽이 위성을 향한다. 위치는 `MOON.direction`에서 계산하므로 위성을 옮기면 따라간다. 집 자리와 같이 충돌체다. 크기와 색은 장면 파일 `scenes/surface.json`의 `rocket`에서 바꾼다.
 - 행성 주변 하늘(시작 시점 왼쪽 위, 거리 40)에 충돌구가 패인 회색 위성이 떠서 제자리에서 자전한다 (2026-11-21 사용자 요청).
 - 주황색 해가 행성 중심에서 70 떨어진 궤도를 120초에 한 바퀴 돈다. 직사광이 해를 따라 움직여 낮과 밤이 바뀌고, 밤 쪽은 간접광으로만 보인다. 해는 둘레의 햇살과 캐릭터를 바라보는 눈을 가지며, 궤적이 가는 고리로 보인다 ([analysis/sun.md](analysis/sun.md)).
 - 행성 중심에서 110~200 떨어진 곳에 얼굴이 있는 별 48개가 카메라를 보며 떠 있다 ([analysis/starfield.md](analysis/starfield.md)).
@@ -219,6 +220,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | [`math.test.ts`](../src/engine/math.test.ts) | 12 | 벡터, 쿼터니언, 행렬 |
 | [`billboard.test.ts`](../src/engine/billboard.test.ts) | 5 | 빌보드 아틀라스 배치와 텍스처 좌표, 그리기 순서 |
 | [`moonShape.test.ts`](../src/engine/moonShape.test.ts) | 4 | 위성의 충돌구·바위 덩어리 모양 |
+| [`rocketShape.test.ts`](../src/engine/rocketShape.test.ts) | 4 | 로켓 모형의 몸통, 다리, 창, 리벳 자리 |
 | [`starfield.test.ts`](../src/engine/starfield.test.ts) | 3 | 별 배치와 윤곽 |
 | [`sunRays.test.ts`](../src/engine/sunRays.test.ts) | 4 | 해 햇살 모양 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
@@ -243,6 +245,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | 집 자리 상자 (2026-11-21) | 시작 화면, 코드로 구를 상자 앞에 이동 | 시작할 때 정면에 상자가 보임. 표면에 붙어 서고 그림자가 짐. WebGL·콘솔 오류 없음 |
 | 집 자리 상자 충돌 (2026-11-21) | 시작 후 W 키 3.5초 | 상자 정면(위도 약 74.7)에서 멈추고 통과하지 않음. 표면 높이 유지. WebGL 오류 없음 |
 | 로켓 자리 정육면체 (2026-11-21) | 시작하기 클릭, 코드로 구를 위도 44·경도 207.5에 이동 | 붉은 정육면체가 표면에 붙어 섬. WebGL·콘솔 오류 없음. 충돌은 테스트로만 확인 |
+| 로켓 모형 (2026-11-21) | 시작하기 클릭, 코드로 구를 위도 42·경도 207.5, 위도 37·경도 222에 이동 | 달걀 몸통, 리벳, 정면 창, 다리가 보이고 다리로 표면에 섬. WebGL·콘솔 오류 없음 |
 
 공개 URL은 three.js 포팅 전 버전까지만 확인했다.
 

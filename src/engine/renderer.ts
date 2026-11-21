@@ -2,12 +2,15 @@ import {
   BoxGeometry,
   BufferAttribute,
   BufferGeometry,
+  CapsuleGeometry,
+  CircleGeometry,
   Color,
   DynamicDrawUsage,
   DepthTexture,
   FramebufferTexture,
   GLSL3,
   IcosahedronGeometry,
+  LatheGeometry,
   LessEqualCompare,
   LinearFilter,
   Matrix3,
@@ -16,6 +19,7 @@ import {
   MeshBasicMaterial,
   OrthographicCamera,
   PerspectiveCamera,
+  Quaternion,
   RawShaderMaterial,
   RGBFormat,
   Scene,
@@ -31,13 +35,14 @@ import {
   type Texture,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import meshVert from '../shaders/mesh.vert?raw';
 import pbrFrag from '../shaders/pbr.frag?raw';
 import type { ContentRenderer, PbrMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
 import type { Mat4 } from './math';
 import { skinVertices, type SkinSource } from './skinning';
 import { displaceToMoon } from './moonShape';
+import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from './rocketShape';
 import { BillboardBatch } from './billboardRenderer';
 import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
 
@@ -60,6 +65,52 @@ function createMoonGeometry(): BufferGeometry {
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   return geometry;
+}
+
+/** 표면 부품을 자리에 놓는 행렬. 지오메트리의 +Z가 `normal`을 향하고, 위쪽은 몸통 축(+Y)에 가깝게 둔다. */
+function partMatrix({ position, normal }: RocketPart, push = 0): Matrix4 {
+  const z = new Vector3(...normal);
+  const x = new Vector3(0, 1, 0).cross(z).normalize();
+  const y = z.clone().cross(x);
+  const p = new Vector3(...position).addScaledVector(z, push);
+  return new Matrix4().makeBasis(x, y, z).setPosition(p);
+}
+
+/** 로켓 모형의 몸통, 다리, 창틀, 옆문, 리벳을 한 지오메트리로 합친다. 모양은 `rocketShape.ts`가 정한다. */
+function createRocketGeometry(): BufferGeometry {
+  const parts: BufferGeometry[] = [];
+  const add = (geometry: BufferGeometry, matrix?: Matrix4) => {
+    if (matrix) geometry.applyMatrix4(matrix);
+    geometry.deleteAttribute('uv');
+    parts.push(geometry.index ? geometry.toNonIndexed() : geometry);
+  };
+  add(new LatheGeometry(bodyProfile().map(([r, y]) => new Vector2(r, y)), ROCKET_SHAPE.radialSegments));
+  const up = new Vector3(0, 1, 0);
+  for (const leg of rocketLegs()) {
+    const rotation = new Quaternion().setFromUnitVectors(up, new Vector3(...leg.axis));
+    add(new CapsuleGeometry(leg.radius, leg.length, 6, 16), new Matrix4().compose(new Vector3(...leg.center), rotation, new Vector3(1, 1, 1)));
+  }
+  const { radius, rimTube } = ROCKET_SHAPE.window;
+  add(new TorusGeometry(radius, rimTube, 8, 32), partMatrix(rocketWindow(), 0.012));
+  const [hw, hh, hd] = ROCKET_SHAPE.hatch.size;
+  add(new SphereGeometry(0.5, 20, 12), partMatrix(rocketHatch()).multiply(new Matrix4().makeScale(hw, hh, hd)));
+  for (const rivet of rocketRivets()) {
+    const r = ROCKET_SHAPE.rivets.radius;
+    add(new SphereGeometry(r, 6, 4), new Matrix4().makeTranslation(...rivet));
+  }
+  const merged = mergeGeometries(parts);
+  for (const part of parts) part.dispose();
+  merged.computeBoundingSphere();
+  return merged;
+}
+
+/** 로켓 창의 유리. 몸통보다 조금 밖에 띄운 원판이다. */
+function createRocketGlassGeometry(): BufferGeometry {
+  const glass = new CircleGeometry(ROCKET_SHAPE.window.radius, 32);
+  glass.deleteAttribute('uv');
+  glass.applyMatrix4(partMatrix(rocketWindow(), 0.018));
+  glass.computeBoundingSphere();
+  return glass;
 }
 
 /**
@@ -138,6 +189,9 @@ export class Renderer {
       // 해 궤적처럼 큰 원을 그리므로 둘레를 촘촘하게, 관은 가늘어서 성기게 나눈다.
       ring: new TorusGeometry(1, RING_TUBE_RATIO, 6, 512),
       moon: createMoonGeometry(),
+      // 로켓 자리의 모형. 장면 파일의 `size`가 한 변 1인 상자를 늘린다.
+      rocket: createRocketGeometry(),
+      rocketGlass: createRocketGlassGeometry(),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
