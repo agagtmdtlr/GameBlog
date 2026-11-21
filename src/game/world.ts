@@ -38,6 +38,8 @@ import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
 import { ROCKET_SHAPE } from '../engine/rocketShape';
 import { SurfaceZone } from './surfaceZone';
+import { Train, type TrainPartModel } from './train';
+import { TRACK_SHAPE } from '../engine/trackPath';
 import { Sun, SUN, SUN_EMISSIVE, SUN_ORBIT_EMISSIVE } from './sun';
 import {
   SUN_EYE_WHITE_EMISSIVE,
@@ -150,6 +152,12 @@ function surfaceObjectDrawItems(o: SurfaceObject): DrawItem[] {
   ];
 }
 
+/** 기차 부품의 그리기 항목. 빛나는 전조등은 그림자를 드리우지 않는다. */
+function trainPartDrawItem(part: TrainPartModel): DrawItem {
+  const mat = material(part.color, part.roughness, part.emissive ? { emissive: part.emissive } : {});
+  return drawItemFromModel(part.mesh, part.model, mat, !part.emissive);
+}
+
 const DEFAULT_VIEW: BillboardView = { position: [0, 0, 0], up: [0, 1, 0] };
 
 /** 행성 둘레의 별. 움직이지 않으므로 한 번만 만든다. 조명을 받지 않아 얼굴 색 그대로 보인다. */
@@ -182,6 +190,7 @@ export class World {
   readonly content: ContentManager;
   readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
   readonly moon = new Moon();
+  readonly train = new Train();
   readonly npcs: readonly Wanderer[];
   /** 서로 통과하지 못하는 캐릭터 몸체들. 플레이어가 먼저다. */
   private readonly bodies: readonly Player[];
@@ -216,8 +225,11 @@ export class World {
   fixedStep(dt: number, command: MoveCommand): void {
     this.sun.step(dt);
     this.moon.step(dt);
-    this.player.step(dt, command, PLANET, SURFACE_OBSTACLES);
-    for (const npc of this.npcs) npc.move(dt, SURFACE_OBSTACLES);
+    this.train.step(dt);
+    // 기차는 움직이는 벽이다. 이번 걸음의 자리로 캐릭터를 밀어낸다.
+    const obstacles = [...SURFACE_OBSTACLES, ...this.train.obstacles()];
+    this.player.step(dt, command, PLANET, obstacles);
+    for (const npc of this.npcs) npc.move(dt, obstacles);
     for (let i = 0; i < this.bodies.length; i++) {
       for (let j = i + 1; j < this.bodies.length; j++) separateBodies(this.bodies[i], this.bodies[j]);
     }
@@ -255,6 +267,13 @@ export class World {
         }),
       ),
       ...SURFACE_OBJECTS.flatMap(surfaceObjectDrawItems),
+      drawItemFromModel(
+        'rails',
+        mat4Identity(),
+        material(TRACK_SHAPE.railColor, TRACK_SHAPE.railRoughness, { metallic: TRACK_SHAPE.railMetallic }),
+      ),
+      drawItemFromModel('sleepers', mat4Identity(), material(TRACK_SHAPE.sleeperColor, TRACK_SHAPE.sleeperRoughness)),
+      ...this.train.parts(alpha).map(trainPartDrawItem),
       ...characterDrawItems(this.walker, alpha, PLAYER_COLOR, 'sphere'),
       ...this.npcs.flatMap((npc, i) => characterDrawItems(npc.walker, alpha, NPCS[i].color, NPCS[i].shape)),
       // 위성은 그림자 맵 범위 밖에 있으므로 그림자를 드리우지 않는다.

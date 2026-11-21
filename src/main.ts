@@ -5,8 +5,10 @@ import characterModelUrl from './assets/character.glb?url';
 import { Input } from './engine/input';
 import { add, length, scale, type Vec3 } from './engine/math';
 import { Renderer } from './engine/renderer';
+import { trackMesh } from './engine/trackPath';
 import { CameraRig } from './game/cameraRig';
 import { PLANET } from './game/planet';
+import { TRACK_PATH } from './game/train';
 import { World } from './game/world';
 import { FixedStepper } from './physics/fixedStepper';
 import { Overlay } from './ui/overlay';
@@ -58,6 +60,8 @@ function main(): void {
     showGraphicsFailure();
     return;
   }
+
+  renderer.setTrack(trackMesh(TRACK_PATH));
 
   // 다리 모델은 비동기로 불러온다. 불러오기 전에는 몸만 보인다.
   renderer.loadCharacter(characterModelUrl).catch((error: unknown) => {
