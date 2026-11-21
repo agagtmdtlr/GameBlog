@@ -26,10 +26,10 @@ from mathutils import Vector
 from mathutils.geometry import intersect_point_line
 
 # walker.ts의 LEG, LEG_REST 값과 같아야 한다 (glTF 좌표 x, y).
-REST_KNEE = (0.566, 0.251)
-REST_ANKLE = (0.55, -0.81)
+REST_KNEE = (0.6, 0.5)
+REST_ANKLE = (0.62, -0.81)
 ANKLE_HEIGHT = 0.12
-REST_TOE = (0.9, -0.87)
+REST_TOE = (0.97, -0.87)
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "src" / "assets" / "character.glb"
@@ -60,10 +60,10 @@ def build_leg_mesh():
     points = [
         (blender(-0.14, 0.0), (0.15, 0.15)),
         (HIP, (0.155, 0.155)),
-        (KNEE, (0.2, 0.2)),
-        (blender(0.56, -0.25), (0.19, 0.19)),
+        (KNEE, (0.21, 0.21)),
+        (blender(0.61, -0.2), (0.19, 0.19)),
         (ANKLE, (0.15, 0.15)),
-        (blender(0.56, -0.87), (0.17, 0.14)),
+        (blender(0.63, -0.87), (0.17, 0.14)),
         (TOE, (0.12, 0.1)),
     ]
     edges = [(i, i + 1) for i in range(len(points) - 1)]

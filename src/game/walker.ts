@@ -20,9 +20,9 @@ export const BODY_RADIUS = 0.5;
 /** 다리 뼈의 치수 */
 export const LEG = {
   /** 엉덩이 관절에서 무릎까지 */
-  thigh: 0.62,
+  thigh: 0.781,
   /** 무릎에서 발목까지 */
-  shin: 1.06,
+  shin: 1.31,
   /** 발바닥에서 발목까지 */
   ankleHeight: 0.12,
 } as const;
@@ -33,15 +33,15 @@ export const LEG = {
  * 몸 높이(`PLAYER_RADIUS`)와 아래 엉덩이·발 위치로 서 있을 때 IK가 푸는 자세와 같다.
  */
 export const LEG_REST = {
-  knee: [0.566, 0.251, 0] as Vec3,
-  ankle: [0.55, -0.81, 0] as Vec3,
+  knee: [0.6, 0.5, 0] as Vec3,
+  ankle: [0.62, -0.81, 0] as Vec3,
 } as const;
 
 /** 몸 중심에서 엉덩이 관절까지의 옆 거리와 높이 */
 const HIP_SIDE = 0.45;
 const HIP_UP = 0.05;
 /** 서 있을 때 몸 중심 아래 지점에서 발이 놓이는 옆 거리 */
-const STANCE_SIDE = 1.0;
+const STANCE_SIDE = 1.07;
 /** 무릎이 향하는 방향의 위쪽 성분 (옆쪽 성분은 1). 무릎이 바깥 위로 솟는다. */
 const KNEE_POLE_UP = 2.0;
 /** 진행 방향에서 발끝이 바깥으로 돌아간 각도 */
