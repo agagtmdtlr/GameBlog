@@ -142,7 +142,7 @@ function main(): void {
     const aspect = renderer.resizeToDisplay();
     renderer.render(
       {
-        items: world.buildDrawList(alpha),
+        items: world.buildDrawList(alpha, camera.view),
         camera: camera.view,
         environment: world.environment(alpha),
         occluder: world.occluder(alpha),

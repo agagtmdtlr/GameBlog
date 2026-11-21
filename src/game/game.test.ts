@@ -392,6 +392,24 @@ describe('해', () => {
     }
   });
 
+  it('햇살은 해를 감싸고, 카메라 쪽을 보며 화면 위쪽에 맞춰 선다', () => {
+    const world = new World();
+    stepWorld(world, SUN.periodSeconds / 5);
+    const view = { position: [6, 30, -9] as Vec3, up: normalize([0.1, 1, 0.2]) };
+    const rays = world.buildDrawList(1, view).find((item) => item.mesh === 'sunRays')!;
+    const m = rays.model;
+    const center: Vec3 = [m[12], m[13], m[14]];
+    const x: Vec3 = [m[0], m[1], m[2]];
+    const y: Vec3 = [m[4], m[5], m[6]];
+    const z: Vec3 = [m[8], m[9], m[10]];
+    expect(length(sub(center, world.sun.position(1)))).toBeCloseTo(0, 4);
+    expect(length(x)).toBeCloseTo(SUN.radius, 4);
+    expect(dot(normalize(z), normalize(sub(view.position, center)))).toBeCloseTo(1, 4);
+    expect(dot(x, view.up)).toBeCloseTo(0, 4);
+    expect(dot(y, view.up)).toBeGreaterThan(0);
+    expect(rays.castShadow).toBe(false);
+  });
+
   it('그림자를 드리우지 않는다', () => {
     expect(sunItem(new World()).castShadow).toBe(false);
   });

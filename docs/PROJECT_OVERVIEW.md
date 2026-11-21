@@ -43,6 +43,7 @@ GameBlog/
 │  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스, 콘텐츠 렌더러 호출
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
 │  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
+│  │  ├─ sunRays.ts            해 둘레 삼각형 햇살의 모양 ([analysis/sun.md](analysis/sun.md))
 │  │  ├─ contentRenderers/     콘텐츠 전용 그리기
 │  │  │  ├─ contentRenderer.ts   공통 기반 클래스와 RenderContext
 │  │  │  └─ registry.ts          콘텐츠 렌더러 등록 목록 (지금은 비어 있음)
@@ -54,7 +55,7 @@ GameBlog/
 │  │  ├─ world.ts              월드 조립, 게임 규칙, 그리기 목록
 │  │  ├─ planet.ts             행성의 크기, 위도·경도를 방향으로 바꾸는 함수
 │  │  ├─ house.ts              캐릭터 집 자리(지금은 상자)의 위치와 크기
-│  │  ├─ sun.ts                행성을 도는 해, 궤적 고리, 직사광 방향 ([analysis/sun.md](analysis/sun.md))
+│  │  ├─ sun.ts                행성을 도는 해, 햇살 빌보드, 궤적 고리, 직사광 방향 ([analysis/sun.md](analysis/sun.md))
 │  │  ├─ moon.ts               제자리에서 자전하는 위성의 자리와 크기 ([analysis/moon.md](analysis/moon.md))
 │  │  ├─ player.ts             캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
 │  │  ├─ walker.ts             서기·걷기 애니메이션 재생, 발 고정, 다리 IK ([analysis/character.md](analysis/character.md))
