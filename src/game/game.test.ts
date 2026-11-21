@@ -14,7 +14,7 @@ import { SurfaceZone } from './surfaceZone';
 import { MOON } from './moon';
 import { SUN } from './sun';
 import { pupilOffset, SUN_FACE, sunBillboardBasis, sunEyes } from './sunFace';
-import { STUDIO_ENVIRONMENT, World } from './world';
+import { NPCS, STUDIO_ENVIRONMENT, World } from './world';
 
 function surfaceObject(id: string): SurfaceObject {
   const found = SURFACE_OBJECTS.find((o) => o.id === id);
@@ -339,7 +339,9 @@ describe('집 자리', () => {
     const items = new World().buildDrawList(1);
     const count = (mesh: string) => items.filter((item) => item.mesh === mesh).length;
     const shapes = SURFACE_OBJECTS.map((o) => o.shape);
-    expect(count('box')).toBe(shapes.filter((v) => v === 'box').length);
+    // 정육면체 몸의 NPC도 `box` 메시를 쓴다.
+    const cubeNpcs = NPCS.filter((npc) => npc.shape === 'cube').length;
+    expect(count('box')).toBe(shapes.filter((v) => v === 'box').length + cubeNpcs);
     expect(count('rocket')).toBe(shapes.filter((v) => v === 'rocket').length);
     expect(count('rocketGlass')).toBe(count('rocket'));
   });

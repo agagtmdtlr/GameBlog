@@ -2,6 +2,8 @@ import { ContentManager } from '../content/manager';
 import { CONTENT_ENTRIES } from '../content/registry';
 import type { ContentEntry, GraphicsContent } from '../content/types';
 import {
+  add,
+  cross,
   lerp,
   mat4FromBasis,
   mat4FromTRS,
@@ -45,6 +47,7 @@ import {
   sunEyes,
   type BillboardView,
 } from './sunFace';
+import { BODY_FORMS, type BodyShape } from './bodyShape';
 import { BODY_RADIUS, CHARACTER_SCALE, restBones, Walker, type BoneTransform } from './walker';
 
 /** 행성의 꼭대기에서 시작한다. */
@@ -65,13 +68,16 @@ const PLAYER_ROUGHNESS = 0.45;
 export interface NpcSpec {
   /** 시작 위치 (행성 표면 위 몸 중심) */
   spawn: Vec3;
-  /** 색 (선형 RGB). 모양은 플레이어와 같고 색만 다르다. */
+  /** 색 (선형 RGB) */
   color: Vec3;
+  /** 몸 모양. 다리와 걸음은 플레이어와 같다. */
+  shape: BodyShape;
 }
 
-const npcAt = (latitude: number, longitude: number, color: Vec3): NpcSpec => ({
+const npcAt = (latitude: number, longitude: number, color: Vec3, shape: BodyShape): NpcSpec => ({
   spawn: scale(surfaceDirection(latitude, longitude), PLANET.radius + PLAYER_RADIUS),
   color,
+  shape,
 });
 
 /**
@@ -79,11 +85,11 @@ const npcAt = (latitude: number, longitude: number, color: Vec3): NpcSpec => ({
  * 첫째는 시작할 때 보이는 집 자리 옆이고, 나머지는 행성 둘레에 흩어 둔다.
  */
 export const NPCS: readonly NpcSpec[] = [
-  npcAt(74, 145, [0.078, 0.434, 0.871]), // 하늘색 #4FB0F0
-  npcAt(45, 70, [0.871, 0.162, 0.332]), // 분홍 #F0709C
-  npcAt(10, 290, [0.15, 0.597, 0.114]), // 초록 #6CCB5F
-  npcAt(-25, 10, [0.376, 0.202, 0.807]), // 보라 #A57CE8
-  npcAt(-60, 200, [0.871, 0.254, 0.045]), // 주황 #F08A3C
+  npcAt(74, 145, [0.078, 0.434, 0.871], 'cube'), // 하늘색 #4FB0F0
+  npcAt(45, 70, [0.871, 0.162, 0.332], 'pyramid'), // 분홍 #F0709C
+  npcAt(10, 290, [0.15, 0.597, 0.114], 'sphere'), // 초록 #6CCB5F
+  npcAt(-25, 10, [0.376, 0.202, 0.807], 'cube'), // 보라 #A57CE8
+  npcAt(-60, 200, [0.871, 0.254, 0.045], 'pyramid'), // 주황 #F08A3C
 ];
 /** 장면 파일(`scenes/surface.json`)의 표면 객체 중 캐릭터가 통과할 수 없는 상자 */
 const SURFACE_OBSTACLES = SURFACE_OBJECTS.filter((o) => o.collides).map((o) => o.box);
@@ -187,7 +193,7 @@ export class World {
     onContentChange?: (content: GraphicsContent) => void,
     random?: Random,
   ) {
-    this.npcs = NPCS.map((npc) => new Wanderer(npc.spawn, PLANET, random));
+    this.npcs = NPCS.map((npc) => new Wanderer(npc.spawn, PLANET, random, BODY_FORMS[npc.shape].hip));
     this.bodies = [this.player, ...this.npcs.map((npc) => npc.body)];
     this.zones = entries.map((entry) => ({
       entry,
@@ -249,8 +255,8 @@ export class World {
         }),
       ),
       ...SURFACE_OBJECTS.flatMap(surfaceObjectDrawItems),
-      ...characterDrawItems(this.walker, alpha, PLAYER_COLOR),
-      ...this.npcs.flatMap((npc, i) => characterDrawItems(npc.walker, alpha, NPCS[i].color)),
+      ...characterDrawItems(this.walker, alpha, PLAYER_COLOR, 'sphere'),
+      ...this.npcs.flatMap((npc, i) => characterDrawItems(npc.walker, alpha, NPCS[i].color, NPCS[i].shape)),
       // 위성은 그림자 맵 범위 밖에 있으므로 그림자를 드리우지 않는다.
       drawItemFromModel('moon', this.moon.model(alpha), material(MOON_COLOR, MOON_ROUGHNESS), false),
       // 해는 빛을 내기만 하고 그림자를 드리우지 않는다.
@@ -323,8 +329,11 @@ export class World {
   }
 }
 
-/** 캐릭터 하나의 몸, 왼다리, 오른다리 순서. 플레이어와 NPC가 같은 모양을 색만 바꿔 쓴다. */
-function characterDrawItems(walker: Walker, alpha: number, color: Vec3): DrawItem[] {
+/**
+ * 캐릭터 하나의 몸, 왼다리, 오른다리 순서. 플레이어와 NPC가 같은 다리를 쓰고 몸 모양과 색만 다르다.
+ * 모난 몸(정육면체, 피라미드)은 진행 방향을 보고 엉덩이와 함께 기운다. 구는 대칭이라 돌리지 않는다.
+ */
+function characterDrawItems(walker: Walker, alpha: number, color: Vec3, shape: BodyShape): DrawItem[] {
   const pose = walker.pose(alpha);
   const mat = material(color, PLAYER_ROUGHNESS);
   const bones = walker.solveLegs(pose).map(posedBoneMatrix);
@@ -332,5 +341,15 @@ function characterDrawItems(walker: Walker, alpha: number, color: Vec3): DrawIte
     ...drawItemFromModel('leg', mat4Identity(), mat),
     skin: bones.slice(first, first + LEG_BONE_COUNT).map((bone, i) => mat4Multiply(bone, REST_BONE_INVERSES[i])),
   });
-  return [drawItem('sphere', pose.body, [BODY_RADIUS, BODY_RADIUS, BODY_RADIUS], mat), leg(0), leg(LEG_BONE_COUNT)];
+  const form = BODY_FORMS[shape];
+  const { right, up } = walker.hipAxes(pose);
+  // 오른쪽 × 위 = 뒤쪽. 오른손 기저여야 면의 감김 방향이 뒤집히지 않는다. 모양이 앞뒤 대칭이라 뒤쪽을 Z로 쓴다.
+  const back = cross(right, up);
+  const [sx, sy, sz] = form.size;
+  const body = drawItemFromModel(
+    form.mesh,
+    mat4FromBasis(add(pose.body, scale(up, form.lift)), scale(right, sx), scale(up, sy), scale(back, sz)),
+    mat,
+  );
+  return [body, leg(0), leg(LEG_BONE_COUNT)];
 }

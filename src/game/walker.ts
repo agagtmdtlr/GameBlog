@@ -53,6 +53,14 @@ const ANKLE_HEIGHT = LEG.ankleHeight * S;
 /** 몸 중심에서 엉덩이 관절까지의 옆 거리와 높이. 다리가 몸 구의 바깥 위쪽(약 43°)에 붙는다. */
 const HIP_SIDE = 0.35 * S;
 const HIP_UP = 0.33 * S;
+
+/** 몸 중심에서 엉덩이 관절까지의 옆 거리와 높이 (게임 안 치수). 몸 모양이 다르면 바꾼다. */
+export interface WalkerHip {
+  side: number;
+  up: number;
+}
+/** 구체 몸의 엉덩이 자리 */
+export const SPHERE_HIP: WalkerHip = { side: HIP_SIDE, up: HIP_UP };
 /** 서 있을 때 몸 중심 아래 지점에서 발이 놓이는 옆 거리 */
 const STANCE_SIDE = 1.07 * S;
 /** 무릎이 향하는 방향의 위쪽 성분 (옆쪽 성분은 1). 무릎이 바깥 위로 솟는다. */
@@ -177,6 +185,8 @@ export class Walker {
     position: Vec3,
     private readonly ground: Sphere,
     forward: Vec3 = [0, 0, -1],
+    /** 엉덩이 관절 자리. 다리 메시가 몸 안에서 시작하도록 몸 모양에 맞춘다. */
+    private readonly hip: WalkerHip = SPHERE_HIP,
   ) {
     const up = this.upAt(position);
     this.forward = tangentDirection(forward, up);
@@ -267,15 +277,13 @@ export class Walker {
   solveLegs(pose: WalkerPose): BoneTransform[] {
     const up = this.upAt(pose.body);
     const right = cross(pose.forward, up);
-    // 엉덩이 기울기: 진행 방향 축으로 오른쪽 축과 위쪽 축을 돌린다.
-    const hipRight = add(scale(right, Math.cos(pose.roll)), scale(up, Math.sin(pose.roll)));
-    const hipUp = sub(scale(up, Math.cos(pose.roll)), scale(right, Math.sin(pose.roll)));
+    const { right: hipRight, up: hipUp } = this.hipAxes(pose);
     const bones: BoneTransform[] = [];
     for (let i = 0; i < 2; i++) {
       const side: Side = i === 0 ? -1 : 1;
       const sole = pose.feet[i];
       const footUp = this.upAt(sole);
-      const hip = add(pose.body, add(scale(hipRight, side * HIP_SIDE), scale(hipUp, HIP_UP)));
+      const hip = add(pose.body, add(scale(hipRight, side * this.hip.side), scale(hipUp, this.hip.up)));
       const pole = normalize(add(scale(right, side), scale(up, KNEE_POLE_UP)));
       const { knee, ankle } = solveTwoBone(hip, add(sole, scale(footUp, ANKLE_HEIGHT)), THIGH, SHIN, pole);
       bones.push(segment('thigh', hip, knee, pole), segment('shin', knee, ankle, pole));
@@ -286,6 +294,16 @@ export class Walker {
       bones.push({ bone: 'foot', origin: ankle, x: cross(footUp, toe), y: footUp, z: toe });
     }
     return bones;
+  }
+
+  /** 엉덩이 기울기(`roll`)만큼 진행 방향 축으로 돌린 오른쪽·위쪽 축. 다리와 모난 몸이 함께 기운다. */
+  hipAxes(pose: WalkerPose): { right: Vec3; up: Vec3 } {
+    const up = this.upAt(pose.body);
+    const right = cross(pose.forward, up);
+    return {
+      right: add(scale(right, Math.cos(pose.roll)), scale(up, Math.sin(pose.roll))),
+      up: sub(scale(up, Math.cos(pose.roll)), scale(right, Math.sin(pose.roll))),
+    };
   }
 
   private turn(dt: number, up: Vec3, horizontal: Vec3, speed: number): void {

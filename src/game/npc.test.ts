@@ -5,6 +5,7 @@ import { separateBodies, seededRandom, Wanderer } from './npc';
 import { PLANET } from './planet';
 import { PLAYER_RADIUS, Player } from './player';
 import { SURFACE_OBJECTS } from './surfaceScene';
+import { BODY_FORMS } from './bodyShape';
 import { NPCS, World } from './world';
 
 const DT = 1 / 120;
@@ -117,15 +118,16 @@ describe('캐릭터끼리 밀어내기', () => {
 });
 
 describe('NPC 그리기', () => {
-  it('NPC마다 플레이어와 같은 몸·다리 항목을 제 색으로 그린다', () => {
+  it('NPC마다 제 모양의 몸과 플레이어와 같은 다리를 제 색으로 그린다', () => {
     const items = new World(undefined, undefined, seededRandom(1)).buildDrawList(1);
     const legs = items.filter((item) => item.mesh === 'leg');
     expect(legs).toHaveLength(2 * (1 + NPCS.length));
     NPCS.forEach((npc, i) => {
       expect(legs[2 + i * 2].material.baseColor).toEqual(npc.color);
       expect(legs[3 + i * 2].material.baseColor).toEqual(npc.color);
-      const body = items.filter((item) => item.mesh === 'sphere' && item.material.baseColor === npc.color);
+      const body = items.filter((item) => item.mesh !== 'leg' && item.material.baseColor === npc.color);
       expect(body).toHaveLength(1);
+      expect(body[0].mesh).toBe(BODY_FORMS[npc.shape].mesh);
       expect(legs[0].material.baseColor).not.toEqual(npc.color);
     });
   });
