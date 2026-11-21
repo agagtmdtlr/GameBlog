@@ -41,6 +41,9 @@ GameBlog/
 │  │  ├─ frame.ts              렌더러 입력 타입 (three.js와 무관)
 │  │  ├─ math.ts               Vec3, Quat, Mat4 연산
 │  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스, 콘텐츠 렌더러 호출
+│  │  ├─ billboard.ts          빌보드 모양, 아틀라스 배치, 그리기 순서 ([analysis/billboard.md](analysis/billboard.md))
+│  │  ├─ billboardAtlas.ts     빌보드 그림을 한 캔버스에 그림
+│  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
 │  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
 │  │  ├─ sunRays.ts            해 둘레 삼각형 햇살의 모양 ([analysis/sun.md](analysis/sun.md))
@@ -95,7 +98,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 - `engine/`은 게임 규칙을 모른다.
 - `World`는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다.
-- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 쓴다.
+- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 쓴다.
 - `Renderer`는 특정 콘텐츠를 모른다. 콘텐츠 전용 그리기는 `ContentRenderer`를 상속한 클래스가 맡는다.
 - 콘텐츠는 `ContentContext`를 통해서만 월드에 영향을 준다. 작동 영역은 콘텐츠의 내용을 모른다.
 
@@ -105,7 +108,7 @@ main.ts ─┬─ game/ ─┬─ content/
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
 3. `fixedStep`은 해의 궤도 진행, 위성 자전, 구 이동과 충돌, 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
 4. 카메라가 보간된 구 위치를 따라간다.
-5. `World.buildDrawList`, `environment`(해 방향의 직사광), `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 지금은 콘텐츠 렌더러가 없다.
+5. `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광), `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 지금은 콘텐츠 렌더러가 없다.
 
 ### 게임 상태
 

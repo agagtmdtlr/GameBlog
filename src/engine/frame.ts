@@ -1,3 +1,4 @@
+import type { Billboard } from './billboard';
 import type { Mat3, Mat4, Vec3 } from './math';
 
 /**
@@ -9,10 +10,9 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * `sphere`는 three.js 기본 구, `box`는 한 변 1인 정육면체, `leg`는 `assets/character.glb`의 캐릭터 다리 스킨 메시다.
  * `ring`은 XY 평면에 놓인 반지름 1의 가느다란 고리(토러스)이고, 관의 반지름은 `RING_TUBE_RATIO`다.
  * `moon`은 반지름 1 언저리의 구에 충돌구와 바위 덩어리를 새긴 위성이다 (`moonShape.ts`).
- * `sunRays`는 XY 평면에서 반지름 1의 원을 둘러싼 삼각형 햇살이다 (`sunRays.ts`). 앞면이 +Z다.
- * `disk`는 XY 평면의 반지름 1 원판이다. 앞면이 +Z이고, 해 눈의 흰자·검은자처럼 빌보드에 쓴다.
+ * 카메라를 보는 평면(별, 햇살, 해 눈)은 메시가 아니라 `FrameData.billboards`로 그린다.
  */
-export type MeshKind = 'sphere' | 'box' | 'leg' | 'ring' | 'moon' | 'sunRays' | 'disk';
+export type MeshKind = 'sphere' | 'box' | 'leg' | 'ring' | 'moon';
 
 /** `ring` 메시의 관 반지름. 고리 반지름에 대한 비율이라 크기를 키우면 함께 굵어진다. */
 export const RING_TUBE_RATIO = 0.0015;
@@ -99,6 +99,8 @@ export interface SurfaceZoneFrame {
 
 export interface FrameData {
   items: readonly DrawItem[];
+  /** 카메라를 보는 사각 빌보드. 순서는 상관없고, 렌더러가 한 번에 모아 그린다 (`billboard.ts`). */
+  billboards: readonly Billboard[];
   camera: CameraView;
   environment: Environment;
   /** 앰비언트 오클루전을 만드는 구 */

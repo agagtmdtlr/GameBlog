@@ -16,7 +16,7 @@ git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.js
 
 - 화면 결과와 플레이는 포팅 전과 같게 유지한다. 그래서 PBR과 물 셰이더는 내용을 그대로 두고 three.js의 `RawShaderMaterial`로 옮겼다.
 - WebGL 호출을 직접 하던 부분(컨텍스트, 프로그램, 버퍼, 프레임버퍼, 상태 전환)은 모두 three.js에 맡겼다. `src/`에 `gl.*` 호출은 남아 있지 않다.
-- three.js는 `engine/renderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 가져온다. `World`, 물리, 콘텐츠는 three.js를 모른다.
+- three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 가져온다. `World`, 물리, 콘텐츠는 three.js를 모른다.
 
 ## 바뀐 파일
 
@@ -61,13 +61,13 @@ git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.js
 - `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
 - 콘텐츠 렌더러는 필요하면 자기 장면을 가진다. 지금은 등록된 렌더러가 없다.
 - `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
-- `skyScene`: 별 빌보드(`Sprite`)만 가진 장면. 그림자 패스에 넣지 않으려고 분리했다 (2026-11-21)
+- `billboardScene`: 별, 햇살, 해 눈을 한 번에 그리는 `BillboardBatch`의 메시 하나만 가진 장면. 그림자 패스에 넣지 않으려고 분리했다. 구조는 [analysis/billboard.md](billboard.md)에 있다 (2026-11-21, 그 전에는 별 `Sprite`만 가진 `skyScene`이었다)
 - `lightCamera`: 그림자용 `OrthographicCamera`. 광원 방향은 해를 따라 매 프레임 바뀌고([analysis/sun.md](sun.md)), 방향이 +Y와 거의 나란하면 `lookAt`이 퇴화하지 않게 위쪽을 +Z로 바꾼다
 
 프레임 순서는 포팅 전과 같다. `renderer.autoClear = false`로 두고 지우기를 직접 호출한다.
 
 1. `setRenderTarget(shadowTarget)` → `clear()` → `overrideMaterial`을 걸고 `render(scene, lightCamera)`
-2. `setRenderTarget(null)` → `setClearColor` → `clear()` → `render(skyScene, camera)`(별 빌보드, [analysis/starfield.md](starfield.md)) → `render(scene, camera)`
+2. `setRenderTarget(null)` → `setClearColor` → `clear()` → `render(scene, camera)` → `render(billboardScene, camera)`(빌보드, [analysis/billboard.md](billboard.md))
 3. `frame.contents`에 값이 있는 콘텐츠 렌더러마다 `render()`. 뒤 장면이 필요한 렌더러는 `copySceneColor()`(`copyFramebufferToTexture`) → `render(자기 장면, camera)` 순서로 그린다
 
 ### 행렬
