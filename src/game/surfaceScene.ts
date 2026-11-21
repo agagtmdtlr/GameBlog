@@ -10,14 +10,18 @@ import { PLANET, surfaceDirection } from './planet';
  */
 
 /** 표면 위의 자리. 위도·경도(도)로 적거나, 하늘의 천체 바로 아래로 정한다. */
+/** 표면 객체의 모양 */
+export type SurfaceShape = 'box' | 'rocket';
+const SURFACE_SHAPES: readonly SurfaceShape[] = ['box', 'rocket'];
+
 export type SurfacePlacement = { latitude: number; longitude: number } | { under: 'moon' };
 
 /** 장면 파일의 객체 한 개 */
 export interface SurfaceObjectData {
   /** 장면 안에서 유일한 이름 */
   id: string;
-  /** 지금은 상자만 있다. */
-  shape: 'box';
+  /** `box`는 상자, `rocket`은 로켓 모형(`engine/rocketShape.ts`)이다. 둘 다 `size` 상자 안에 들어가고, 충돌은 그 상자로 한다. */
+  shape: SurfaceShape;
   placement: SurfacePlacement;
   /** 폭, 높이, 깊이 */
   size: Vec3;
@@ -37,6 +41,7 @@ export interface SurfaceSceneData {
 /** 장면 파일을 읽어 월드에 놓을 수 있게 계산한 객체 */
 export interface SurfaceObject {
   id: string;
+  shape: SurfaceShape;
   /** 바닥 중심의 위치 (도) */
   latitude: number;
   longitude: number;
@@ -116,7 +121,9 @@ export function validateSurfaceScene(data: unknown): SurfaceSceneData {
       if (ids.has(o.id)) throw new Error(`${where}.id: "${o.id}"가 겹친다`);
       ids.add(o.id);
       const at = `${where}(${o.id})`;
-      if (o.shape !== 'box') throw new Error(`${at}.shape: 지금은 "box"만 쓸 수 있다`);
+      if (!SURFACE_SHAPES.includes(o.shape as SurfaceShape)) {
+        throw new Error(`${at}.shape: ${SURFACE_SHAPES.map((v) => `"${v}"`).join(', ')} 중 하나여야 한다`);
+      }
       if (!isVec3(o.size) || o.size.some((v) => v <= 0)) throw new Error(`${at}.size: 양수 세 개여야 한다`);
       if (!isNumber(o.sink) || o.sink < 0) throw new Error(`${at}.sink: 0 이상이어야 한다`);
       if (!isVec3(o.color) || o.color.some((v) => v < 0)) throw new Error(`${at}.color: 0 이상인 선형 RGB 세 개여야 한다`);
@@ -124,7 +131,7 @@ export function validateSurfaceScene(data: unknown): SurfaceSceneData {
       if (typeof o.collides !== 'boolean') throw new Error(`${at}.collides: true 또는 false여야 한다`);
       return {
         id: o.id,
-        shape: 'box',
+        shape: o.shape as SurfaceShape,
         placement: validatePlacement(o.placement, at),
         size: o.size,
         sink: o.sink,
@@ -143,6 +150,7 @@ export function loadSurfaceScene(data: unknown): SurfaceObject[] {
     const box = surfaceBox({ latitude, longitude, size: o.size, sink: o.sink });
     return {
       id: o.id,
+      shape: o.shape,
       latitude,
       longitude,
       size: o.size,

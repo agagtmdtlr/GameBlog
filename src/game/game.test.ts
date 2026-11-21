@@ -335,9 +335,13 @@ describe('집 자리', () => {
     expect(length(world.player.position)).toBeCloseTo(REST_DISTANCE, 1);
   });
 
-  it('월드 그리기 목록에 상자로 들어간다', () => {
-    const boxes = new World().buildDrawList(1).filter((item) => item.mesh === 'box');
-    expect(boxes).toHaveLength(SURFACE_OBJECTS.length);
+  it('월드 그리기 목록에 모양대로 들어간다', () => {
+    const items = new World().buildDrawList(1);
+    const count = (mesh: string) => items.filter((item) => item.mesh === mesh).length;
+    const shapes = SURFACE_OBJECTS.map((o) => o.shape);
+    expect(count('box')).toBe(shapes.filter((v) => v === 'box').length);
+    expect(count('rocket')).toBe(shapes.filter((v) => v === 'rocket').length);
+    expect(count('rocketGlass')).toBe(count('rocket'));
   });
 });
 
@@ -392,11 +396,10 @@ describe('로켓 자리', () => {
     expect(angle(up, [0, 1, 0])).toBeGreaterThan(ROCKET.size[0] + PLAYER_RADIUS);
   });
 
-  it('정육면체로 표면에 서고, 위쪽이 위성을 향한다', () => {
+  it('로켓 모형으로 표면에 서고, 위쪽이 위성을 향한다', () => {
     const box = ROCKET.box;
-    const [w, h, d] = ROCKET.size;
-    expect(w).toBe(h);
-    expect(h).toBe(d);
+    const [, h] = ROCKET.size;
+    expect(ROCKET.shape).toBe('rocket');
     expect(dot(box.axes[1], MOON.direction)).toBeCloseTo(1, 6);
     const bottom = length(box.center) - h / 2;
     expect(bottom).toBeLessThan(PLANET.radius);

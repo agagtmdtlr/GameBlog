@@ -12,7 +12,7 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * `moon`은 반지름 1 언저리의 구에 충돌구와 바위 덩어리를 새긴 위성이다 (`moonShape.ts`).
  * 카메라를 보는 평면(별, 햇살, 해 눈)은 메시가 아니라 `FrameData.billboards`로 그린다.
  */
-export type MeshKind = 'sphere' | 'box' | 'leg' | 'ring' | 'moon';
+export type MeshKind = 'sphere' | 'box' | 'leg' | 'ring' | 'moon' | 'rocket' | 'rocketGlass';
 
 /** `ring` 메시의 관 반지름. 고리 반지름에 대한 비율이라 크기를 키우면 함께 굵어진다. */
 export const RING_TUBE_RATIO = 0.0015;

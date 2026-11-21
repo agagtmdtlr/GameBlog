@@ -12,12 +12,12 @@
     },
     {
       "id": "rocket",
-      "shape": "box",
+      "shape": "rocket",
       "placement": { "under": "moon" },
-      "size": [2.4, 2.4, 2.4],
+      "size": [2.6, 3.0, 2.6],
       "sink": 0.1,
-      "color": [0.55, 0.1, 0.08],
-      "roughness": 0.7,
+      "color": [0.8, 0.2, 0.03],
+      "roughness": 0.55,
       "collides": true
     }
   ]

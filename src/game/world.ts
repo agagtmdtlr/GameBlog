@@ -33,7 +33,8 @@ import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
 import { PLANET, surfaceDirection } from './planet';
 import { separateBodies, Wanderer, type Random } from './npc';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
-import { SURFACE_OBJECTS } from './surfaceScene';
+import { SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
+import { ROCKET_SHAPE } from '../engine/rocketShape';
 import { SurfaceZone } from './surfaceZone';
 import { Sun, SUN, SUN_EMISSIVE, SUN_ORBIT_EMISSIVE } from './sun';
 import {
@@ -131,6 +132,16 @@ function drawItem(
 
 function drawItemFromModel(mesh: MeshKind, model: Mat4, mat: Material, castShadow = true): DrawItem {
   return { mesh, model, normal: normalMatrix(model), material: mat, castShadow };
+}
+
+/** 표면 객체의 그리기 항목. 로켓은 몸통과 창 유리를 따로 칠한다. */
+function surfaceObjectDrawItems(o: SurfaceObject): DrawItem[] {
+  const body = material(o.color, o.roughness);
+  if (o.shape === 'box') return [drawItemFromModel('box', o.model, body)];
+  return [
+    drawItemFromModel('rocket', o.model, body),
+    drawItemFromModel('rocketGlass', o.model, material(ROCKET_SHAPE.glassColor, ROCKET_SHAPE.glassRoughness), false),
+  ];
 }
 
 const DEFAULT_VIEW: BillboardView = { position: [0, 0, 0], up: [0, 1, 0] };
@@ -237,7 +248,7 @@ export class World {
           receivesOccluder: true,
         }),
       ),
-      ...SURFACE_OBJECTS.map((o) => drawItemFromModel('box', o.model, material(o.color, o.roughness))),
+      ...SURFACE_OBJECTS.flatMap(surfaceObjectDrawItems),
       ...characterDrawItems(this.walker, alpha, PLAYER_COLOR),
       ...this.npcs.flatMap((npc, i) => characterDrawItems(npc.walker, alpha, NPCS[i].color)),
       // 위성은 그림자 맵 범위 밖에 있으므로 그림자를 드리우지 않는다.
