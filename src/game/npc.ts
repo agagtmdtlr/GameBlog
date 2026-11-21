@@ -1,7 +1,7 @@
 import { add, cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import type { OrientedBox, Sphere } from '../physics/collision';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
-import { CHARACTER_SCALE, Walker } from './walker';
+import { CHARACTER_SCALE, Walker, type WalkerHip } from './walker';
 
 /** NPC가 걸을 때 내는 힘. 플레이어 최대 입력(1)보다 작아 산책하듯 걷는다. */
 const WANDER_EFFORT = 0.32;
@@ -56,10 +56,10 @@ export class Wanderer {
     spawn: Vec3,
     private readonly ground: Sphere,
     private readonly random: Random = Math.random,
-    forward?: Vec3,
+    hip?: WalkerHip,
   ) {
     this.body = new Player(spawn);
-    this.walker = new Walker(spawn, ground, forward);
+    this.walker = new Walker(spawn, ground, undefined, hip);
     this.pause = this.between(MIN_PAUSE, MAX_PAUSE);
   }
 

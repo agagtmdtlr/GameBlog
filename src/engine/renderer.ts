@@ -104,6 +104,31 @@ function createRocketGeometry(): BufferGeometry {
   return merged;
 }
 
+/**
+ * 사각뿔. 상자처럼 한 변 1인 공간에 맞춰 밑면이 y = -0.5, 꼭짓점이 (0, 0.5, 0)이다.
+ * 면마다 정점을 따로 두어 법선이 면을 따르므로 모서리가 각져 보인다.
+ */
+function createPyramidGeometry(): BufferGeometry {
+  const h = 0.5;
+  const apex = [0, h, 0];
+  const corners = [
+    [-h, -h, h],
+    [h, -h, h],
+    [h, -h, -h],
+    [-h, -h, -h],
+  ];
+  const triangles: number[][] = [];
+  // 옆면: 바깥에서 볼 때 반시계 방향
+  for (let i = 0; i < 4; i++) triangles.push(corners[i], corners[(i + 1) % 4], apex);
+  // 밑면: 아래에서 볼 때 반시계 방향
+  triangles.push(corners[0], corners[3], corners[2], corners[0], corners[2], corners[1]);
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(triangles.flat()), 3));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
 /** 로켓 창의 유리. 몸통보다 조금 밖에 띄운 원판이다. */
 function createRocketGlassGeometry(): BufferGeometry {
   const glass = new CircleGeometry(ROCKET_SHAPE.window.radius, 32);
@@ -184,6 +209,8 @@ export class Renderer {
       sphere: new SphereGeometry(1, 96, 64),
       // 캐릭터 집 자리 표시
       box: new BoxGeometry(1, 1, 1),
+      // NPC의 피라미드 몸. 상자처럼 한 변 1인 공간에 맞춘다.
+      pyramid: createPyramidGeometry(),
       // 캐릭터 다리의 기본 자세. 그릴 때는 메시마다 스키닝한 복사본을 쓴다.
       leg: new BufferGeometry(),
       // 해 궤적처럼 큰 원을 그리므로 둘레를 촘촘하게, 관은 가늘어서 성기게 나눈다.
