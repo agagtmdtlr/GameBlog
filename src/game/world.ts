@@ -61,10 +61,29 @@ const PLANET_COLOR: Vec3 = [0.74, 0.74, 0.75];
 /** 캐릭터의 색 (선형 RGB, sRGB #FCC812) */
 const PLAYER_COLOR: Vec3 = [0.973, 0.578, 0.006];
 const PLAYER_ROUGHNESS = 0.45;
-/** 돌아다니는 NPC의 시작 위치. 시작할 때 보이는 쪽, 집 자리 옆이다. */
-export const NPC_SPAWN: Vec3 = scale(surfaceDirection(74, 145), PLANET.radius + PLAYER_RADIUS);
-/** NPC의 색 (선형 RGB, sRGB #4FB0F0). 모양은 플레이어와 같고 색만 다르다. */
-export const NPC_COLOR: Vec3 = [0.078, 0.434, 0.871];
+export interface NpcSpec {
+  /** 시작 위치 (행성 표면 위 몸 중심) */
+  spawn: Vec3;
+  /** 색 (선형 RGB). 모양은 플레이어와 같고 색만 다르다. */
+  color: Vec3;
+}
+
+const npcAt = (latitude: number, longitude: number, color: Vec3): NpcSpec => ({
+  spawn: scale(surfaceDirection(latitude, longitude), PLANET.radius + PLAYER_RADIUS),
+  color,
+});
+
+/**
+ * 돌아다니는 NPC 목록. 줄을 더하거나 빼면 수가 바뀐다.
+ * 첫째는 시작할 때 보이는 집 자리 옆이고, 나머지는 행성 둘레에 흩어 둔다.
+ */
+export const NPCS: readonly NpcSpec[] = [
+  npcAt(74, 145, [0.078, 0.434, 0.871]), // 하늘색 #4FB0F0
+  npcAt(45, 70, [0.871, 0.162, 0.332]), // 분홍 #F0709C
+  npcAt(10, 290, [0.15, 0.597, 0.114]), // 초록 #6CCB5F
+  npcAt(-25, 10, [0.376, 0.202, 0.807]), // 보라 #A57CE8
+  npcAt(-60, 200, [0.871, 0.254, 0.045]), // 주황 #F08A3C
+];
 /** 장면 파일(`scenes/surface.json`)의 표면 객체 중 캐릭터가 통과할 수 없는 상자 */
 const SURFACE_OBSTACLES = SURFACE_OBJECTS.filter((o) => o.collides).map((o) => o.box);
 
@@ -146,7 +165,9 @@ export class World {
   readonly content: ContentManager;
   readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
   readonly moon = new Moon();
-  readonly npc: Wanderer;
+  readonly npcs: readonly Wanderer[];
+  /** 서로 통과하지 못하는 캐릭터 몸체들. 플레이어가 먼저다. */
+  private readonly bodies: readonly Player[];
 
   private readonly zones: readonly ZoneInstance[];
 
@@ -155,7 +176,8 @@ export class World {
     onContentChange?: (content: GraphicsContent) => void,
     random?: Random,
   ) {
-    this.npc = new Wanderer(NPC_SPAWN, PLANET, random);
+    this.npcs = NPCS.map((npc) => new Wanderer(npc.spawn, PLANET, random));
+    this.bodies = [this.player, ...this.npcs.map((npc) => npc.body)];
     this.zones = entries.map((entry) => ({
       entry,
       zone: new SurfaceZone(
@@ -178,10 +200,12 @@ export class World {
     this.sun.step(dt);
     this.moon.step(dt);
     this.player.step(dt, command, PLANET, SURFACE_OBSTACLES);
-    this.npc.move(dt, SURFACE_OBSTACLES);
-    separateBodies(this.player, this.npc.body);
+    for (const npc of this.npcs) npc.move(dt, SURFACE_OBSTACLES);
+    for (let i = 0; i < this.bodies.length; i++) {
+      for (let j = i + 1; j < this.bodies.length; j++) separateBodies(this.bodies[i], this.bodies[j]);
+    }
     this.walker.step(dt, this.player);
-    this.npc.animate(dt);
+    for (const npc of this.npcs) npc.animate(dt);
 
     const fade = 1 - Math.exp(-ZONE_FADE_RATE * dt);
     for (const instance of this.zones) {
@@ -215,7 +239,7 @@ export class World {
       ),
       ...SURFACE_OBJECTS.map((o) => drawItemFromModel('box', o.model, material(o.color, o.roughness))),
       ...characterDrawItems(this.walker, alpha, PLAYER_COLOR),
-      ...characterDrawItems(this.npc.walker, alpha, NPC_COLOR),
+      ...this.npcs.flatMap((npc, i) => characterDrawItems(npc.walker, alpha, NPCS[i].color)),
       // 위성은 그림자 맵 범위 밖에 있으므로 그림자를 드리우지 않는다.
       drawItemFromModel('moon', this.moon.model(alpha), material(MOON_COLOR, MOON_ROUGHNESS), false),
       // 해는 빛을 내기만 하고 그림자를 드리우지 않는다.
