@@ -61,12 +61,13 @@ git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.js
 - `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
 - 콘텐츠 렌더러는 필요하면 자기 장면을 가진다. 지금은 등록된 렌더러가 없다.
 - `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
+- `skyScene`: 별 하늘 `CubeTexture`를 `background`로만 가진 장면 (2026-11-21)
 - `lightCamera`: 그림자용 `OrthographicCamera`. 광원 방향은 해를 따라 매 프레임 바뀌고([analysis/sun.md](sun.md)), 방향이 +Y와 거의 나란하면 `lookAt`이 퇴화하지 않게 위쪽을 +Z로 바꾼다
 
 프레임 순서는 포팅 전과 같다. `renderer.autoClear = false`로 두고 지우기를 직접 호출한다.
 
 1. `setRenderTarget(shadowTarget)` → `clear()` → `overrideMaterial`을 걸고 `render(scene, lightCamera)`
-2. `setRenderTarget(null)` → `setClearColor` → `clear()` → `render(scene, camera)`
+2. `setRenderTarget(null)` → `setClearColor` → `clear()` → `render(skyScene, camera)`(별 하늘 큐브맵, [analysis/starfield.md](starfield.md)) → `render(scene, camera)`
 3. `frame.contents`에 값이 있는 콘텐츠 렌더러마다 `render()`. 뒤 장면이 필요한 렌더러는 `copySceneColor()`(`copyFramebufferToTexture`) → `render(자기 장면, camera)` 순서로 그린다
 
 ### 행렬

@@ -3,6 +3,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
+  CubeTexture,
   DynamicDrawUsage,
   DepthTexture,
   FramebufferTexture,
@@ -35,6 +36,7 @@ import pbrFrag from '../shaders/pbr.frag?raw';
 import type { ContentRenderer, PbrMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
 import type { Mat4 } from './math';
 import { skinVertices, type SkinSource } from './skinning';
+import { drawStarfieldFaces } from './starfield';
 import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
 
 const SHADOW_MAP_SIZE = 2048;
@@ -54,6 +56,8 @@ const LEG_BONE_NAMES = ['Thigh', 'Shin', 'Foot'];
 export class Renderer {
   private readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
+  /** 별 하늘 큐브맵만 배경으로 가진 장면. 메인 패스 전에 그린다. */
+  private readonly skyScene = new Scene();
   private readonly camera = new PerspectiveCamera();
   private readonly lightCamera = new OrthographicCamera();
   private readonly geometries: Record<MeshKind, BufferGeometry>;
@@ -130,6 +134,15 @@ export class Renderer {
       polygonOffsetUnits: 4,
     });
     this.lightCamera.layers.set(SHADOW_LAYER);
+
+    // 별은 모델이 아니라 큐브맵 텍스처에 그린 점이다. 한 번 만들고 바뀌지 않으므로 밉맵은 만들지 않는다.
+    const stars = new CubeTexture(drawStarfieldFaces());
+    stars.colorSpace = SRGBColorSpace;
+    stars.generateMipmaps = false;
+    stars.minFilter = LinearFilter;
+    stars.magFilter = LinearFilter;
+    stars.needsUpdate = true;
+    this.skyScene.background = stars;
 
     const byKind = new Map<string, ContentRenderer>();
     for (const content of contentRenderers) {
@@ -244,6 +257,8 @@ export class Renderer {
     const bg = frame.environment.background;
     r.setClearColor(this.clearColor.setRGB(bg[0], bg[1], bg[2], SRGBColorSpace));
     r.clear();
+    // 배경 장면은 three.js 내장 배경 셰이더로 그린다. 깊이를 쓰지 않으므로 메인 장면이 그 위에 그려진다.
+    r.render(this.skyScene, this.camera);
     r.render(this.scene, this.camera);
 
     // 3. 콘텐츠 렌더러: 이번 프레임에 값이 있는 것만 등록한 순서대로 그린다.
