@@ -176,3 +176,27 @@ export function mat4TransformPoint(m: Mat4, p: Vec3): Vec3 {
     (m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]) / w,
   ];
 }
+
+/** 회전과 이동만 있는 행렬의 역행렬 */
+export function mat4RigidInverse(m: Mat4): Mat4 {
+  const t: Vec3 = [m[12], m[13], m[14]];
+  const x: Vec3 = [m[0], m[1], m[2]];
+  const y: Vec3 = [m[4], m[5], m[6]];
+  const z: Vec3 = [m[8], m[9], m[10]];
+  return new Float32Array([
+    x[0], y[0], z[0], 0,
+    x[1], y[1], z[1], 0,
+    x[2], y[2], z[2], 0,
+    -dot(x, t), -dot(y, t), -dot(z, t), 1,
+  ]);
+}
+
+/** 정규직교 축 x, y, z와 원점으로 만든 모델 행렬. 축은 오른손 좌표계여야 한다. */
+export function mat4FromBasis(origin: Vec3, x: Vec3, y: Vec3, z: Vec3): Mat4 {
+  return new Float32Array([
+    x[0], x[1], x[2], 0,
+    y[0], y[1], y[2], 0,
+    z[0], z[1], z[2], 0,
+    origin[0], origin[1], origin[2], 1,
+  ]);
+}

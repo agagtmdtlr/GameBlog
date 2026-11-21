@@ -3,15 +3,20 @@ import { CONTENT_ENTRIES, DEFAULT_PLANET_COLOR, INITIAL_CONTENT_ID } from '../co
 import type { ContentEntry, GraphicsContent } from '../content/types';
 import {
   lerp,
+  mat4FromBasis,
   mat4FromTRS,
+  mat4Identity,
+  mat4Multiply,
+  mat4RigidInverse,
   normalize,
   normalMatrix,
-  quatNlerp,
   QUAT_IDENTITY,
+  type Mat4,
   type Quat,
   type Vec3,
 } from '../engine/math';
 import {
+  LEG_BONE_COUNT,
   SurfacePattern,
   type ContentFrame,
   type DrawItem,
@@ -24,6 +29,7 @@ import { ColorTransition } from './colorTransition';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
+import { BODY_RADIUS, restBones, Walker, type BoneTransform } from './walker';
 
 /** 행성의 꼭대기에서 시작한다. */
 const SPAWN: Vec3 = [0, PLANET.radius + PLAYER_RADIUS, 0];
@@ -36,8 +42,13 @@ const ZONE_REARM_MARGIN = PLAYER_RADIUS;
 const ZONE_EDGE_WIDTH = 0.12;
 const ZONE_FADE_RATE = 7;
 const COLOR_TRANSITION_SECONDS = 0.3;
-/** 플레이어 구의 색 (선형 RGB). 발판은 행성 표면의 색을 바꾸고 구는 그대로 둔다. */
-const PLAYER_COLOR: Vec3 = [0.02, 0.022, 0.028];
+/** 캐릭터의 색 (선형 RGB, sRGB #FCC812). 작동 영역은 행성 표면의 색을 바꾸고 캐릭터는 그대로 둔다. */
+const PLAYER_COLOR: Vec3 = [0.973, 0.578, 0.006];
+const PLAYER_ROUGHNESS = 0.45;
+
+const boneMatrix = ({ origin, x, y, z }: BoneTransform): Mat4 => mat4FromBasis(origin, x, y, z);
+/** 다리 메시의 기본 자세 뼈를 원점으로 되돌리는 행렬. 지금 뼈와 곱하면 스키닝 행렬이 된다. */
+const REST_BONE_INVERSES = restBones().map((bone) => mat4RigidInverse(boneMatrix(bone)));
 
 export const STUDIO_ENVIRONMENT: Environment = {
   // 기본 시점에서 그림자가 구의 앞쪽 옆으로 떨어져 잘 보이는 방향
@@ -57,6 +68,7 @@ function material(baseColor: Vec3, roughness: number, overrides: Partial<Materia
     emissive: [0, 0, 0],
     pattern: SurfacePattern.None,
     showsZones: false,
+    receivesOccluder: false,
     ...overrides,
   };
 }
@@ -69,7 +81,10 @@ function drawItem(
   rotation: Quat = QUAT_IDENTITY,
   castShadow = true,
 ): DrawItem {
-  const model = mat4FromTRS(position, rotation, size);
+  return drawItemFromModel(mesh, mat4FromTRS(position, rotation, size), mat, castShadow);
+}
+
+function drawItemFromModel(mesh: MeshKind, model: Mat4, mat: Material, castShadow = true): DrawItem {
   return { mesh, model, normal: normalMatrix(model), material: mat, castShadow };
 }
 
@@ -85,6 +100,7 @@ interface ZoneInstance {
 /** 월드를 구성하고 게임 규칙을 진행한다. GPU와 DOM에 의존하지 않는다. */
 export class World {
   readonly player = new Player(SPAWN);
+  readonly walker = new Walker(SPAWN, PLANET);
   readonly content: ContentManager;
 
   private readonly zones: readonly ZoneInstance[];
@@ -118,6 +134,7 @@ export class World {
 
   fixedStep(dt: number, command: MoveCommand): void {
     this.player.step(dt, command, PLANET);
+    this.walker.step(dt, this.player);
 
     const fade = 1 - Math.exp(-ZONE_FADE_RATE * dt);
     for (const instance of this.zones) {
@@ -132,7 +149,7 @@ export class World {
     this.content.update(dt);
   }
 
-  /** 렌더링 보간이 적용된 구의 위치 */
+  /** 렌더링 보간이 적용된 물리 몸체의 위치 */
   interpolatedPlayerPosition(alpha: number): Vec3 {
     return lerp(this.player.previousPosition, this.player.position, alpha);
   }
@@ -147,11 +164,20 @@ export class World {
         'sphere',
         PLANET.center,
         [PLANET.radius, PLANET.radius, PLANET.radius],
-        material(this.planetColor.current, 0.75, { pattern: SurfacePattern.Grid, showsZones: true }),
+        material(this.planetColor.current, 0.75, {
+          pattern: SurfacePattern.Grid,
+          showsZones: true,
+          receivesOccluder: true,
+        }),
       ),
-      this.sphereDrawItem(alpha),
+      ...this.characterDrawItems(alpha),
     ];
     return items;
+  }
+
+  /** 앰비언트 오클루전을 만드는 캐릭터 몸 */
+  occluder(alpha: number): { center: Vec3; radius: number } {
+    return { center: this.walker.pose(alpha).body, radius: BODY_RADIUS };
   }
 
   /** 행성 표면에 그릴 작동 영역 */
@@ -171,14 +197,19 @@ export class World {
     return [];
   }
 
-  private sphereDrawItem(alpha: number): DrawItem {
-    const orientation = quatNlerp(this.player.previousOrientation, this.player.orientation, alpha);
-    return drawItem(
-      'sphere',
-      this.interpolatedPlayerPosition(alpha),
-      [PLAYER_RADIUS, PLAYER_RADIUS, PLAYER_RADIUS],
-      material(PLAYER_COLOR, 0.32, { pattern: SurfacePattern.SphereBands }),
-      orientation,
-    );
+  /** 몸, 왼다리, 오른다리 순서 */
+  private characterDrawItems(alpha: number): DrawItem[] {
+    const pose = this.walker.pose(alpha);
+    const mat = material(PLAYER_COLOR, PLAYER_ROUGHNESS);
+    const bones = this.walker.solveLegs(pose).map(boneMatrix);
+    const leg = (first: number): DrawItem => ({
+      ...drawItemFromModel('leg', mat4Identity(), mat),
+      skin: bones.slice(first, first + LEG_BONE_COUNT).map((bone, i) => mat4Multiply(bone, REST_BONE_INVERSES[i])),
+    });
+    return [
+      drawItem('sphere', pose.body, [BODY_RADIUS, BODY_RADIUS, BODY_RADIUS], mat),
+      leg(0),
+      leg(LEG_BONE_COUNT),
+    ];
   }
 }

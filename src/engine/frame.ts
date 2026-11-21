@@ -5,9 +5,13 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * three.js에 의존하지 않으므로 `World`와 테스트가 GPU 없이 쓸 수 있다.
  */
 
-export type MeshKind = 'sphere';
+/** `sphere`는 three.js 기본 구, `leg`는 `assets/character.glb`의 캐릭터 다리 스킨 메시다. */
+export type MeshKind = 'sphere' | 'leg';
 
-export const SurfacePattern = { None: 0, SphereBands: 1, Grid: 2 } as const;
+/** 스킨 메시가 쓰는 뼈 수. `leg` 메시의 뼈 순서는 [허벅지, 정강이, 발]이다. */
+export const LEG_BONE_COUNT = 3;
+
+export const SurfacePattern = { None: 0, Grid: 2 } as const;
 export type SurfacePattern = (typeof SurfacePattern)[keyof typeof SurfacePattern];
 
 export interface Material {
@@ -18,6 +22,8 @@ export interface Material {
   pattern: SurfacePattern;
   /** `FrameData.surfaceZones`를 표면에 그린다. 원점 기준 구 메시(행성)에 쓴다. */
   showsZones: boolean;
+  /** `FrameData.occluder`가 만드는 앰비언트 오클루전을 받는다. 캐릭터 자신에는 끈다. */
+  receivesOccluder: boolean;
 }
 
 export interface DrawItem {
@@ -26,6 +32,11 @@ export interface DrawItem {
   normal: Mat3;
   material: Material;
   castShadow: boolean;
+  /**
+   * 스킨 메시의 뼈마다 기본 자세의 정점을 월드로 옮기는 행렬. 있으면 `model`과 `normal` 대신
+   * 정점마다 가중치로 섞은 이 행렬을 쓴다. 회전과 이동만 있어야 한다.
+   */
+  skin?: readonly Mat4[];
 }
 
 export interface Environment {

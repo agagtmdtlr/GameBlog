@@ -43,7 +43,7 @@ interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; 
 
 - `setSurfaceColor(color)`: 행성 표면 색을 0.3초 동안 전환
 
-플레이어 구의 재질은 `World`의 `PLAYER_COLOR`로 고정이며 콘텐츠가 바꾸지 않는다. 행성은 색이 바뀌므로 정적 목록이 아니라 `buildDrawList`가 매 프레임 그리기 목록의 첫 항목으로 만든다.
+플레이어 캐릭터(몸과 다리)의 재질은 `World`의 `PLAYER_COLOR`로 고정이며 콘텐츠가 바꾸지 않는다. 캐릭터 구조는 [analysis/character.md](character.md)에 있다. 행성은 색이 바뀌므로 정적 목록이 아니라 `buildDrawList`가 매 프레임 그리기 목록의 첫 항목으로 만든다.
 
 동작:
 

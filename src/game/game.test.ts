@@ -77,16 +77,6 @@ describe('구 조작', () => {
     expect(length(sub(player.position, TOP))).toBeLessThan(1e-6);
   });
 
-  it('+X로 구르면 윗면이 진행 방향으로 회전한다', () => {
-    const player = new Player(TOP);
-    simulate(player, 0.1);
-    const start = player.orientation;
-    player.velocity = [1, 0, 0];
-    player.step(DT, IDLE, PLANET);
-    expect(player.orientation).not.toEqual(start);
-    // 작은 회전에서 쿼터니언 벡터부는 회전축 방향을 가리키며, +X 구름의 축은 -Z다.
-    expect(player.orientation[2]).toBeLessThan(0);
-  });
 });
 
 describe('카메라', () => {
@@ -300,7 +290,7 @@ describe('월드 통합', () => {
 
   it('발판을 밟아도 플레이어 구의 재질은 바뀌지 않는다', () => {
     const world = new World();
-    const playerMaterial = () => world.buildDrawList(1).at(-1)!.material;
+    const playerMaterial = () => world.buildDrawList(1)[1].material;
     const before = playerMaterial();
     rollTo(world, find('color-blue'));
     for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);

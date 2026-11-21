@@ -1,12 +1,12 @@
 import WebGL from 'three/addons/capabilities/WebGL.js';
 import { CONTENT_ENTRIES } from './content/registry';
 import { createContentRenderers } from './engine/contentRenderers/registry';
+import characterModelUrl from './assets/character.glb?url';
 import { Input } from './engine/input';
 import { add, length, scale, type Vec3 } from './engine/math';
 import { Renderer } from './engine/renderer';
 import { CameraRig } from './game/cameraRig';
 import { PLANET } from './game/planet';
-import { PLAYER_RADIUS } from './game/player';
 import { STUDIO_ENVIRONMENT, World } from './game/world';
 import { FixedStepper } from './physics/fixedStepper';
 import { Overlay } from './ui/overlay';
@@ -58,6 +58,12 @@ function main(): void {
     showGraphicsFailure();
     return;
   }
+
+  // 다리 모델은 비동기로 불러온다. 불러오기 전에는 몸만 보인다.
+  renderer.loadCharacter(characterModelUrl).catch((error: unknown) => {
+    console.error(error);
+    showGraphicsFailure();
+  });
 
   const input = new Input(canvas);
   const stepper = new FixedStepper(PHYSICS_STEP_SECONDS, MAX_FRAME_SECONDS);
@@ -134,13 +140,12 @@ function main(): void {
     }
 
     const aspect = renderer.resizeToDisplay();
-    const playerPosition = world.interpolatedPlayerPosition(alpha);
     renderer.render(
       {
         items: world.buildDrawList(alpha),
         camera: camera.view,
         environment: STUDIO_ENVIRONMENT,
-        occluder: { center: playerPosition, radius: PLAYER_RADIUS },
+        occluder: world.occluder(alpha),
         surfaceZones: world.buildSurfaceZones(),
         contents: world.buildContentFrames(alpha),
       },

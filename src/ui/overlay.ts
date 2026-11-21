@@ -35,7 +35,7 @@ export class Overlay {
   }
 
   showStart(): void {
-    this.show('구를 굴려 보세요', '발판을 밟으면 그래픽스 콘텐츠가 켜집니다.', '시작하기');
+    this.show('행성을 걸어 보세요', '표면의 원을 밟으면 그래픽스 콘텐츠가 켜집니다.', '시작하기');
   }
 
   showPaused(): void {

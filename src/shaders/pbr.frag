@@ -18,6 +18,7 @@ uniform vec3 uLightColor;
 uniform vec3 uSkyColor;
 uniform vec3 uGroundColor;
 uniform vec4 uOccluder;
+uniform bool uReceiveOccluder;
 
 /** 표면 영역. uZoneParams x: 반지름(라디안), y: 경계선 폭(라디안), z: 빛남, w: 구가 위에 있음 */
 const int MAX_ZONES = 8;
@@ -33,7 +34,6 @@ uniform float uShadowTexel;
 out vec4 fragColor;
 
 const float PI = 3.14159265359;
-const int PATTERN_SPHERE_BANDS = 1;
 const int PATTERN_GRID = 2;
 /** 정육면체 한 면의 절반에 들어가는 격자 칸 수 */
 const float GRID_CELLS = 7.0;
@@ -78,7 +78,7 @@ float sampleShadow() {
   return sum / 9.0;
 }
 
-// 구가 만드는 해석적 앰비언트 오클루전. 구를 바닥에 붙어 보이게 한다.
+// 캐릭터 몸(구)이 만드는 해석적 앰비언트 오클루전. 몸 아래 땅을 어둡게 한다.
 float occluderVisibility(vec3 N) {
   vec3 toOccluder = uOccluder.xyz - vWorldPos;
   float d2 = dot(toOccluder, toOccluder);
@@ -96,14 +96,6 @@ vec3 linearToSrgb(vec3 c) {
 }
 
 vec3 applySurfacePattern(vec3 albedo, vec3 N) {
-  if (uPattern == PATTERN_SPHERE_BANDS) {
-    // 오브젝트 공간의 대원 두 개. 회전이 눈에 보이게 하는 표식이다.
-    vec3 p = normalize(vObjectPos);
-    float d = min(abs(p.y), abs(p.x));
-    float aa = fwidth(d);
-    float band = 1.0 - smoothstep(0.05 - aa, 0.05 + aa, d);
-    return mix(albedo, vec3(0.92), band * 0.5);
-  }
   if (uPattern == PATTERN_GRID) {
     // 구를 정육면체의 여섯 면으로 나눠 격자를 그린다. 위도·경도 격자와 달리 극점에서 선이 몰리지 않는다.
     vec3 p = normalize(vObjectPos);
@@ -161,7 +153,7 @@ void main() {
   float shadow = sampleShadow();
   vec3 direct = (diffuseColor / PI * (1.0 - F) + specular) * uLightColor * NoL * shadow;
 
-  float visibility = uPattern == PATTERN_SPHERE_BANDS ? 1.0 : occluderVisibility(N);
+  float visibility = uReceiveOccluder ? occluderVisibility(N) : 1.0;
   vec3 irradiance = mix(uGroundColor, uSkyColor, N.y * 0.5 + 0.5);
   vec3 R = reflect(-V, N);
   vec3 envColor = mix(uGroundColor, uSkyColor, R.y * 0.5 + 0.5);

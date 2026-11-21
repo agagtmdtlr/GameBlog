@@ -1,5 +1,8 @@
 import {
+  BufferAttribute,
+  BufferGeometry,
   Color,
+  DynamicDrawUsage,
   DepthTexture,
   FramebufferTexture,
   GLSL3,
@@ -14,6 +17,7 @@ import {
   RawShaderMaterial,
   RGBFormat,
   Scene,
+  SkinnedMesh,
   SphereGeometry,
   SRGBColorSpace,
   Vector2,
@@ -21,18 +25,22 @@ import {
   Vector4,
   WebGLRenderer,
   WebGLRenderTarget,
-  type BufferGeometry,
   type Texture,
 } from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import meshVert from '../shaders/mesh.vert?raw';
 import pbrFrag from '../shaders/pbr.frag?raw';
 import type { ContentRenderer, PbrMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
-import { MAX_SURFACE_ZONES, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
+import type { Mat4 } from './math';
+import { skinVertices, type SkinSource } from './skinning';
+import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
 
 const SHADOW_MAP_SIZE = 2048;
 const MAX_DEVICE_PIXEL_RATIO = 2;
 /** 그림자를 드리우는 메시만 켜는 레이어. 광원 카메라는 이 레이어만 본다. */
 const SHADOW_LAYER = 1;
+/** `frame.ts`의 `leg` 뼈 순서에 맞춘 glTF 뼈 이름 */
+const LEG_BONE_NAMES = ['Thigh', 'Shin', 'Foot'];
 
 /**
  * three.js로 장면을 그린다. 게임 상태는 들고 있지 않고, 매 프레임 `FrameData`를 받아
@@ -55,6 +63,9 @@ export class Renderer {
   /** 이번 프레임의 콘텐츠 값을 `kind`로 찾는 표. 매 프레임 다시 채운다. */
   private readonly contentFrames = new Map<string, ContentFrame>();
   private sceneColor: FramebufferTexture | null = null;
+  /** 다리 스킨 메시의 기본 자세와 가중치. loadCharacter 전에는 없다. */
+  private legSkin: SkinSource | null = null;
+  private readonly skinned = new Map<PbrMesh, BufferGeometry>();
 
   private readonly clearColor = new Color();
   private readonly bufferSize = new Vector2();
@@ -94,6 +105,8 @@ export class Renderer {
     this.geometries = {
       // 행성에도 쓰므로 촘촘하게 나눈다. 성기면 구가 행성 표면에 살짝 묻혀 보인다.
       sphere: new SphereGeometry(1, 96, 64),
+      // 캐릭터 다리의 기본 자세. 그릴 때는 메시마다 스키닝한 복사본을 쓴다.
+      leg: new BufferGeometry(),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -142,6 +155,46 @@ export class Renderer {
       copySceneColor: () => this.copySceneColor(),
     };
     for (const content of contentRenderers) content.init(this.renderContext);
+  }
+
+  /**
+   * Blender에서 내보낸 캐릭터 모델(`tools/blender/build_character.py`)을 불러와 다리 스킨 메시를 채운다.
+   * 메시 Leg의 기본 자세 정점과 뼈 번호·가중치만 쓰고, 내보낸 뼈의 변환은 쓰지 않는다.
+   * 뼈 번호는 이름으로 찾아 [Thigh, Shin, Foot] 순서로 바꾼다.
+   */
+  async loadCharacter(url: string): Promise<void> {
+    const gltf = await new GLTFLoader().loadAsync(url);
+    // instanceof 대신 isSkinnedMesh로 확인한다. 개발 서버의 의존성 최적화 중에는 three.js가 두 번 불러와질 수 있다.
+    const leg = gltf.scene.getObjectByName('Leg') as SkinnedMesh | undefined;
+    if (!leg?.isSkinnedMesh) throw new Error('캐릭터 모델에 Leg 스킨 메시가 없습니다.');
+    const remap = leg.skeleton.bones.map((bone) => LEG_BONE_NAMES.indexOf(bone.name));
+    if (remap.includes(-1) || remap.length !== LEG_BONE_COUNT) {
+      throw new Error(`다리 뼈 이름이 ${LEG_BONE_NAMES.join(', ')}가 아닙니다.`);
+    }
+
+    const geometry = leg.geometry;
+    const position = geometry.getAttribute('position');
+    const normal = geometry.getAttribute('normal');
+    const skinIndex = geometry.getAttribute('skinIndex');
+    const skinWeight = geometry.getAttribute('skinWeight');
+    const count = position.count;
+    const source: SkinSource = {
+      positions: new Float32Array(count * 3),
+      normals: new Float32Array(count * 3),
+      boneIndices: new Uint8Array(count * 4),
+      boneWeights: new Float32Array(count * 4),
+    };
+    for (let i = 0; i < count; i++) {
+      source.positions.set([position.getX(i), position.getY(i), position.getZ(i)], i * 3);
+      source.normals.set([normal.getX(i), normal.getY(i), normal.getZ(i)], i * 3);
+      for (let k = 0; k < 4; k++) {
+        source.boneIndices[i * 4 + k] = remap[skinIndex.getComponent(i, k)];
+        source.boneWeights[i * 4 + k] = skinWeight.getComponent(i, k);
+      }
+    }
+    this.geometries.leg.dispose();
+    this.geometries.leg = geometry;
+    this.legSkin = source;
   }
 
   /** 개발용 확인(`getError`)에 쓰는 WebGL 컨텍스트 */
@@ -278,6 +331,7 @@ export class Renderer {
         uRoughness: { value: 1 },
         uPattern: { value: 0 },
         uShowZones: { value: false },
+        uReceiveOccluder: { value: false },
       },
     });
     const mesh = new Mesh(this.geometries.sphere, material);
@@ -287,7 +341,9 @@ export class Renderer {
   }
 
   private applyItem(mesh: PbrMesh, item: DrawItem): void {
-    mesh.geometry = this.geometries[item.mesh];
+    mesh.geometry = item.skin ? this.skinnedGeometry(mesh, item.skin) : this.geometries[item.mesh];
+    // 스키닝한 정점은 이미 월드 좌표라 경계 구를 따로 계산하지 않고 화면 밖 제외를 끈다.
+    mesh.frustumCulled = !item.skin;
     mesh.matrix.fromArray(item.model);
     mesh.matrixWorldNeedsUpdate = true;
     mesh.layers.set(0);
@@ -302,6 +358,30 @@ export class Renderer {
     u.uRoughness.value = m.roughness;
     u.uPattern.value = m.pattern;
     u.uShowZones.value = m.showsZones;
+    u.uReceiveOccluder.value = m.receivesOccluder;
+  }
+
+  /**
+   * 풀의 메시마다 따로 가진 다리 지오메트리에 스키닝 결과를 쓴다.
+   * 같은 메시는 매 프레임 같은 다리를 그리므로 지오메트리를 다시 만들지 않는다.
+   */
+  private skinnedGeometry(mesh: PbrMesh, bones: readonly Mat4[]): BufferGeometry {
+    const source = this.legSkin;
+    if (!source) return this.geometries.leg;
+    let geometry = this.skinned.get(mesh);
+    if (!geometry) {
+      geometry = new BufferGeometry();
+      geometry.setIndex(this.geometries.leg.index);
+      geometry.setAttribute('position', new BufferAttribute(source.positions.slice(), 3).setUsage(DynamicDrawUsage));
+      geometry.setAttribute('normal', new BufferAttribute(source.normals.slice(), 3).setUsage(DynamicDrawUsage));
+      this.skinned.set(mesh, geometry);
+    }
+    const position = geometry.getAttribute('position') as BufferAttribute;
+    const normal = geometry.getAttribute('normal') as BufferAttribute;
+    skinVertices(source, bones, position.array as Float32Array, normal.array as Float32Array);
+    position.needsUpdate = true;
+    normal.needsUpdate = true;
+    return geometry;
   }
 
   /** 지금까지 그린 화면을 텍스처로 복사한다. 굴절처럼 뒤 장면을 읽는 콘텐츠가 쓴다. */
