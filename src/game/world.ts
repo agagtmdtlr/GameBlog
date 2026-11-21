@@ -16,6 +16,9 @@ import {
   type Quat,
   type Vec3,
 } from '../engine/math';
+import type { Billboard } from '../engine/billboard';
+import { placeStars } from '../engine/starfield';
+import { sunRaysExtent } from '../engine/sunRays';
 import {
   LEG_BONE_COUNT,
   SurfacePattern,
@@ -34,11 +37,10 @@ import { SurfaceZone } from './surfaceZone';
 import { Sun, SUN, SUN_EMISSIVE, SUN_ORBIT_EMISSIVE } from './sun';
 import {
   SUN_EYE_WHITE_EMISSIVE,
+  SUN_FACE,
   SUN_PUPIL_COLOR,
   sunBillboardBasis,
   sunEyes,
-  sunRaysModel,
-  type BillboardBasis,
   type BillboardView,
 } from './sunFace';
 import { BODY_RADIUS, CHARACTER_SCALE, restBones, Walker, type BoneTransform } from './walker';
@@ -109,6 +111,20 @@ function drawItemFromModel(mesh: MeshKind, model: Mat4, mat: Material, castShado
 
 const DEFAULT_VIEW: BillboardView = { position: [0, 0, 0], up: [0, 1, 0] };
 
+/** 행성 둘레의 별. 움직이지 않으므로 한 번만 만든다. 조명을 받지 않아 얼굴 색 그대로 보인다. */
+const STAR_BILLBOARDS: readonly Billboard[] = placeStars().map((star) => ({
+  image: 'starFace',
+  frame: star.face,
+  position: star.position,
+  size: [star.mirrored ? -star.size : star.size, star.size],
+  rotation: star.tilt,
+  color: [1, 1, 1],
+  toneMapped: false,
+}));
+
+/** 햇살 그림 한 변의 길이 (해 반지름 단위) */
+const SUN_RAYS_SIZE = sunRaysExtent() * 2;
+
 interface ZoneInstance {
   entry: ContentEntry;
   zone: SurfaceZone;
@@ -173,13 +189,8 @@ export class World {
     return lerp(this.player.previousPosition, this.player.position, alpha);
   }
 
-  /**
-   * `view`는 이번 프레임의 카메라다. 해 햇살 빌보드를 화면에 맞춰 세우는 데 쓴다.
-   * 없으면 행성 중심에서 보는 것으로 친다.
-   */
-  buildDrawList(alpha: number, view: BillboardView = DEFAULT_VIEW): DrawItem[] {
+  buildDrawList(alpha: number): DrawItem[] {
     const sunPosition = this.sun.position(alpha);
-    const sunBasis = sunBillboardBasis(sunPosition, view);
     const items: DrawItem[] = [
       drawItem(
         'sphere',
@@ -204,21 +215,30 @@ export class World {
         QUAT_IDENTITY,
         false,
       ),
-      drawItemFromModel('sunRays', sunRaysModel(sunPosition, SUN.radius, sunBasis), material([0, 0, 0], 1, { emissive: SUN_EMISSIVE }), false),
-      ...this.sunEyeDrawItems(sunPosition, sunBasis, alpha),
       drawItemFromModel('ring', this.sunOrbitModel(), material([0, 0, 0], 1, { emissive: SUN_ORBIT_EMISSIVE }), false),
     ];
     return items;
   }
 
-  /** 해 얼굴의 흰자와 검은자. 검은자는 캐릭터 몸을 바라본다. */
-  private sunEyeDrawItems(sunPosition: Vec3, basis: BillboardBasis, alpha: number): DrawItem[] {
-    const white = material([0, 0, 0], 1, { emissive: SUN_EYE_WHITE_EMISSIVE });
-    const pupil = material(SUN_PUPIL_COLOR, 1);
-    return sunEyes(sunPosition, SUN.radius, basis, this.walker.pose(alpha).body).flatMap((eye) => [
-      drawItemFromModel('disk', eye.white, white, false),
-      drawItemFromModel('disk', eye.pupil, pupil, false),
-    ]);
+  /**
+   * 카메라를 보는 빌보드: 별, 햇살, 해 눈(흰자·검은자). 해 빌보드는 해 구체와 같은 색으로 보이도록
+   * PBR과 같은 톤 매핑을 건다. 렌더러가 모두 모아 한 번에 그린다.
+   * `view`는 이번 프레임의 카메라이고, 해 눈을 해 얼굴 위에 놓는 데 쓴다. 없으면 행성 중심에서 보는 것으로 친다.
+   */
+  buildBillboards(alpha: number, view: BillboardView = DEFAULT_VIEW): Billboard[] {
+    const sunPosition = this.sun.position(alpha);
+    const r = SUN.radius;
+    const [rx, ry] = SUN_FACE.whiteRadius;
+    const pupil = SUN_FACE.pupilRadius * 2 * r;
+    const eyes = sunEyes(sunPosition, r, sunBillboardBasis(sunPosition, view), this.walker.pose(alpha).body);
+    return [
+      ...STAR_BILLBOARDS,
+      { image: 'sunRays', position: sunPosition, size: [SUN_RAYS_SIZE * r, SUN_RAYS_SIZE * r], color: SUN_EMISSIVE, toneMapped: true },
+      ...eyes.flatMap((eye): Billboard[] => [
+        { image: 'disk', position: eye.white, size: [rx * 2 * r, ry * 2 * r], color: SUN_EYE_WHITE_EMISSIVE, toneMapped: true },
+        { image: 'disk', position: eye.pupil, size: [pupil, pupil], color: SUN_PUPIL_COLOR, toneMapped: true },
+      ]),
+    ];
   }
 
   /** 해 궤적 고리의 모델 행렬. 고리의 XY 평면을 궤도면에 맞추고 궤도 반지름만큼 키운다. */

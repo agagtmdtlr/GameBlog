@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { ContentManager } from '../content/manager';
 import { CONTENT_ENTRIES } from '../content/registry';
 import { MAX_SURFACE_ZONES } from '../engine/frame';
+import { STARFIELD } from '../engine/starfield';
+import { SUN_RAYS } from '../engine/sunRays';
 import type { ContentEntry, GraphicsContent } from '../content/types';
 import { cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
@@ -480,38 +482,42 @@ describe('해', () => {
     }
   });
 
-  it('햇살은 해를 감싸고, 카메라 쪽을 보며 화면 위쪽에 맞춰 선다', () => {
+  it('햇살은 해를 가운데 두고 둘러싸는 빌보드다', () => {
     const world = new World();
     stepWorld(world, SUN.periodSeconds / 5);
     const view = { position: [6, 30, -9] as Vec3, up: normalize([0.1, 1, 0.2]) };
-    const rays = world.buildDrawList(1, view).find((item) => item.mesh === 'sunRays')!;
-    const m = rays.model;
-    const center: Vec3 = [m[12], m[13], m[14]];
-    const x: Vec3 = [m[0], m[1], m[2]];
-    const y: Vec3 = [m[4], m[5], m[6]];
-    const z: Vec3 = [m[8], m[9], m[10]];
-    expect(length(sub(center, world.sun.position(1)))).toBeCloseTo(0, 4);
-    expect(length(x)).toBeCloseTo(SUN.radius, 4);
-    expect(dot(normalize(z), normalize(sub(view.position, center)))).toBeCloseTo(1, 4);
-    expect(dot(x, view.up)).toBeCloseTo(0, 4);
-    expect(dot(y, view.up)).toBeGreaterThan(0);
-    expect(rays.castShadow).toBe(false);
+    const rays = world.buildBillboards(1, view).filter((b) => b.image === 'sunRays');
+    expect(rays).toHaveLength(1);
+    const [ray] = rays;
+    expect(length(sub(ray.position, world.sun.position(1)))).toBeCloseTo(0, 4);
+    expect(ray.size[0]).toBeCloseTo(ray.size[1], 6);
+    // 가장 긴 햇살의 끝까지 덮는다.
+    expect(ray.size[0] / 2).toBeGreaterThan((SUN_RAYS.innerRadius + SUN_RAYS.maxLength) * SUN.radius);
+    expect(ray.toneMapped).toBe(true);
+    // 해 빌보드는 그리기 목록(그림자 패스)에 들어가지 않는다.
+    expect(world.buildDrawList(1).filter((item) => item.material.emissive[0] > 0)).toHaveLength(2);
   });
 
-  it('눈은 흰자와 검은자를 따로 그리고, 해 구면 앞에서 카메라를 본다', () => {
+  it('눈은 흰자와 검은자를 따로 그리고, 해 구면 앞에 놓인다', () => {
     const world = new World();
     const view = { position: [6, 30, -9] as Vec3, up: [0, 1, 0] as Vec3 };
-    const disks = world.buildDrawList(1, view).filter((item) => item.mesh === 'disk');
+    const disks = world.buildBillboards(1, view).filter((b) => b.image === 'disk');
     expect(disks).toHaveLength(4);
     const sun = world.sun.position(1);
     const toCamera = normalize(sub(view.position, sun));
-    for (const item of disks) {
-      const m = item.model;
-      const center: Vec3 = [m[12], m[13], m[14]];
-      expect(dot(sub(center, sun), toCamera)).toBeGreaterThan(SUN.radius);
-      expect(dot(normalize([m[8], m[9], m[10]]), toCamera)).toBeCloseTo(1, 4);
-      expect(item.castShadow).toBe(false);
+    for (const disk of disks) {
+      expect(dot(sub(disk.position, sun), toCamera)).toBeGreaterThan(SUN.radius);
     }
+    const [white, pupil] = disks;
+    // 검은자가 흰자보다 카메라 쪽에 있어 흰자 위에 그려진다.
+    expect(dot(sub(pupil.position, white.position), toCamera)).toBeGreaterThan(0);
+    expect(pupil.size[0]).toBeLessThan(white.size[0]);
+  });
+
+  it('별은 정해진 개수만큼 있고 얼굴 색 그대로 보인다', () => {
+    const stars = new World().buildBillboards(1).filter((b) => b.image === 'starFace');
+    expect(stars).toHaveLength(STARFIELD.count);
+    for (const star of stars) expect(star.toneMapped).toBe(false);
   });
 
   it('검은자는 캐릭터 쪽으로 움직이되 흰자 밖으로 나가지 않는다', () => {

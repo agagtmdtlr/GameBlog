@@ -1,6 +1,6 @@
 # 별 빌보드 분석
 
-행성 둘레에 떠 있는 의인화된 코믹한 별들의 구조다. 별은 모델이 아니라 캔버스에 그린 얼굴 텍스처를 붙인 빌보드(three.js `Sprite`)다.
+행성 둘레에 떠 있는 의인화된 코믹한 별들의 구조다. 별은 모델이 아니라 캔버스에 그린 얼굴 텍스처를 붙인 빌보드다 ([analysis/billboard.md](billboard.md)).
 
 - **규칙:** 없음 ([rules/threejs.md](../rules/threejs.md)의 three.js 가져오기 범위는 지킨다)
 - **색인:** [docs/README.md](../README.md)
@@ -20,16 +20,17 @@
 | 파일 | 내용 |
 |---|---|
 | `engine/starfield.ts` | `STARFIELD` 상수, `STAR_FACES`, 배치(`placeStars`), 별 윤곽(`starOutline`), 얼굴 캔버스(`drawStarFace`). three.js를 가져오지 않는다 |
-| `engine/renderer.ts` | 얼굴마다 `CanvasTexture` 하나, 별마다 `Sprite`와 `SpriteMaterial`(기울기가 재질 값이라)을 만들어 `skyScene`에 넣는다 |
+| `game/world.ts` | 별마다 `Billboard`(`starFace` 그림의 얼굴 프레임, 크기, 기울기, 뒤집기)를 한 번만 만들어 `buildBillboards`에 넣는다 |
+| `engine/billboardAtlas.ts` | 얼굴 네 가지를 빌보드 아틀라스에 그린다. 그리기는 [analysis/billboard.md](billboard.md)의 `BillboardBatch`가 한다 |
 | `engine/starfield.test.ts` | 씨앗 재현성, 거리·크기·기울기 범위, 별 윤곽 |
 
 ## 세부
 
-- **렌더링:** `skyScene`은 별만 가진 장면이다. 그림자 패스에 들어가지 않게 메인 장면과 분리했다. 메인 패스에서 지운 뒤 `skyScene`, `scene` 순서로 그린다. 별이 깊이를 쓰므로 그 앞의 행성·달·해가 깊이 검사로 별을 가린다.
-- **텍스처:** 256×256 캔버스, `colorSpace = SRGBColorSpace`. `SpriteMaterial`은 내장 재질이라 three.js 출력 변환을 거치고, `toneMapping`이 꺼져 있어 캔버스 색이 그대로 나온다.
+- **렌더링:** 햇살·해 눈과 함께 빌보드 일괄 렌더링으로 그린다 ([analysis/billboard.md](billboard.md), 2026-11-21). 그 전에는 별마다 `Sprite`를 만들어 별만 가진 `skyScene`에 넣었다. 불투명한 메인 장면 뒤에 그리므로 그 앞의 행성·달·해가 깊이 검사로 별을 가린다.
+- **텍스처:** 빌보드 아틀라스의 256×256 칸, `colorSpace = SRGBColorSpace`. 별 빌보드는 톤 매핑을 끄므로(`toneMapped: false`) 캔버스 색이 그대로 나온다.
 - **텍스처 좌표:** 오각별의 무게중심이 외접원 중심보다 아래라, 원 중심을 (128, 140)에 두어 빌보드 가운데에 맞췄다. 꼭짓점은 같은 색 둥근 선으로 살짝 둥글게 했다.
-- **뒤집기:** `sprite.scale.x`를 음수로 둔다.
-- **투명:** `SpriteMaterial`은 기본으로 `transparent`라 three.js가 뒤에서 앞으로 정렬해 그린다. 별끼리 겹친 가장자리도 자연스럽다.
+- **뒤집기:** 빌보드 `size`의 가로를 음수로 둔다.
+- **투명:** `BillboardBatch`가 매 프레임 카메라에서 먼 빌보드부터 그린다. 별끼리 겹친 가장자리도 자연스럽다.
 
 ## 브라우저 확인 (2026-11-21, 개발 서버)
 

@@ -45,3 +45,15 @@ export function sunRayPositions(seed = SUN_RAYS.seed): Float32Array {
   }
   return out;
 }
+
+/**
+ * 햇살 그림이 들어가는 정사각형의 절반 크기 (해 반지름 단위). 빌보드 칸이 [-이 값, 이 값]을 덮는다.
+ * 가장 멀리 나간 꼭짓점보다 조금 크게 잡아 둥근 끝이 잘리지 않게 한다.
+ */
+export function sunRaysExtent(positions: Float32Array = sunRayPositions()): number {
+  let extent = 0;
+  for (let i = 0; i < positions.length; i += 3) {
+    extent = Math.max(extent, Math.abs(positions[i]), Math.abs(positions[i + 1]));
+  }
+  return extent * 1.04;
+}
