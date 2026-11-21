@@ -14,7 +14,7 @@
 - 모양은 고정 씨앗(`MOON_SHAPE.seed`)으로 만들어 늘 같다.
 - `World.fixedStep`에서만 자전하므로 시작 화면과 일시 정지 중에는 멈춘다.
 - 충돌이 없다. 플레이어가 닿을 수 없는 거리다.
-- 위성 바로 아래 표면에 로켓 자리 정육면체가 있다 (`game/rocket.ts`). 위치를 `MOON.direction`에서 계산하므로 `MOON.direction`을 바꾸면 함께 옮겨진다.
+- 위성 바로 아래 표면에 로켓 자리 정육면체가 있다 (`scenes/surface.json`의 `rocket`, 자리 `{ "under": "moon" }`). 위치를 `MOON.direction`에서 계산하므로 `MOON.direction`을 바꾸면 함께 옮겨진다.
 
 ## 파일
 
