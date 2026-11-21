@@ -6,6 +6,7 @@ import type { ContentEntry, GraphicsContent } from '../content/types';
 import { cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
 import { boxModel, HOUSE, houseBox } from './house';
+import { ROCKET, rocketBox } from './rocket';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
@@ -327,7 +328,49 @@ describe('집 자리', () => {
 
   it('월드 그리기 목록에 상자로 들어간다', () => {
     const boxes = new World().buildDrawList(1).filter((item) => item.mesh === 'box');
-    expect(boxes).toHaveLength(1);
+    expect(boxes).toHaveLength(2);
+  });
+});
+
+describe('로켓 자리', () => {
+  const up = surfaceDirection(ROCKET.latitude, ROCKET.longitude);
+
+  it('위성 바로 아래 표면에 있다', () => {
+    expect(dot(up, MOON.direction)).toBeCloseTo(1, 6);
+  });
+
+  it('집 자리, 시작 지점과 떨어져 있다', () => {
+    const angle = (a: Vec3, b: Vec3) => Math.acos(Math.min(1, dot(a, b))) * PLANET.radius;
+    const house = surfaceDirection(HOUSE.latitude, HOUSE.longitude);
+    expect(angle(up, house)).toBeGreaterThan(HOUSE.size[0] + ROCKET.size[0] + 2 * PLAYER_RADIUS);
+    expect(angle(up, [0, 1, 0])).toBeGreaterThan(ROCKET.size[0] + PLAYER_RADIUS);
+  });
+
+  it('정육면체로 표면에 서고, 위쪽이 위성을 향한다', () => {
+    const box = rocketBox();
+    const [w, h, d] = ROCKET.size;
+    expect(w).toBe(h);
+    expect(h).toBe(d);
+    expect(dot(box.axes[1], MOON.direction)).toBeCloseTo(1, 6);
+    const bottom = length(box.center) - h / 2;
+    expect(bottom).toBeLessThan(PLANET.radius);
+    expect(bottom).toBeGreaterThan(PLANET.radius - 0.3);
+  });
+
+  it('걸어서 통과할 수 없다', () => {
+    const world = new World();
+    const box = rocketBox();
+    let closest = Infinity;
+    for (let i = 0; i < 120 * 12; i++) {
+      const position = world.player.position;
+      const up = normalize(position);
+      const forward = normalize(sub(box.center, scale(up, dot(box.center, up))));
+      world.fixedStep(DT, { direction: forward });
+      closest = Math.min(closest, length(sub(world.player.position, box.center)));
+    }
+    // 상자 앞까지 와서 부딪혔고, 구는 상자 안으로 들어가지 않았다.
+    expect(closest).toBeLessThan(box.halfExtents[0] * 1.5 + PLAYER_RADIUS);
+    expect(closest).toBeGreaterThan(box.halfExtents[0] + PLAYER_RADIUS - 0.05);
   });
 });
 
