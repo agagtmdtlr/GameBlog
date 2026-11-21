@@ -54,7 +54,7 @@ interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; 
 
 - 위도 90이 시작 지점(+Y)이다. 경도 180이 시작할 때 바라보는 방향(-Z)이고, 경도 90이 오른쪽(+X)이다.
 - 표면 거리는 각도 1도에 약 0.31이다.
-- 해는 시작할 때 위도 약 47, 경도 약 115 쪽(`STUDIO_ENVIRONMENT.lightDirection`)에 있고, 120초에 한 바퀴 궤도를 돈다 ([analysis/sun.md](sun.md)). 그래서 낮과 밤이 바뀐다. "해가 드는 쪽" 검사는 시작할 때의 방향 기준이다.
+- 해는 시작할 때 위도 약 47, 경도 약 115 쪽(`STUDIO_ENVIRONMENT.lightDirection`)에 있고, 48초에 한 바퀴 궤도를 돈다 ([analysis/sun.md](sun.md)). 그래서 낮과 밤이 바뀐다. "해가 드는 쪽" 검사는 시작할 때의 방향 기준이다.
 
 사용 중인 위치는 없다.
 

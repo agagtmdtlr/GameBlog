@@ -7,7 +7,7 @@ export const SUN = {
   /** 해 구체의 반지름 */
   radius: 4,
   /** 한 바퀴 도는 데 걸리는 시간 (초) */
-  periodSeconds: 120,
+  periodSeconds: 48,
 };
 
 /**
