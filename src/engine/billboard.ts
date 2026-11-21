@@ -39,7 +39,7 @@ export interface Billboard {
   /** 텍스처 색에 곱하는 선형 RGB. 1보다 밝게 둘 수 있다. */
   color: Vec3;
   /**
-   * PBR 셰이더와 같은 ACES 톤 매핑을 건다. 해처럼 PBR 발광색과 같은 색으로 보여야 하는 것에 켠다.
+   * 툰 셰이더와 같은 ACES 톤 매핑을 건다. 해처럼 툰 발광색과 같은 색으로 보여야 하는 것에 켠다.
    * 끄면 텍스처 색이 그대로 나온다 (별 얼굴).
    */
   toneMapped: boolean;

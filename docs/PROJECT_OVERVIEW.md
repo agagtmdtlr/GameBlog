@@ -14,7 +14,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 그래픽스 | three.js 0.187 (WebGL2). 직접 작성한 PBR 셰이더를 `RawShaderMaterial`로 사용. 적용 내용은 [analysis/threejs.md](analysis/threejs.md) |
+| 그래픽스 | three.js 0.187 (WebGL2). 직접 작성한 툰 셰이더(`toon.frag`)를 `RawShaderMaterial`로 사용. 적용 내용은 [analysis/threejs.md](analysis/threejs.md) |
 | 개발 도구 | TypeScript, Vite, Vitest, `@types/three` (모두 개발 시에만 사용) |
 | 배포 | `main` 푸시 시 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 배포 |
 | 코드 규모 | TypeScript 3,556줄, 셰이더 264줄, CSS 257줄, 테스트 1,233줄, Blender 스크립트 179줄 |
@@ -79,7 +79,7 @@ GameBlog/
 │  │  └─ registry.ts           작동 영역과 콘텐츠 등록 목록 (지금은 비어 있음)
 │  ├─ assets/character.glb     Blender에서 내보낸 다리 스킨 메시
 │  ├─ scenes/surface.json      행성 표면에 놓는 객체(집·로켓 자리)의 장면 파일
-│  ├─ shaders/                 mesh.vert, pbr.frag, billboard.vert, billboard.frag
+│  ├─ shaders/                 mesh.vert, toon.frag, billboard.vert, billboard.frag
 │  └─ ui/overlay.ts            화면 안내와 HUD 제어
 ├─ tools/blender/build_character.py  캐릭터 다리 모델(character.glb)을 만드는 Blender 스크립트
 ├─ docs/
@@ -179,7 +179,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 ### 렌더링
 
-- **재질:** Cook-Torrance PBR (GGX, Smith, Schlick)과 방향광 1개
+- **재질:** 툰 셰이딩과 방향광 1개. 외곽선 없이 직사광(그림자 포함)을 4단계로 나누고, 거칠기에 따라 한 단계짜리 하이라이트를 둔다. 앰비언트는 하늘·땅 평균색 하나다 (2026-11-21, 전에는 Cook-Torrance PBR)
 - **three.js:** `WebGLRenderer`, `Scene`, 기본 지오메트리, `GLTFLoader`(캐릭터 다리 스킨 메시, CPU 스키닝), 카메라, 렌더 타깃을 쓴다. 조명과 재질 계산은 내장 재질 대신 아래의 직접 작성한 셰이더가 한다
 - **그림자:** 2048px 깊이 맵, 3×3 PCF, 원점 기준 반경 24 고정. 광원 방향은 해를 따라 매 프레임 바뀐다. 해와 위성은 범위 밖이라 그림자를 드리우지 않는다
 - **빌보드:** 별, 햇살, 해 눈을 텍스처 아틀라스 한 장과 인스턴스 그리기 한 번으로 그린다 ([analysis/billboard.md](analysis/billboard.md))
@@ -271,7 +271,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | 안 쓰는 코드 | `math.ts`의 `mat4Perspective`, `mat4LookAt`, `mat4Ortho`, `mat4TransformPoint`, `quatMultiply`, `quatNormalize`, `quatNlerp`, `quatFromUnitVectors`는 다른 런타임 코드에서 쓰지 않고 테스트만 남아 있다 |
 | 빌드 크기 | three.js로 옮기면서 JS가 크게 늘었고, 지금은 674.54KB(gzip 176.19KB)라 Vite가 500KB 청크 경고를 낸다 |
 | 그림자 메모리 | 그림자 렌더 타깃에 쓰지 않는 색 첨부(약 16MB)가 함께 잡힌다 |
-| 재질 | PBR 셰이더가 `metallic`을 지원하지만 모든 재질이 0을 쓴다 |
+| 재질 | 툰 셰이더가 `metallic`(하이라이트·앰비언트를 바탕색으로 물들임)을 지원하지만 모든 재질이 0을 쓴다 |
 | 프레임 비용 | 그림자 패스를 매 프레임 전부 다시 그린다. 실제 부담은 측정하지 않았다 |
 | 시야 | 행성이 작아 지평선이 가깝다. 구 앞쪽으로 약 7 거리까지만 보이고, 작동 영역은 표면에 칠한 원이라 지평선 너머에서는 전혀 보이지 않는다 |
 | 낮과 밤 | 해가 48초에 한 바퀴 돌아 어느 곳이든 한동안 밤이 된다. 밤에는 간접광만 남는다. 작동 영역의 위치 검사는 시작할 때의 해 방향만 본다 |

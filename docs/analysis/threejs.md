@@ -91,6 +91,15 @@ git log --oneline cc0d160..HEAD -- src/engine src/shaders src/main.ts package.js
 - 프래그먼트 출력은 `out vec4 fragColor`를 직접 선언한다.
 - 셰이더 파일에 `#version`을 쓰면 중복되어 컴파일이 실패한다.
 
+### 툰 셰이더 (`shaders/toon.frag`)
+
+2026-11-21에 PBR(`pbr.frag`, Cook-Torrance)을 툰 셰이딩으로 바꿨다. 외곽선은 없고 음영을 단계로 나눈다. 재질 입력(`baseColor`, `roughness`, `metallic`, `emissive`, 무늬, 영역)과 uniform은 그대로다. TypeScript 이름도 `PbrMesh`→`ToonMesh`, `createPbrMesh`→`createToonMesh`, `pbrUniforms`→`toonUniforms`로 바꿨다. 아래 "포팅" 기록의 `pbr.frag`는 지금의 `toon.frag`다.
+
+- **직사광:** `NoL × 그림자`를 `TOON_EDGES`(0.06, 0.32, 0.68)에서 끊어 0, 0.4, 0.75, 1의 4단계로 만든다. 그림자를 곱한 뒤 나누므로 몸의 음영과 드리운 그림자가 같은 단계로 보인다. 경계는 `fwidth` 폭만 부드럽게 넘겨 계단 현상을 막는다.
+- **하이라이트:** `pow(NoH, mix(96, 6, roughness))`를 0.5에서 끊은 한 단계 점. 세기는 `(1 - roughness) × 0.25`라 거칠기 1이면 없고, 빛이 두 번째 단계 이상인 곳에만 생긴다. `metallic`이면 바탕색으로 물든다.
+- **앰비언트:** 하늘색과 땅색을 6:4로 섞은 한 색이라 그늘이 평평한 한 색이 된다. 캐릭터 몸 아래 오클루전도 0.18에서 끊어 한 단계(45% 어둡게)로 둔다.
+- 단계를 바꾸려면 `TOON_EDGES`(경계)와 `TOON_STEPS`(각 경계에서 오르는 밝기, 합 1)를 고친다.
+
 ### 색공간과 톤 매핑
 
 three.js의 톤 매핑과 출력 색공간 변환은 내장 재질과 셰이더 청크에만 적용된다. `RawShaderMaterial`에는 적용되지 않으므로, 포팅 전처럼 셰이더 안에서 ACES와 sRGB 변환을 한다. `renderer.toneMapping`은 기본값(`NoToneMapping`)이다.

@@ -294,7 +294,7 @@ export class World {
 
   /**
    * 카메라를 보는 빌보드: 별, 햇살, 해 눈(흰자·검은자). 해 빌보드는 해 구체와 같은 색으로 보이도록
-   * PBR과 같은 톤 매핑을 건다. 렌더러가 모두 모아 한 번에 그린다.
+   * 툰 셰이더와 같은 톤 매핑을 건다. 렌더러가 모두 모아 한 번에 그린다.
    * `view`는 이번 프레임의 카메라이고, 해 눈을 해 얼굴 위에 놓는 데 쓴다. 없으면 행성 중심에서 보는 것으로 친다.
    */
   buildBillboards(alpha: number, view: BillboardView = DEFAULT_VIEW): Billboard[] {
