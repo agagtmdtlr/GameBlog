@@ -4,11 +4,11 @@
 
 - **규칙:** [rules/character.md](../rules/character.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `741f0bf` 다음의 엉덩이 위치 올림과 크기 배율
+- **분석 기준:** 커밋 `cc0d160` (2026-11-21, 전체 문서 재검토)
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline 741f0bf..HEAD -- tools/blender src/assets src/game/walker.ts src/game/characterClips.ts src/game/keyframes.ts src/game/player.ts src/game/world.ts src/engine/renderer.ts src/engine/skinning.ts
+git log --oneline cc0d160..HEAD -- tools/blender src/assets src/game/walker.ts src/game/characterClips.ts src/game/keyframes.ts src/game/player.ts src/game/world.ts src/engine/renderer.ts src/engine/skinning.ts
 ```
 
 ## 흐름
@@ -19,7 +19,7 @@ git log --oneline 741f0bf..HEAD -- tools/blender src/assets src/game/walker.ts s
 | 물리 | `game/player.ts` | 반지름 0.88 × `CHARACTER_SCALE`(1.32)의 보이지 않는 충돌 구. 중심이 몸의 중심이고, 반지름이 다리가 몸을 받치는 높이다. 굴러가는 회전은 계산하지 않는다. 행성 말고도 `obstacles`로 받은 상자(지금은 집 자리와 로켓 자리)와 충돌한다 |
 | 클립 | `game/characterClips.ts`, `game/keyframes.ts` | 서기·걷기·내딛기 키프레임 클립과 트랙 샘플링 |
 | 걸음 | `game/walker.ts` | 물리 결과(위치, 속도, 접지)를 보고 클립을 재생해 몸의 위치·엉덩이 기울기와 두 발의 위치를 정한다. 그릴 때 두 마디 IK로 무릎을 풀어 다리마다 뼈 3개의 위치와 축을 낸다 |
-| 그리기 목록 | `game/world.ts` | 몸(`sphere`)과 다리마다 `leg` 항목 하나를 만든다. 순서는 행성, 몸, 왼다리, 오른다리다. 다리 항목의 `skin`은 뼈마다 `지금 뼈 × 기본 자세 뼈의 역행렬`이다 |
+| 그리기 목록 | `game/world.ts` | 몸(`sphere`)과 다리마다 `leg` 항목 하나를 만든다. 전체 순서는 행성, 표면 장면 상자들, 몸, 왼다리, 오른다리, 위성, 해, 해 궤적 고리다. 다리 항목의 `skin`은 뼈마다 `지금 뼈 × 기본 자세 뼈의 역행렬`이다 |
 | 스키닝 | `engine/skinning.ts` | 정점마다 뼈 행렬을 가중치로 섞는 선형 블렌드 스키닝 (CPU) |
 | 렌더러 | `engine/renderer.ts` | `loadCharacter(url)`가 glb를 `GLTFLoader`로 불러와 기본 자세 정점과 뼈 번호·가중치를 꺼낸다. 풀의 메시마다 다리 지오메트리 복사본을 두고 매 프레임 스키닝 결과를 쓴다. 불러오기 전에는 몸만 보인다 |
 
@@ -112,7 +112,6 @@ git log --oneline 741f0bf..HEAD -- tools/blender src/assets src/game/walker.ts s
 | 프로덕션 빌드 | `character-*.glb` 200, 콘솔 오류 없음 (조각 부품일 때 확인. 스킨 메시로 바꾼 뒤에는 빌드만 확인) |
 | `gl.getError()` | 0 |
 | 서기·걷기 클립 (2026-11-21) | 서 있을 때 숨쉬기, D 입력 시 발을 앞으로 내밀어 디디며 걷기, 멈추면 `walkWeight` 0으로 돌아감 (멈춤은 테스트로 확인). `gl.getError()` 0, 콘솔 오류 없음 |
-
 | 엉덩이 올림, 배율 1.5 (2026-11-21) | 다리가 몸 위쪽에 붙고 캐릭터가 커짐. 걷기에서 다리 이음매가 끊기지 않음. `gl.getError()` 0, 콘솔 오류 없음 |
 
 확인하지 않은 것: 실제 키보드·마우스로 오래 걷기, 최고 속도에서 조작감, 모바일. 서기·걷기 클립은 브라우저 창이 가려진 상태에서 스크린샷으로만 봐서, 실제 프레임 속도로 움직임을 보지는 않았다.
