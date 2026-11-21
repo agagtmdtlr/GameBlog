@@ -38,8 +38,8 @@ import {
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import meshVert from '../shaders/mesh.vert?raw';
-import pbrFrag from '../shaders/pbr.frag?raw';
-import type { ContentRenderer, PbrMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
+import toonFrag from '../shaders/toon.frag?raw';
+import type { ContentRenderer, ToonMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
 import type { Mat4 } from './math';
 import { skinVertices, type SkinSource } from './skinning';
 import { displaceToMoon } from './moonShape';
@@ -161,7 +161,7 @@ export class Renderer {
   private readonly geometries: Record<MeshKind, BufferGeometry>;
   private readonly depthMaterial: MeshBasicMaterial;
   private readonly shadowTarget: WebGLRenderTarget;
-  private readonly pool: PbrMesh[] = [];
+  private readonly pool: ToonMesh[] = [];
   private readonly contentRenderers: ReadonlyMap<string, ContentRenderer>;
   private readonly renderContext: RenderContext;
   /** 이번 프레임의 콘텐츠 값을 `kind`로 찾는 표. 매 프레임 다시 채운다. */
@@ -169,7 +169,7 @@ export class Renderer {
   private sceneColor: FramebufferTexture | null = null;
   /** 다리 스킨 메시의 기본 자세와 가중치. loadCharacter 전에는 없다. */
   private legSkin: SkinSource | null = null;
-  private readonly skinned = new Map<PbrMesh, BufferGeometry>();
+  private readonly skinned = new Map<ToonMesh, BufferGeometry>();
 
   private readonly clearColor = new Color();
   private readonly bufferSize = new Vector2();
@@ -182,7 +182,7 @@ export class Renderer {
     uSkyColor: { value: new Vector3() },
     uGroundColor: { value: new Vector3() },
   };
-  private readonly pbrShared: Uniforms;
+  private readonly toonShared: Uniforms;
 
   /**
    * `contentRenderers`는 전용 그리기가 있는 콘텐츠의 렌더러다. 목록 순서대로 그린다.
@@ -253,8 +253,8 @@ export class Renderer {
     }
     this.contentRenderers = byKind;
 
-    // 콘텐츠 렌더러가 더한 uniform까지 모은 뒤에 PBR 재질을 만들어야 모든 재질이 함께 참조한다.
-    this.pbrShared = {
+    // 콘텐츠 렌더러가 더한 uniform까지 모은 뒤에 툰 재질을 만들어야 모든 재질이 함께 참조한다.
+    this.toonShared = {
       ...this.shared,
       uShadowMap: { value: shadowMap },
       uShadowTexel: { value: 1 / SHADOW_MAP_SIZE },
@@ -264,14 +264,14 @@ export class Renderer {
       uZoneColor: { value: Array.from({ length: MAX_SURFACE_ZONES }, () => new Vector3()) },
       uZoneParams: { value: Array.from({ length: MAX_SURFACE_ZONES }, () => new Vector4()) },
     };
-    for (const content of contentRenderers) Object.assign(this.pbrShared, content.pbrUniforms);
+    for (const content of contentRenderers) Object.assign(this.toonShared, content.toonUniforms);
 
     this.renderContext = {
       renderer: this.renderer,
       camera: this.camera,
       geometries: this.geometries,
       shared: this.shared,
-      createPbrMesh: () => this.createPbrMesh(),
+      createToonMesh: () => this.createToonMesh(),
       applyItem: (mesh, item) => this.applyItem(mesh, item),
       copySceneColor: () => this.copySceneColor(),
     };
@@ -425,20 +425,20 @@ export class Renderer {
     shared.uGroundColor.value.fromArray(env.groundColor);
 
     const { center, radius } = frame.occluder;
-    this.pbrShared.uOccluder.value.set(center[0], center[1], center[2], radius);
+    this.toonShared.uOccluder.value.set(center[0], center[1], center[2], radius);
 
     const zones = frame.surfaceZones;
     const count = Math.min(zones.length, MAX_SURFACE_ZONES);
-    const dirs = this.pbrShared.uZoneDir.value as Vector3[];
-    const colors = this.pbrShared.uZoneColor.value as Vector3[];
-    const params = this.pbrShared.uZoneParams.value as Vector4[];
+    const dirs = this.toonShared.uZoneDir.value as Vector3[];
+    const colors = this.toonShared.uZoneColor.value as Vector3[];
+    const params = this.toonShared.uZoneParams.value as Vector4[];
     for (let i = 0; i < count; i++) {
       const zone = zones[i];
       dirs[i].fromArray(zone.direction);
       colors[i].fromArray(zone.color);
       params[i].set(zone.angularRadius, zone.edgeWidth, zone.glow, zone.presence);
     }
-    this.pbrShared.uZoneCount.value = count;
+    this.toonShared.uZoneCount.value = count;
   }
 
   /** 그리기 목록을 메시 풀에 옮긴다. 목록보다 남는 메시는 숨긴다. */
@@ -446,7 +446,7 @@ export class Renderer {
     for (let i = 0; i < items.length; i++) {
       let mesh = this.pool[i];
       if (!mesh) {
-        mesh = this.createPbrMesh();
+        mesh = this.createToonMesh();
         this.pool.push(mesh);
         this.scene.add(mesh);
       }
@@ -456,13 +456,13 @@ export class Renderer {
     for (let i = items.length; i < this.pool.length; i++) this.pool[i].visible = false;
   }
 
-  private createPbrMesh(): PbrMesh {
+  private createToonMesh(): ToonMesh {
     const material = new RawShaderMaterial({
       glslVersion: GLSL3,
       vertexShader: meshVert,
-      fragmentShader: pbrFrag,
+      fragmentShader: toonFrag,
       uniforms: {
-        ...this.pbrShared,
+        ...this.toonShared,
         uNormalMatrix: { value: new Matrix3() },
         uBaseColor: { value: new Vector3() },
         uEmissive: { value: new Vector3() },
@@ -479,7 +479,7 @@ export class Renderer {
     return mesh;
   }
 
-  private applyItem(mesh: PbrMesh, item: DrawItem): void {
+  private applyItem(mesh: ToonMesh, item: DrawItem): void {
     mesh.geometry = item.skin ? this.skinnedGeometry(mesh, item.skin) : this.geometries[item.mesh];
     // 스키닝한 정점은 이미 월드 좌표라 경계 구를 따로 계산하지 않고 화면 밖 제외를 끈다.
     mesh.frustumCulled = !item.skin;
@@ -504,7 +504,7 @@ export class Renderer {
    * 풀의 메시마다 따로 가진 다리 지오메트리에 스키닝 결과를 쓴다.
    * 같은 메시는 매 프레임 같은 다리를 그리므로 지오메트리를 다시 만들지 않는다.
    */
-  private skinnedGeometry(mesh: PbrMesh, bones: readonly Mat4[]): BufferGeometry {
+  private skinnedGeometry(mesh: ToonMesh, bones: readonly Mat4[]): BufferGeometry {
     const source = this.legSkin;
     if (!source) return this.geometries.leg;
     let geometry = this.skinned.get(mesh);

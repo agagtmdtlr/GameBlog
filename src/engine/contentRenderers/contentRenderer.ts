@@ -10,7 +10,7 @@ import type {
 import type { ContentFrame, DrawItem, MeshKind } from '../frame';
 
 export type Uniforms = Record<string, IUniform>;
-export type PbrMesh = Mesh<BufferGeometry, RawShaderMaterial>;
+export type ToonMesh = Mesh<BufferGeometry, RawShaderMaterial>;
 
 /** `Renderer`가 콘텐츠 렌더러에 빌려주는 공용 자원과 기능 */
 export interface RenderContext {
@@ -19,10 +19,10 @@ export interface RenderContext {
   readonly geometries: Readonly<Record<MeshKind, BufferGeometry>>;
   /** 조명, 카메라 위치처럼 모든 재질이 함께 참조하는 프레임 단위 uniform */
   readonly shared: Readonly<Uniforms>;
-  /** PBR 재질을 가진 메시를 만든다. 장면에는 직접 넣어야 한다. */
-  createPbrMesh(): PbrMesh;
-  /** 그리기 항목의 지오메트리, 행렬, 재질 값을 PBR 메시에 옮긴다. */
-  applyItem(mesh: PbrMesh, item: DrawItem): void;
+  /** 툰 재질을 가진 메시를 만든다. 장면에는 직접 넣어야 한다. */
+  createToonMesh(): ToonMesh;
+  /** 그리기 항목의 지오메트리, 행렬, 재질 값을 툰 메시에 옮긴다. */
+  applyItem(mesh: ToonMesh, item: DrawItem): void;
   /** 지금까지 그린 화면을 복사한 텍스처. 다음 호출 때 덮어쓴다. */
   copySceneColor(): Texture;
 }
@@ -38,10 +38,10 @@ export abstract class ContentRenderer<T extends ContentFrame = ContentFrame> {
   abstract readonly kind: T['kind'];
 
   /**
-   * PBR 셰이더(`pbr.frag`)에 더하는 uniform. 모든 PBR 재질이 같은 객체를 참조하므로
+   * 툰 셰이더(`toon.frag`)에 더하는 uniform. 모든 툰 재질이 같은 객체를 참조하므로
    * `prepare`에서 `value`만 고치면 장면 전체에 반영된다.
    */
-  readonly pbrUniforms: Uniforms = {};
+  readonly toonUniforms: Uniforms = {};
 
   /** 공용 uniform이 정해진 뒤 한 번 호출된다. 메시와 재질을 여기서 만든다. */
   init(_ctx: RenderContext): void {}

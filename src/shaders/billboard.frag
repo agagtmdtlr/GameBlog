@@ -8,7 +8,7 @@ in float vToneMap;
 
 out vec4 fragColor;
 
-// pbr.frag와 같은 톤 매핑과 sRGB 변환. 톤 매핑을 켠 빌보드는 PBR 발광색과 같은 색으로 보인다.
+// toon.frag와 같은 톤 매핑과 sRGB 변환. 톤 매핑을 켠 빌보드는 툰 발광색과 같은 색으로 보인다.
 vec3 acesFilm(vec3 x) {
   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
 }

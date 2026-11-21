@@ -74,14 +74,14 @@ export interface CameraView {
 }
 
 /**
- * PBR 그리기 목록만으로 표현할 수 없는 콘텐츠가 프레임마다 넘기는 값.
+ * 툰 그리기 목록만으로 표현할 수 없는 콘텐츠가 프레임마다 넘기는 값.
  * `kind`가 같은 콘텐츠 렌더러(`engine/contentRenderers/`)가 받아서 그린다.
  */
 export interface ContentFrame {
   readonly kind: string;
 }
 
-/** 한 번에 그릴 수 있는 표면 영역 수. `pbr.frag`의 `MAX_ZONES`와 같아야 한다. */
+/** 한 번에 그릴 수 있는 표면 영역 수. `toon.frag`의 `MAX_ZONES`와 같아야 한다. */
 export const MAX_SURFACE_ZONES = 8;
 
 /** 구 표면에 칠하는 원형 영역 */

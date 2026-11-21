@@ -38,31 +38,18 @@ const int PATTERN_GRID = 2;
 /** 정육면체 한 면의 절반에 들어가는 격자 칸 수 */
 const float GRID_CELLS = 7.0;
 
-float distributionGGX(float NoH, float a) {
-  float a2 = a * a;
-  float d = NoH * NoH * (a2 - 1.0) + 1.0;
-  return a2 / (PI * d * d);
+/** 직사광 단계. 빛의 양이 경계값을 넘을 때마다 밝기가 한 단계 오른다 (그늘, 어두움, 중간, 밝음) */
+const vec3 TOON_EDGES = vec3(0.06, 0.32, 0.68);
+const vec3 TOON_STEPS = vec3(0.4, 0.35, 0.25);
+
+// 경계를 화면에서 한두 픽셀 폭으로만 부드럽게 넘긴다. 단계는 또렷하고 계단 현상은 없다.
+float toonStep(float edge, float x) {
+  float w = max(fwidth(x), 1e-4);
+  return smoothstep(edge - w, edge + w, x);
 }
 
-float visibilitySmith(float NoV, float NoL, float a) {
-  float k = a * 0.5;
-  float gv = NoV * (1.0 - k) + k;
-  float gl = NoL * (1.0 - k) + k;
-  return 0.25 / max(gv * gl, 1e-4);
-}
-
-vec3 fresnelSchlick(float VoH, vec3 f0) {
-  return f0 + (1.0 - f0) * pow(1.0 - VoH, 5.0);
-}
-
-// 환경 맵 없이 간접 반사의 크기를 근사한다 (Karis, 2014).
-vec3 envBrdfApprox(vec3 f0, float roughness, float NoV) {
-  const vec4 c0 = vec4(-1.0, -0.0275, -0.572, 0.022);
-  const vec4 c1 = vec4(1.0, 0.0425, 1.04, -0.04);
-  vec4 r = roughness * c0 + c1;
-  float a004 = min(r.x * r.x, exp2(-9.28 * NoV)) * r.x + r.y;
-  vec2 ab = vec2(-1.04, 1.04) * a004 + r.zw;
-  return f0 * ab.x + ab.y;
+float toonDiffuse(float x) {
+  return dot(TOON_STEPS, vec3(toonStep(TOON_EDGES.x, x), toonStep(TOON_EDGES.y, x), toonStep(TOON_EDGES.z, x)));
 }
 
 float sampleShadow() {
@@ -139,25 +126,26 @@ void main() {
   vec3 emissive = uEmissive;
   applySurfaceZones(N, albedo, emissive);
   float roughness = clamp(uRoughness, 0.04, 1.0);
-  float a = roughness * roughness;
-  vec3 f0 = mix(vec3(0.04), albedo, uMetallic);
   vec3 diffuseColor = albedo * (1.0 - uMetallic);
 
+  // 그림자까지 곱한 빛의 양을 단계로 나눠, 몸의 음영과 드리운 그림자가 같은 단계로 보이게 한다.
   float NoL = max(dot(N, L), 0.0);
-  float NoV = max(dot(N, V), 1e-3);
-  float NoH = max(dot(N, H), 0.0);
-  float VoH = max(dot(V, H), 0.0);
-
-  vec3 F = fresnelSchlick(VoH, f0);
-  vec3 specular = distributionGGX(NoH, a) * visibilitySmith(NoV, NoL, a) * F;
   float shadow = sampleShadow();
-  vec3 direct = (diffuseColor / PI * (1.0 - F) + specular) * uLightColor * NoL * shadow;
+  float lit = toonDiffuse(NoL * shadow);
+  vec3 direct = diffuseColor / PI * uLightColor * lit;
 
-  float visibility = uReceiveOccluder ? occluderVisibility(N) : 1.0;
-  vec3 irradiance = mix(uGroundColor, uSkyColor, N.y * 0.5 + 0.5);
-  vec3 R = reflect(-V, N);
-  vec3 envColor = mix(uGroundColor, uSkyColor, R.y * 0.5 + 0.5);
-  vec3 ambient = (diffuseColor * irradiance + envBrdfApprox(f0, roughness, NoV) * envColor) * visibility;
+  // 하이라이트는 한 단계짜리 점. 매끈할수록 작고 진하며, 거칠기 1이면 없다.
+  float shininess = mix(96.0, 6.0, roughness);
+  float highlight = toonStep(0.5, pow(max(dot(N, H), 0.0), shininess)) * toonStep(TOON_EDGES.y, NoL * shadow);
+  vec3 highlightColor = mix(vec3(1.0), albedo, uMetallic);
+  direct += highlightColor * uLightColor * highlight * (1.0 - roughness) * 0.25;
+
+  // 앰비언트는 하늘과 땅 색의 평균 하나로 칠해 그늘을 평평한 한 색으로 둔다.
+  // 몸 아래 오클루전도 한 단계로 나눈다.
+  float occlusion = uReceiveOccluder ? 1.0 - occluderVisibility(N) : 0.0;
+  float visibility = 1.0 - 0.45 * toonStep(0.18, occlusion);
+  vec3 ambientLight = mix(uGroundColor, uSkyColor, 0.6);
+  vec3 ambient = (diffuseColor + albedo * uMetallic * 0.5) * ambientLight * visibility;
 
   fragColor = vec4(linearToSrgb(acesFilm(direct + ambient + emissive)), 1.0);
 }
