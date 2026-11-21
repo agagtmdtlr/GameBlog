@@ -2,7 +2,6 @@ import { ContentManager } from '../content/manager';
 import { CONTENT_ENTRIES } from '../content/registry';
 import type { ContentEntry, GraphicsContent } from '../content/types';
 import {
-  cross,
   lerp,
   mat4FromBasis,
   mat4FromTRS,
@@ -12,7 +11,6 @@ import {
   normalize,
   normalMatrix,
   scale,
-  sub,
   QUAT_IDENTITY,
   type Mat4,
   type Quat,
@@ -21,7 +19,6 @@ import {
 import {
   LEG_BONE_COUNT,
   SurfacePattern,
-  type CameraView,
   type ContentFrame,
   type DrawItem,
   type Environment,
@@ -35,6 +32,15 @@ import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
 import { Sun, SUN, SUN_EMISSIVE, SUN_ORBIT_EMISSIVE } from './sun';
+import {
+  SUN_EYE_WHITE_EMISSIVE,
+  SUN_PUPIL_COLOR,
+  sunBillboardBasis,
+  sunEyes,
+  sunRaysModel,
+  type BillboardBasis,
+  type BillboardView,
+} from './sunFace';
 import { BODY_RADIUS, CHARACTER_SCALE, restBones, Walker, type BoneTransform } from './walker';
 
 /** 행성의 꼭대기에서 시작한다. */
@@ -104,22 +110,7 @@ function drawItemFromModel(mesh: MeshKind, model: Mat4, mat: Material, castShado
   return { mesh, model, normal: normalMatrix(model), material: mat, castShadow };
 }
 
-const DEFAULT_VIEW: Pick<CameraView, 'position' | 'up'> = { position: [0, 0, 0], up: [0, 1, 0] };
-
-/**
- * 해 햇살 빌보드의 모델 행렬. 앞면(+Z)이 카메라를 향하고, 위쪽은 화면의 위쪽에 맞춘다.
- * 그래서 카메라가 돌아도 햇살은 화면 위에서 돌지 않는다.
- */
-export function sunRaysModel(sunPosition: Vec3, view: Pick<CameraView, 'position' | 'up'>): Mat4 {
-  const z = normalize(sub(view.position, sunPosition));
-  // 화면 위쪽이 시선과 나란한 드문 경우에는 다른 축을 쓴다.
-  let x = cross(view.up, z);
-  if (Math.hypot(x[0], x[1], x[2]) < 1e-4) x = cross(Math.abs(z[0]) < 0.9 ? [1, 0, 0] : [0, 0, 1], z);
-  x = normalize(x);
-  const y = cross(z, x);
-  const r = SUN.radius;
-  return mat4FromBasis(sunPosition, scale(x, r), scale(y, r), scale(z, r));
-}
+const DEFAULT_VIEW: BillboardView = { position: [0, 0, 0], up: [0, 1, 0] };
 
 interface ZoneInstance {
   entry: ContentEntry;
@@ -189,8 +180,9 @@ export class World {
    * `view`는 이번 프레임의 카메라다. 해 햇살 빌보드를 화면에 맞춰 세우는 데 쓴다.
    * 없으면 행성 중심에서 보는 것으로 친다.
    */
-  buildDrawList(alpha: number, view: Pick<CameraView, 'position' | 'up'> = DEFAULT_VIEW): DrawItem[] {
+  buildDrawList(alpha: number, view: BillboardView = DEFAULT_VIEW): DrawItem[] {
     const sunPosition = this.sun.position(alpha);
+    const sunBasis = sunBillboardBasis(sunPosition, view);
     const items: DrawItem[] = [
       drawItem(
         'sphere',
@@ -215,10 +207,21 @@ export class World {
         QUAT_IDENTITY,
         false,
       ),
-      drawItemFromModel('sunRays', sunRaysModel(sunPosition, view), material([0, 0, 0], 1, { emissive: SUN_EMISSIVE }), false),
+      drawItemFromModel('sunRays', sunRaysModel(sunPosition, SUN.radius, sunBasis), material([0, 0, 0], 1, { emissive: SUN_EMISSIVE }), false),
+      ...this.sunEyeDrawItems(sunPosition, sunBasis, alpha),
       drawItemFromModel('ring', this.sunOrbitModel(), material([0, 0, 0], 1, { emissive: SUN_ORBIT_EMISSIVE }), false),
     ];
     return items;
+  }
+
+  /** 해 얼굴의 흰자와 검은자. 검은자는 캐릭터 몸을 바라본다. */
+  private sunEyeDrawItems(sunPosition: Vec3, basis: BillboardBasis, alpha: number): DrawItem[] {
+    const white = material([0, 0, 0], 1, { emissive: SUN_EYE_WHITE_EMISSIVE });
+    const pupil = material(SUN_PUPIL_COLOR, 1);
+    return sunEyes(sunPosition, SUN.radius, basis, this.walker.pose(alpha).body).flatMap((eye) => [
+      drawItemFromModel('disk', eye.white, white, false),
+      drawItemFromModel('disk', eye.pupil, pupil, false),
+    ]);
   }
 
   /** 해 궤적 고리의 모델 행렬. 고리의 XY 평면을 궤도면에 맞추고 궤도 반지름만큼 키운다. */
