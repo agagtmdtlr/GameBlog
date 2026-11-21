@@ -56,6 +56,10 @@ export interface Environment {
   lightColor: Vec3;
   skyColor: Vec3;
   groundColor: Vec3;
+  /** 해가 지면 해 반대쪽에서 비추는 달빛의 색과 세기. 그림자는 없다 */
+  moonColor: Vec3;
+  /** 밤인 곳의 앰비언트 색. 낮의 하늘·땅 평균색 대신 쓴다 */
+  nightAmbient: Vec3;
   /** 화면 출력값(sRGB) 기준 배경색 */
   background: Vec3;
   /** 그림자 맵이 덮는 원점 기준 반경 */

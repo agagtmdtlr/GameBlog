@@ -110,6 +110,9 @@ export const STUDIO_ENVIRONMENT: Environment = {
   lightColor: [2.75, 2.65, 2.5],
   skyColor: [0.62, 0.64, 0.68],
   groundColor: [0.3, 0.29, 0.28],
+  // 달빛은 해보다 훨씬 약하고 푸르다. 밤 앰비언트도 푸른 쪽으로 어둡게 둔다.
+  moonColor: [0.34, 0.46, 0.8],
+  nightAmbient: [0.1, 0.14, 0.26],
   background: [0, 0, 0],
   shadowRadius: 24,
 };

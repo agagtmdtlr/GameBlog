@@ -185,6 +185,8 @@ export class Renderer {
     uLightColor: { value: new Vector3() },
     uSkyColor: { value: new Vector3() },
     uGroundColor: { value: new Vector3() },
+    uMoonColor: { value: new Vector3() },
+    uNightAmbient: { value: new Vector3() },
   };
   private readonly toonShared: Uniforms;
 
@@ -435,6 +437,8 @@ export class Renderer {
     shared.uLightColor.value.fromArray(env.lightColor);
     shared.uSkyColor.value.fromArray(env.skyColor);
     shared.uGroundColor.value.fromArray(env.groundColor);
+    shared.uMoonColor.value.fromArray(env.moonColor);
+    shared.uNightAmbient.value.fromArray(env.nightAmbient);
 
     const { center, radius } = frame.occluder;
     this.toonShared.uOccluder.value.set(center[0], center[1], center[2], radius);

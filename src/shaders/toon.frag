@@ -17,6 +17,8 @@ uniform vec3 uLightDir;
 uniform vec3 uLightColor;
 uniform vec3 uSkyColor;
 uniform vec3 uGroundColor;
+uniform vec3 uMoonColor;
+uniform vec3 uNightAmbient;
 uniform vec4 uOccluder;
 uniform bool uReceiveOccluder;
 
@@ -140,11 +142,20 @@ void main() {
   vec3 highlightColor = mix(vec3(1.0), albedo, uMetallic);
   direct += highlightColor * uLightColor * highlight * (1.0 - roughness) * 0.25;
 
-  // 앰비언트는 하늘과 땅 색의 평균 하나로 칠해 그늘을 평평한 한 색으로 둔다.
+  // 밤의 정도. 행성 중심(원점)에서 이 점을 향하는 방향과 해 방향으로 정하므로,
+  // 물체가 어느 쪽을 보든 행성에서 서 있는 자리가 밤이면 같이 밤이 된다. 해 질 녘에 걸쳐 넘어간다.
+  float sunHeight = dot(normalize(vWorldPos), L);
+  float night = smoothstep(0.05, -0.2, sunHeight);
+
+  // 달빛은 해 반대쪽에서 비춘다. 해처럼 단계로 나누지만 그림자는 없다.
+  float moonLit = toonDiffuse(max(dot(N, -L), 0.0)) * night;
+  direct += diffuseColor / PI * uMoonColor * moonLit;
+
+  // 앰비언트는 한 색으로 칠해 그늘을 평평하게 둔다. 낮에는 하늘과 땅 색의 평균, 밤에는 푸른 밤 색이다.
   // 몸 아래 오클루전도 한 단계로 나눈다.
   float occlusion = uReceiveOccluder ? 1.0 - occluderVisibility(N) : 0.0;
   float visibility = 1.0 - 0.45 * toonStep(0.18, occlusion);
-  vec3 ambientLight = mix(uGroundColor, uSkyColor, 0.6);
+  vec3 ambientLight = mix(mix(uGroundColor, uSkyColor, 0.6), uNightAmbient, night);
   vec3 ambient = (diffuseColor + albedo * uMetallic * 0.5) * ambientLight * visibility;
 
   fragColor = vec4(linearToSrgb(acesFilm(direct + ambient + emissive)), 1.0);
