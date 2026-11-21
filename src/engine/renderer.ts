@@ -3,7 +3,7 @@ import {
   BufferAttribute,
   BufferGeometry,
   Color,
-  CanvasTexture,
+  CubeTexture,
   DynamicDrawUsage,
   DepthTexture,
   FramebufferTexture,
@@ -22,8 +22,6 @@ import {
   Scene,
   SkinnedMesh,
   SphereGeometry,
-  Sprite,
-  SpriteMaterial,
   SRGBColorSpace,
   TorusGeometry,
   Vector2,
@@ -42,7 +40,7 @@ import type { Mat4 } from './math';
 import { skinVertices, type SkinSource } from './skinning';
 import { displaceToMoon } from './moonShape';
 import { sunRayPositions } from './sunRays';
-import { drawStarFace, placeStars, STAR_FACES } from './starfield';
+import { drawStarfieldFaces } from './starfield';
 import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
 
 const SHADOW_MAP_SIZE = 2048;
@@ -88,7 +86,7 @@ function createSunRayGeometry(): BufferGeometry {
 export class Renderer {
   private readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
-  /** 행성 둘레의 별 빌보드만 가진 장면. 그림자 패스에 넣지 않으려고 따로 두고, 메인 패스 전에 그린다. */
+  /** 별 하늘 큐브맵만 배경으로 가진 장면. 메인 패스 전에 그린다. */
   private readonly skyScene = new Scene();
   private readonly camera = new PerspectiveCamera();
   private readonly lightCamera = new OrthographicCamera();
@@ -169,19 +167,14 @@ export class Renderer {
     });
     this.lightCamera.layers.set(SHADOW_LAYER);
 
-    // 별은 모델이 아니라 얼굴을 그린 텍스처를 붙인, 늘 카메라를 보는 스프라이트다.
-    const faceTextures = STAR_FACES.map((face) => {
-      const texture = new CanvasTexture(drawStarFace(face));
-      texture.colorSpace = SRGBColorSpace;
-      return texture;
-    });
-    for (const star of placeStars()) {
-      // 기울기는 재질 값이라 별마다 재질을 만든다. 텍스처는 얼굴마다 공유한다.
-      const sprite = new Sprite(new SpriteMaterial({ map: faceTextures[star.face], rotation: star.tilt }));
-      sprite.position.fromArray(star.position);
-      sprite.scale.set(star.mirrored ? -star.size : star.size, star.size, 1);
-      this.skyScene.add(sprite);
-    }
+    // 별은 모델이 아니라 큐브맵 텍스처에 그린 점이다. 한 번 만들고 바뀌지 않으므로 밉맵은 만들지 않는다.
+    const stars = new CubeTexture(drawStarfieldFaces());
+    stars.colorSpace = SRGBColorSpace;
+    stars.generateMipmaps = false;
+    stars.minFilter = LinearFilter;
+    stars.magFilter = LinearFilter;
+    stars.needsUpdate = true;
+    this.skyScene.background = stars;
 
     const byKind = new Map<string, ContentRenderer>();
     for (const content of contentRenderers) {
@@ -296,7 +289,7 @@ export class Renderer {
     const bg = frame.environment.background;
     r.setClearColor(this.clearColor.setRGB(bg[0], bg[1], bg[2], SRGBColorSpace));
     r.clear();
-    // 별은 행성과 해보다 멀리 있으므로 깊이 검사로 메인 장면이 그 앞을 가린다.
+    // 배경 장면은 three.js 내장 배경 셰이더로 그린다. 깊이를 쓰지 않으므로 메인 장면이 그 위에 그려진다.
     r.render(this.skyScene, this.camera);
     r.render(this.scene, this.camera);
 
