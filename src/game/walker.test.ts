@@ -19,7 +19,16 @@ import { PLANET } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { IDLE_CLIP, STEP_CLIP, WALK_CLIP } from './characterClips';
 import { sampleTrack, track } from './keyframes';
-import { LEG, LEG_REST, restBones, solveTwoBone, Walker, type BoneTransform, type Side } from './walker';
+import {
+  CHARACTER_SCALE,
+  LEG,
+  LEG_REST,
+  restBones,
+  solveTwoBone,
+  Walker,
+  type BoneTransform,
+  type Side,
+} from './walker';
 
 const DT = 1 / 120;
 const TOP: Vec3 = [0, PLANET.radius + PLAYER_RADIUS, 0];
@@ -174,7 +183,7 @@ describe('절차적 걸음', () => {
       for (let leg = 0; leg < 2; leg++) {
         const ankle = bones[leg * 3 + 2].origin;
         const sole = pose.feet[leg];
-        const expected = add(sole, scale(normalize(sub(sole, PLANET.center)), LEG.ankleHeight));
+        const expected = add(sole, scale(normalize(sub(sole, PLANET.center)), LEG.ankleHeight * CHARACTER_SCALE));
         expect(length(sub(ankle, expected))).toBeLessThan(0.15);
       }
     }
@@ -243,7 +252,10 @@ describe('다리 스킨 메시의 기본 자세', () => {
     const bones = walker.solveLegs(walker.pose(1));
     const rest = restBones();
     for (let leg = 0; leg < 2; leg++) {
-      const skin = (i: number) => mat4Multiply(matrix(bones[leg * 3 + i]), mat4RigidInverse(matrix(rest[i])));
+      // 게임의 뼈 행렬은 설계 치수의 메시를 CHARACTER_SCALE만큼 키운다 (world.ts와 같다).
+      const posed = ({ origin, x, y, z }: BoneTransform) =>
+        mat4FromBasis(origin, scale(x, CHARACTER_SCALE), scale(y, CHARACTER_SCALE), scale(z, CHARACTER_SCALE));
+      const skin = (i: number) => mat4Multiply(posed(bones[leg * 3 + i]), mat4RigidInverse(matrix(rest[i])));
       const ankle = bones[leg * 3 + 2].origin;
       // 이웃한 뼈가 기본 자세의 관절을 같은 곳으로 옮겨야 관절에서 메시가 끊기지 않는다.
       // 기본 자세 좌표는 소수 셋째 자리로 반올림해 두어 마디 길이와 1mm쯤 다르다.
@@ -254,10 +266,10 @@ describe('다리 스킨 메시의 기본 자세', () => {
       expect(length(sub(mat4TransformPoint(skin(2), LEG_REST.ankle), ankle))).toBeLessThan(0.005);
     }
     // 서 있는 자세의 무릎 높이는 기본 자세와 거의 같다 (몸 높이와 엉덩이·발 위치가 기본 자세에 맞춰져 있다).
-    // 행성이 둥글어 발이 옆으로 1만큼 떨어진 곳의 땅이 약 0.03 낮으므로 그만큼 차이를 둔다.
+    // 행성이 둥글어 발이 옆으로 약 1.6 떨어진 곳의 땅이 약 0.07 낮으므로 그만큼 차이를 둔다.
     const up = normalize(sub(player.position, PLANET.center));
     const hipToKnee = sub(bones[4].origin, bones[3].origin);
-    expect(Math.abs(dot(hipToKnee, up) - LEG_REST.knee[1])).toBeLessThan(0.04);
+    expect(Math.abs(dot(hipToKnee, up) - LEG_REST.knee[1] * CHARACTER_SCALE)).toBeLessThan(0.08);
   });
 
   it('CPU 스키닝은 가중치대로 뼈 행렬을 섞는다', () => {

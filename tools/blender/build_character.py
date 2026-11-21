@@ -26,10 +26,17 @@ from mathutils import Vector
 from mathutils.geometry import intersect_point_line
 
 # walker.ts의 LEG, LEG_REST 값과 같아야 한다 (glTF 좌표 x, y).
-REST_KNEE = (0.6, 0.5)
-REST_ANKLE = (0.62, -0.81)
+REST_KNEE = (0.749, 0.22)
+REST_ANKLE = (0.72, -1.09)
 ANKLE_HEIGHT = 0.12
-REST_TOE = (0.97, -0.87)
+# 발끝과 뒤꿈치는 발목 기준으로 둔다.
+REST_TOE = (REST_ANKLE[0] + 0.35, REST_ANKLE[1] - 0.06)
+REST_HEEL = (REST_ANKLE[0] + 0.01, REST_ANKLE[1] - 0.06)
+# 정강이 중간의 굵기 조절점 (무릎에서 발목 쪽으로 이 비율만큼)
+SHIN_MID = 0.53
+# 엉덩이에서 몸 중심 쪽으로 더 뻗는 점. 다리가 몸 구 안에서 시작해 이음매가 보이지 않는다.
+# 엉덩이가 몸 중심에서 바깥 위(walker.ts의 HIP_SIDE, HIP_UP)에 있으므로 안쪽 아래로 뻗는다.
+HIP_INSET = (-0.1, -0.1)
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "src" / "assets" / "character.glb"
@@ -58,12 +65,12 @@ def build_leg_mesh():
     """스킨 모디파이어로 엉덩이에서 발끝까지 이어진 관을 만들고 서브디비전을 적용한다."""
     # (점, 반지름). 엉덩이 안쪽으로 조금 더 뻗어 몸 구 안에서 시작하게 한다.
     points = [
-        (blender(-0.14, 0.0), (0.15, 0.15)),
+        (blender(*HIP_INSET), (0.15, 0.15)),
         (HIP, (0.155, 0.155)),
         (KNEE, (0.21, 0.21)),
-        (blender(0.61, -0.2), (0.19, 0.19)),
+        (blender(*[k + (a - k) * SHIN_MID for k, a in zip(REST_KNEE, REST_ANKLE)]), (0.19, 0.19)),
         (ANKLE, (0.15, 0.15)),
-        (blender(0.63, -0.87), (0.17, 0.14)),
+        (blender(*REST_HEEL), (0.17, 0.14)),
         (TOE, (0.12, 0.1)),
     ]
     edges = [(i, i + 1) for i in range(len(points) - 1)]

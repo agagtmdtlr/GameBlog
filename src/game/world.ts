@@ -10,6 +10,7 @@ import {
   mat4RigidInverse,
   normalize,
   normalMatrix,
+  scale,
   QUAT_IDENTITY,
   type Mat4,
   type Quat,
@@ -29,7 +30,7 @@ import { ColorTransition } from './colorTransition';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
-import { BODY_RADIUS, restBones, Walker, type BoneTransform } from './walker';
+import { BODY_RADIUS, CHARACTER_SCALE, restBones, Walker, type BoneTransform } from './walker';
 
 /** 행성의 꼭대기에서 시작한다. */
 const SPAWN: Vec3 = [0, PLANET.radius + PLAYER_RADIUS, 0];
@@ -49,6 +50,9 @@ const PLAYER_ROUGHNESS = 0.45;
 const boneMatrix = ({ origin, x, y, z }: BoneTransform): Mat4 => mat4FromBasis(origin, x, y, z);
 /** 다리 메시의 기본 자세 뼈를 원점으로 되돌리는 행렬. 지금 뼈와 곱하면 스키닝 행렬이 된다. */
 const REST_BONE_INVERSES = restBones().map((bone) => mat4RigidInverse(boneMatrix(bone)));
+/** 지금 뼈의 행렬. 설계 치수의 다리 메시를 `CHARACTER_SCALE`만큼 키운다. */
+const posedBoneMatrix = ({ origin, x, y, z }: BoneTransform): Mat4 =>
+  mat4FromBasis(origin, scale(x, CHARACTER_SCALE), scale(y, CHARACTER_SCALE), scale(z, CHARACTER_SCALE));
 
 export const STUDIO_ENVIRONMENT: Environment = {
   // 기본 시점에서 그림자가 구의 앞쪽 옆으로 떨어져 잘 보이는 방향
@@ -201,7 +205,7 @@ export class World {
   private characterDrawItems(alpha: number): DrawItem[] {
     const pose = this.walker.pose(alpha);
     const mat = material(PLAYER_COLOR, PLAYER_ROUGHNESS);
-    const bones = this.walker.solveLegs(pose).map(boneMatrix);
+    const bones = this.walker.solveLegs(pose).map(posedBoneMatrix);
     const leg = (first: number): DrawItem => ({
       ...drawItemFromModel('leg', mat4Identity(), mat),
       skin: bones.slice(first, first + LEG_BONE_COUNT).map((bone, i) => mat4Multiply(bone, REST_BONE_INVERSES[i])),

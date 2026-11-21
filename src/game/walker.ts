@@ -16,10 +16,17 @@ import type { Sphere } from '../physics/collision';
 import { IDLE_CLIP, STEP_CLIP, WALK_CLIP } from './characterClips';
 import { sampleClip } from './keyframes';
 
-/** 구체 몸의 반지름 */
-export const BODY_RADIUS = 0.5;
+/**
+ * 캐릭터 전체의 크기 배율. 아래 `LEG`, `LEG_REST`와 Blender 모델은 배율 1의 설계 치수이고,
+ * 게임 안의 몸, 다리, 걸음, 물리 몸체(`PLAYER_RADIUS`)는 모두 이 배율을 곱해 쓴다.
+ */
+export const CHARACTER_SCALE = 1.5;
+const S = CHARACTER_SCALE;
 
-/** 다리 뼈의 치수 */
+/** 구체 몸의 반지름 */
+export const BODY_RADIUS = 0.5 * S;
+
+/** 다리 뼈의 설계 치수 (배율 1) */
 export const LEG = {
   /** 엉덩이 관절에서 무릎까지 */
   thigh: 0.781,
@@ -30,49 +37,53 @@ export const LEG = {
 } as const;
 
 /**
- * 다리 메시의 기본 자세. 오른쪽 다리가 서 있는 모습이며 엉덩이가 원점, +X가 몸 바깥, +Y가 위다 (glTF 좌표).
+ * 다리 메시의 기본 자세 (배율 1). 오른쪽 다리가 서 있는 모습이며 엉덩이가 원점, +X가 몸 바깥, +Y가 위다 (glTF 좌표).
  * `tools/blender/build_character.py`의 REST_KNEE, REST_ANKLE과 같아야 한다.
  * 몸 높이(`PLAYER_RADIUS`)와 아래 엉덩이·발 위치로 서 있을 때 IK가 푸는 자세와 같다.
  */
 export const LEG_REST = {
-  knee: [0.6, 0.5, 0] as Vec3,
-  ankle: [0.62, -0.81, 0] as Vec3,
+  knee: [0.749, 0.22, 0] as Vec3,
+  ankle: [0.72, -1.09, 0] as Vec3,
 } as const;
 
-/** 몸 중심에서 엉덩이 관절까지의 옆 거리와 높이 */
-const HIP_SIDE = 0.45;
-const HIP_UP = 0.05;
+/** 다리 뼈의 게임 안 치수 */
+const THIGH = LEG.thigh * S;
+const SHIN = LEG.shin * S;
+const ANKLE_HEIGHT = LEG.ankleHeight * S;
+/** 몸 중심에서 엉덩이 관절까지의 옆 거리와 높이. 다리가 몸 구의 바깥 위쪽(약 43°)에 붙는다. */
+const HIP_SIDE = 0.35 * S;
+const HIP_UP = 0.33 * S;
 /** 서 있을 때 몸 중심 아래 지점에서 발이 놓이는 옆 거리 */
-const STANCE_SIDE = 1.07;
+const STANCE_SIDE = 1.07 * S;
 /** 무릎이 향하는 방향의 위쪽 성분 (옆쪽 성분은 1). 무릎이 바깥 위로 솟는다. */
 const KNEE_POLE_UP = 2.0;
 /** 진행 방향에서 발끝이 바깥으로 돌아간 각도 */
 const TOE_OUT = (75 * Math.PI) / 180;
 
 /** 발을 드는 최대 높이 */
-const STEP_HEIGHT = 0.3;
+const STEP_HEIGHT = 0.3 * S;
 /** 이보다 느리면 멈춘 것으로 본다. */
 const IDLE_SPEED = 0.4;
 /** 걷기 한 주기(두 걸음)에 몸이 나아가는 거리 = STRIDE_BASE + STRIDE_PER_SPEED × 속도. 빠를수록 보폭이 길다. */
-const STRIDE_BASE = 0.9;
-const STRIDE_PER_SPEED = 0.16;
-const MAX_STRIDE = 2.6;
+const STRIDE_BASE = 0.9 * S;
+const STRIDE_PER_SPEED = 0.16 * S;
+const MAX_STRIDE = 2.6 * S;
 /** 한 주기에서 발이 땅을 딛고 있는 비율. 0.5보다 조금 커서 두 발이 잠깐 함께 딛는다. */
 const DUTY = 0.55;
 const MIN_STEP_SECONDS = 0.08;
 const MAX_STEP_SECONDS = 0.4;
 /** 멈춘 뒤 발을 제자리로 모으는 걸음 */
-const SETTLE_TRIGGER = 0.05;
+const SETTLE_TRIGGER = 0.05 * S;
 const SETTLE_SECONDS = 0.22;
 const SETTLE_LIFT = 0.5;
 /** 딛고 있는 발이 쉬는 위치에서 이만큼 벗어나면 위상과 상관없이 바로 내딛는다 (급회전, 밀려남). */
-const REACH_LIMIT = 1.5;
+const REACH_LIMIT = 1.5 * S;
 const RECOVER_SECONDS = 0.14;
 
 /** 걷기 클립의 진폭 (몸 높이, 옆, 앞, 엉덩이 기울기 라디안) */
-const WALK_AMPLITUDE = { bob: 0.07, sway: 0.08, surge: 0.035, roll: (7 * Math.PI) / 180 } as const;
+const WALK_AMPLITUDE = { bob: 0.07 * S, sway: 0.08 * S, surge: 0.035 * S, roll: (7 * Math.PI) / 180 } as const;
 /** 숨쉬기 클립의 진폭 */
-const IDLE_AMPLITUDE = { bob: 0.045, sway: 0.025, roll: (2.5 * Math.PI) / 180 } as const;
+const IDLE_AMPLITUDE = { bob: 0.045 * S, sway: 0.025 * S, roll: (2.5 * Math.PI) / 180 } as const;
 /** 서기와 걷기 클립을 섞는 비율이 따라가는 빠르기 */
 const BLEND_RATE = 7;
 
@@ -81,7 +92,7 @@ const TURN_RATE = 12;
 /** 이 시간보다 오래 땅에서 떨어져 있으면 공중 자세로 바꾼다. 튕길 때 발이 떨리지 않게 한다. */
 const AIR_DELAY = 0.12;
 /** 공중에서 발이 매달리는 위치 (몸 중심 기준 아래쪽 거리, 옆 거리 비율) */
-const AIR_HANG_DOWN = 0.75;
+const AIR_HANG_DOWN = 0.75 * S;
 const AIR_HANG_SIDE = 0.8;
 const AIR_FOLLOW_RATE = 14;
 
@@ -266,7 +277,7 @@ export class Walker {
       const footUp = this.upAt(sole);
       const hip = add(pose.body, add(scale(hipRight, side * HIP_SIDE), scale(hipUp, HIP_UP)));
       const pole = normalize(add(scale(right, side), scale(up, KNEE_POLE_UP)));
-      const { knee, ankle } = solveTwoBone(hip, add(sole, scale(footUp, LEG.ankleHeight)), LEG.thigh, LEG.shin, pole);
+      const { knee, ankle } = solveTwoBone(hip, add(sole, scale(footUp, ANKLE_HEIGHT)), THIGH, SHIN, pole);
       bones.push(segment('thigh', hip, knee, pole), segment('shin', knee, ankle, pole));
 
       const footForward = tangentDirection(pose.footHeadings[i], footUp);

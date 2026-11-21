@@ -1,11 +1,12 @@
 import { add, dot, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { reflectVelocity, sphereVsSphere, type Sphere } from '../physics/collision';
+import { CHARACTER_SCALE } from './walker';
 
 /**
  * 충돌 구의 반지름. 다리가 몸을 받치는 높이이기도 하다.
  * 구의 중심이 캐릭터 몸의 중심이고, 표면에서 이만큼 떠 있다.
  */
-export const PLAYER_RADIUS = 0.88;
+export const PLAYER_RADIUS = 0.88 * CHARACTER_SCALE;
 
 const GROUND_ACCELERATION = 26;
 const AIR_ACCELERATION = 9;
