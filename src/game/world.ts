@@ -27,6 +27,7 @@ import {
   type SurfaceZoneFrame,
 } from '../engine/frame';
 import { boxModel, houseBox } from './house';
+import { rocketBox } from './rocket';
 import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
@@ -63,6 +64,11 @@ const HOUSE_COLOR: Vec3 = [0.3, 0.36, 0.46];
 /** 집 자리 상자. 그리기와 충돌에 함께 쓴다. */
 const HOUSE_BOX = houseBox();
 const HOUSE_MODEL = boxModel(HOUSE_BOX);
+/** 로켓 자리 상자의 색 (선형 RGB). 집 상자와 구분되는 붉은색 */
+const ROCKET_COLOR: Vec3 = [0.55, 0.1, 0.08];
+/** 로켓 자리 상자. 위성 바로 아래 표면에 있다. 그리기와 충돌에 함께 쓴다. */
+const ROCKET_BOX = rocketBox();
+const ROCKET_MODEL = boxModel(ROCKET_BOX);
 
 const boneMatrix = ({ origin, x, y, z }: BoneTransform): Mat4 => mat4FromBasis(origin, x, y, z);
 /** 다리 메시의 기본 자세 뼈를 원점으로 되돌리는 행렬. 지금 뼈와 곱하면 스키닝 행렬이 된다. */
@@ -156,7 +162,7 @@ export class World {
   fixedStep(dt: number, command: MoveCommand): void {
     this.sun.step(dt);
     this.moon.step(dt);
-    this.player.step(dt, command, PLANET, [HOUSE_BOX]);
+    this.player.step(dt, command, PLANET, [HOUSE_BOX, ROCKET_BOX]);
     this.walker.step(dt, this.player);
 
     const fade = 1 - Math.exp(-ZONE_FADE_RATE * dt);
@@ -195,6 +201,7 @@ export class World {
         }),
       ),
       drawItemFromModel('box', HOUSE_MODEL, material(HOUSE_COLOR, 0.8)),
+      drawItemFromModel('box', ROCKET_MODEL, material(ROCKET_COLOR, 0.7)),
       ...this.characterDrawItems(alpha),
       // 위성은 그림자 맵 범위 밖에 있으므로 그림자를 드리우지 않는다.
       drawItemFromModel('moon', this.moon.model(alpha), material(MOON_COLOR, MOON_ROUGHNESS), false),
