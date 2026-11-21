@@ -9,6 +9,7 @@
 | 콘텐츠와 셰이더 | 행성 표면의 작동 영역(예전 발판), 콘텐츠, 셰이더, 행성·구의 재질이나 연출 | [rules/content.md](rules/content.md) | [analysis/content.md](analysis/content.md) |
 | 입력과 조작 | 키보드·마우스·터치 입력, 가상 조이스틱, 일시 정지, 조작 안내 | 없음 | [analysis/input.md](analysis/input.md) |
 | 플레이어 캐릭터 | 구체 몸과 다리의 모양, Blender 모델, 서기·걷기 키프레임 애니메이션, 물리 몸체 | [rules/character.md](rules/character.md) | [analysis/character.md](analysis/character.md) |
+| NPC | 행성 위를 혼자 돌아다니는 플레이어 모양의 NPC, 색·시작 위치·걷는 빠르기, 캐릭터끼리 밀어내기 | 없음 | [analysis/npc.md](analysis/npc.md) |
 | 별 빌보드 | 행성 둘레의 의인화된 코믹한 별, 별 얼굴 텍스처·개수·배치 | 없음 | [analysis/starfield.md](analysis/starfield.md) |
 | 빌보드 일괄 렌더링 | 카메라를 보는 빌보드(별, 햇살, 해 눈)를 모아 한 번에 그리는 계층, 텍스처 아틀라스, 새 빌보드 추가 | 없음 | [analysis/billboard.md](analysis/billboard.md) |
 | 위성 | 행성 주변에 떠서 자전하는 바위 위성, 충돌구 모양 | 없음 | [analysis/moon.md](analysis/moon.md) |
