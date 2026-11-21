@@ -6,6 +6,7 @@ import {
   CircleGeometry,
   CylinderGeometry,
   Color,
+  CubeTexture,
   DynamicDrawUsage,
   DepthTexture,
   FramebufferTexture,
@@ -45,6 +46,7 @@ import { skinVertices, type SkinSource } from './skinning';
 import { displaceToMoon } from './moonShape';
 import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from './rocketShape';
 import { BillboardBatch } from './billboardRenderer';
+import { drawSkyboxFaces } from './skybox';
 import type { TriangleMesh } from './trackPath';
 import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
 
@@ -150,6 +152,8 @@ function createRocketGlassGeometry(): BufferGeometry {
 export class Renderer {
   private readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
+  /** 아주 먼 우주 큐브맵만 배경으로 가진 장면. 메인 패스에서 가장 먼저 그린다. */
+  private readonly skyScene = new Scene();
   /**
    * 별, 햇살, 해 눈처럼 카메라를 보는 빌보드를 한 번에 그리는 장면. 그림자 패스에 넣지 않으려고 따로 두고,
    * 불투명한 메인 장면 뒤에 그린다.
@@ -245,6 +249,12 @@ export class Renderer {
     this.lightCamera.layers.set(SHADOW_LAYER);
 
     this.billboardScene.add(this.billboards.mesh);
+
+    // 먼 우주는 모델 없이 캔버스에 그린 큐브맵 한 장이다. 한 번 만들고 바뀌지 않는다.
+    const sky = new CubeTexture(drawSkyboxFaces());
+    sky.colorSpace = SRGBColorSpace;
+    sky.needsUpdate = true;
+    this.skyScene.background = sky;
 
     const byKind = new Map<string, ContentRenderer>();
     for (const content of contentRenderers) {
@@ -372,6 +382,8 @@ export class Renderer {
     const bg = frame.environment.background;
     r.setClearColor(this.clearColor.setRGB(bg[0], bg[1], bg[2], SRGBColorSpace));
     r.clear();
+    // 내장 배경 셰이더는 깊이를 쓰지 않으므로 그 위에 무엇이든 그려진다.
+    r.render(this.skyScene, this.camera);
     r.render(this.scene, this.camera);
     // 빌보드는 반투명 가장자리가 있으므로 불투명한 장면 뒤에 그린다. 깊이 검사로 행성·위성이 그 뒤를 가린다.
     r.render(this.billboardScene, this.camera);
