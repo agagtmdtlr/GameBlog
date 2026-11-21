@@ -158,7 +158,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - 행성 중심에서 110~200 떨어진 곳에 얼굴이 있는 별 48개가 카메라를 보며 떠 있다 ([analysis/starfield.md](analysis/starfield.md)).
 - 카메라의 위쪽은 캐릭터가 있는 곳의 표면 바깥 방향이다. 좌우 각도 대신 표면에 접하는 진행 방향을 들고 다녀 극점에서도 뒤집히지 않는다.
 - 검은 배경에 흰색에 가까운 무채색 행성을 둔다. 행성 색은 고정이다. 캐릭터는 노랑(#FCC812)으로 고정이다.
-- 플레이어와 같은 모양의 하늘색(#4FB0F0) NPC가 집 자리 옆에서 시작해 아무 곳으로 천천히 걸어갔다가 잠깐 서기를 되풀이한다. 플레이어와 서로 통과하지 못한다 (2026-11-21 사용자 요청, [analysis/npc.md](analysis/npc.md)).
+- 플레이어와 같은 모양에 색만 다른 NPC 5마리(하늘색, 분홍, 초록, 보라, 주황)가 행성 둘레에서 시작해 아무 곳으로 천천히 걸어갔다가 잠깐 서기를 되풀이한다. 하늘색이 집 자리 옆에서 시작한다. 플레이어와 NPC는 서로 통과하지 못한다 (2026-11-21 사용자 요청, [analysis/npc.md](analysis/npc.md)).
 
 ### 작동 영역과 콘텐츠
 
@@ -223,7 +223,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | [`sunRays.test.ts`](../src/engine/sunRays.test.ts) | 4 | 해 햇살 모양 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
 | [`game.test.ts`](../src/game/game.test.ts) | 47 | 구 조작(중력, 한 바퀴 돌기), 카메라, 작동 영역, 콘텐츠 관리, 월드 통합, 집 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
-| [`npc.test.ts`](../src/game/npc.test.ts) | 8 | NPC 시작 위치, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기 |
+| [`npc.test.ts`](../src/game/npc.test.ts) | 9 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기 |
 | [`walker.test.ts`](../src/game/walker.test.ts) | 17 | 캐릭터 다리와 걷기, 키프레임, 스킨 메시 기본 자세 |
 
 렌더러, 입력, UI, `main.ts`는 단위 테스트가 없다.

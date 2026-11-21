@@ -5,20 +5,29 @@ import { separateBodies, seededRandom, Wanderer } from './npc';
 import { PLANET } from './planet';
 import { PLAYER_RADIUS, Player } from './player';
 import { SURFACE_OBJECTS } from './surfaceScene';
-import { NPC_COLOR, NPC_SPAWN, World } from './world';
+import { NPCS, World } from './world';
 
 const DT = 1 / 120;
 const OBSTACLES = SURFACE_OBJECTS.filter((o) => o.collides).map((o) => o.box);
 const IDLE = { direction: [0, 0, 0] as [number, number, number] };
 
 describe('돌아다니는 NPC', () => {
-  it('시작 위치가 장애물과 플레이어 시작 지점에 겹치지 않는다', () => {
-    for (const box of OBSTACLES) expect(sphereVsBox(NPC_SPAWN, PLAYER_RADIUS, box)).toBeNull();
-    expect(length(sub(NPC_SPAWN, new World().player.position))).toBeGreaterThan(PLAYER_RADIUS * 4);
+  it('시작 위치가 장애물, 플레이어, 서로에게 겹치지 않고 색이 모두 다르다', () => {
+    expect(NPCS.length).toBeGreaterThan(1);
+    const spawns = [new World().player.position, ...NPCS.map((npc) => npc.spawn)];
+    for (const spawn of spawns.slice(1)) {
+      for (const box of OBSTACLES) expect(sphereVsBox(spawn, PLAYER_RADIUS, box)).toBeNull();
+    }
+    for (let i = 0; i < spawns.length; i++) {
+      for (let j = i + 1; j < spawns.length; j++) {
+        expect(length(sub(spawns[i], spawns[j]))).toBeGreaterThan(PLAYER_RADIUS * 4);
+      }
+    }
+    expect(new Set(NPCS.map((npc) => npc.color.join())).size).toBe(NPCS.length);
   });
 
   it('쉬다가 목표를 골라 걸어가고, 행성 표면을 벗어나지 않는다', () => {
-    const npc = new Wanderer(NPC_SPAWN, PLANET, seededRandom(7));
+    const npc = new Wanderer(NPCS[0].spawn, PLANET, seededRandom(7));
     let walked = 0;
     let maxSpeed = 0;
     let targets = 0;
@@ -42,7 +51,7 @@ describe('돌아다니는 NPC', () => {
   });
 
   it('목표에 다가가면 멈춰 서서 숨쉬기 자세로 돌아간다', () => {
-    const npc = new Wanderer(NPC_SPAWN, PLANET, seededRandom(3));
+    const npc = new Wanderer(NPCS[0].spawn, PLANET, seededRandom(3));
     let rested = false;
     let walkedOnce = false;
     for (let i = 0; i < 120 * 30 && !rested; i++) {
@@ -57,7 +66,7 @@ describe('돌아다니는 NPC', () => {
 
   it('같은 시드면 같은 길을 걷는다', () => {
     const run = () => {
-      const npc = new Wanderer(NPC_SPAWN, PLANET, seededRandom(11));
+      const npc = new Wanderer(NPCS[0].spawn, PLANET, seededRandom(11));
       for (let i = 0; i < 120 * 10; i++) npc.move(DT, OBSTACLES);
       return npc.body.position;
     };
@@ -79,31 +88,51 @@ describe('캐릭터끼리 밀어내기', () => {
 
   it('월드에서 플레이어가 NPC를 통과하지 못한다', () => {
     const world = new World(undefined, undefined, seededRandom(1));
-    // NPC를 멈춰 세워 두고 플레이어를 그쪽으로 민다.
+    const npc = world.npcs[0];
     let closest = Infinity;
     for (let i = 0; i < 120 * 6; i++) {
-      const toward = normalize(sub(world.npc.body.position, world.player.position));
+      const toward = normalize(sub(npc.body.position, world.player.position));
       world.fixedStep(DT, { direction: toward });
-      closest = Math.min(closest, length(sub(world.npc.body.position, world.player.position)));
+      closest = Math.min(closest, length(sub(npc.body.position, world.player.position)));
     }
     expect(closest).toBeGreaterThan(PLAYER_RADIUS * 2 - 0.1);
+  });
+
+  it('NPC끼리도 오래 돌아다니는 동안 서로 통과하지 못한다', () => {
+    const world = new World(undefined, undefined, seededRandom(5));
+    // 모두 1분 동안 돌아다니게 두고 매 순간 간격을 본다.
+    const [a, b] = world.npcs;
+    for (let i = 0; i < 120 * 60; i++) {
+      world.fixedStep(DT, IDLE);
+      for (let x = 0; x < world.npcs.length; x++) {
+        for (let y = x + 1; y < world.npcs.length; y++) {
+          const gap = length(sub(world.npcs[x].body.position, world.npcs[y].body.position));
+          expect(gap).toBeGreaterThan(PLAYER_RADIUS * 2 - 0.1);
+        }
+      }
+    }
+    expect(a.body.position).not.toEqual(NPCS[0].spawn);
+    expect(b.body.position).not.toEqual(NPCS[1].spawn);
   });
 });
 
 describe('NPC 그리기', () => {
-  it('플레이어와 같은 몸·다리 항목을 다른 색으로 그린다', () => {
+  it('NPC마다 플레이어와 같은 몸·다리 항목을 제 색으로 그린다', () => {
     const items = new World(undefined, undefined, seededRandom(1)).buildDrawList(1);
     const legs = items.filter((item) => item.mesh === 'leg');
-    expect(legs).toHaveLength(4);
-    expect(legs[2].material.baseColor).toEqual(NPC_COLOR);
-    expect(legs[0].material.baseColor).not.toEqual(NPC_COLOR);
-    const npcBody = items.filter((item) => item.mesh === 'sphere' && item.material.baseColor === NPC_COLOR);
-    expect(npcBody).toHaveLength(1);
+    expect(legs).toHaveLength(2 * (1 + NPCS.length));
+    NPCS.forEach((npc, i) => {
+      expect(legs[2 + i * 2].material.baseColor).toEqual(npc.color);
+      expect(legs[3 + i * 2].material.baseColor).toEqual(npc.color);
+      const body = items.filter((item) => item.mesh === 'sphere' && item.material.baseColor === npc.color);
+      expect(body).toHaveLength(1);
+      expect(legs[0].material.baseColor).not.toEqual(npc.color);
+    });
   });
 });
 
 it('기본 난수의 월드도 NPC를 함께 진행한다', () => {
   const world = new World();
   for (let i = 0; i < 240; i++) world.fixedStep(DT, IDLE);
-  expect(Number.isFinite(world.npc.body.position[0])).toBe(true);
+  for (const npc of world.npcs) expect(Number.isFinite(npc.body.position[0])).toBe(true);
 });
