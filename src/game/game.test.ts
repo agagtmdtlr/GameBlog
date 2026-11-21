@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ContentManager } from '../content/manager';
-import { CONTENT_ENTRIES, DEFAULT_PLANET_COLOR } from '../content/registry';
+import { CONTENT_ENTRIES } from '../content/registry';
 import { MAX_SURFACE_ZONES } from '../engine/frame';
-import type { GraphicsContent } from '../content/types';
+import type { ContentEntry, GraphicsContent } from '../content/types';
 import { cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
-import { ColorTransition } from './colorTransition';
+import { boxModel, HOUSE, houseBox } from './house';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
@@ -141,27 +141,6 @@ describe('작동 영역', () => {
   });
 });
 
-describe('색 전환', () => {
-  it('지정한 시간 뒤 목표 색에 도달한다', () => {
-    const transition = new ColorTransition([0, 0, 0], 0.3);
-    transition.setTarget([1, 0, 0]);
-    transition.update(0.15);
-    expect(transition.current[0]).toBeCloseTo(0.5);
-    transition.update(0.15);
-    expect(transition.current).toEqual([1, 0, 0]);
-  });
-
-  it('전환 도중 목표가 바뀌면 현재 색에서 이어간다', () => {
-    const transition = new ColorTransition([0, 0, 0], 0.3);
-    transition.setTarget([1, 0, 0]);
-    transition.update(0.15);
-    transition.setTarget([0, 1, 0]);
-    expect(transition.current[0]).toBeCloseTo(0.5);
-    transition.update(0.01);
-    expect(transition.current[0]).toBeGreaterThan(0.4);
-  });
-});
-
 describe('콘텐츠 관리', () => {
   function fakeContent(id: string, log: string[]): GraphicsContent {
     return {
@@ -171,7 +150,7 @@ describe('콘텐츠 관리', () => {
       deactivate: () => log.push(`-${id}`),
     };
   }
-  const ctx = { planet: { setSurfaceColor: () => {} } };
+  const ctx = {};
 
   it('새 콘텐츠를 켜기 전에 이전 콘텐츠를 끈다', () => {
     const log: string[] = [];
@@ -196,12 +175,24 @@ describe('콘텐츠 관리', () => {
 });
 
 describe('월드 통합', () => {
-  type Entry = (typeof CONTENT_ENTRIES)[number];
-  const find = (id: string): Entry => CONTENT_ENTRIES.find((e) => e.content.id === id)!;
-  const directionOf = ({ zone }: Entry): Vec3 => surfaceDirection(zone.latitude, zone.longitude);
+  const directionOf = ({ zone }: ContentEntry): Vec3 => surfaceDirection(zone.latitude, zone.longitude);
 
-  /** 발판을 향해 표면을 따라 굴러간다. */
-  function rollTo(world: World, entry: Entry): void {
+  /** 시험용 콘텐츠 두 개. 켜고 끈 순서를 `log`에 남긴다. */
+  function testEntries(log: string[]): ContentEntry[] {
+    const entry = (id: string, latitude: number, longitude: number): ContentEntry => ({
+      content: {
+        id,
+        label: id,
+        activate: () => log.push(`+${id}`),
+        deactivate: () => log.push(`-${id}`),
+      },
+      zone: { latitude, longitude, color: [1, 0, 0] },
+    });
+    return [entry('a', 35, 60), entry('b', -5, 115)];
+  }
+
+  /** 영역을 향해 표면을 따라 굴러간다. */
+  function rollTo(world: World, entry: ContentEntry): void {
     const target = scale(directionOf(entry), REST_DISTANCE);
     for (let i = 0; i < 2400; i++) {
       const position = world.player.position;
@@ -213,10 +204,9 @@ describe('월드 통합', () => {
     }
   }
 
-  it('처음에는 기본색 콘텐츠가 켜져 있다', () => {
-    const world = new World();
-    expect(world.content.activeId).toBe('color-default');
-    expect(world.currentPlanetColor).toEqual(DEFAULT_PLANET_COLOR);
+  it('처음에는 켜진 콘텐츠가 없다', () => {
+    expect(new World().content.activeId).toBeNull();
+    expect(new World(testEntries([])).content.activeId).toBeNull();
   });
 
   it('구는 행성 꼭대기에서 시작한다', () => {
@@ -224,7 +214,7 @@ describe('월드 통합', () => {
     expect(world.player.position).toEqual(TOP);
   });
 
-  it('발판은 서로 겹치지 않고 시작 지점을 덮지 않는다', () => {
+  it('영역은 서로 겹치지 않고 시작 지점을 덮지 않는다', () => {
     const surfaceDistance = (a: Vec3, b: Vec3): number =>
       Math.acos(Math.min(1, Math.max(-1, dot(a, b)))) * PLANET.radius;
     CONTENT_ENTRIES.forEach((entry, i) => {
@@ -240,9 +230,16 @@ describe('월드 통합', () => {
     expect(CONTENT_ENTRIES.length).toBeLessThanOrEqual(MAX_SURFACE_ZONES);
   });
 
+  it('모든 영역은 해가 드는 쪽에 있다', () => {
+    for (const entry of CONTENT_ENTRIES) {
+      expect(dot(directionOf(entry), STUDIO_ENVIRONMENT.lightDirection)).toBeGreaterThan(0.25);
+    }
+  });
+
   it('구가 올라선 영역만 강조되고, 켜진 영역은 빛난다', () => {
-    const world = new World();
-    rollTo(world, find('color-teal'));
+    const entries = testEntries([]);
+    const world = new World(entries);
+    rollTo(world, entries[1]);
     // 멈추지 않고 영역 위에 있는 동안 0.3초를 보낸다.
     const p = world.player.position;
     for (let i = 0; i < 36; i++) {
@@ -250,51 +247,83 @@ describe('월드 통합', () => {
       world.player.velocity = [0, 0, 0];
       world.fixedStep(DT, IDLE);
     }
-    const zones = world.buildSurfaceZones();
-    const teal = CONTENT_ENTRIES.indexOf(find('color-teal'));
-    zones.forEach((zone, i) => {
-      if (i === teal) {
-        expect(zone.presence).toBeGreaterThan(0.8);
-        expect(zone.glow).toBeGreaterThan(0.8);
-      } else {
-        expect(zone.presence).toBeLessThan(0.2);
-        expect(zone.glow).toBeLessThan(0.2);
-      }
-    });
+    const [other, target] = world.buildSurfaceZones();
+    expect(target.presence).toBeGreaterThan(0.8);
+    expect(target.glow).toBeGreaterThan(0.8);
+    expect(other.presence).toBeLessThan(0.2);
+    expect(other.glow).toBeLessThan(0.2);
   });
 
-  it('모든 발판은 해가 드는 쪽에 있다', () => {
-    for (const entry of CONTENT_ENTRIES) {
-      expect(dot(directionOf(entry), STUDIO_ENVIRONMENT.lightDirection)).toBeGreaterThan(0.25);
+  it('영역까지 굴러가면 그 콘텐츠가 켜지고, 다른 영역으로 가면 바뀐다', () => {
+    const log: string[] = [];
+    const entries = testEntries(log);
+    const world = new World(entries);
+    rollTo(world, entries[0]);
+    expect(world.content.activeId).toBe('a');
+    rollTo(world, entries[1]);
+    expect(world.content.activeId).toBe('b');
+    expect(log).toEqual(['+a', '-a', '+b']);
+  });
+
+  it('영역을 밟아도 행성과 캐릭터의 재질은 바뀌지 않는다', () => {
+    const entries = testEntries([]);
+    const world = new World(entries);
+    const materials = () => world.buildDrawList(1).map((item) => item.material);
+    const before = materials();
+    rollTo(world, entries[0]);
+    for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);
+    expect(world.content.activeId).toBe('a');
+    expect(materials()).toEqual(before);
+  });
+});
+
+describe('집 자리', () => {
+  const up = surfaceDirection(HOUSE.latitude, HOUSE.longitude);
+  const surfaceDistance = (a: Vec3, b: Vec3): number =>
+    Math.acos(Math.min(1, Math.max(-1, dot(a, b)))) * PLANET.radius;
+
+  it('시작 지점을 덮지 않고, 시작할 때 바라보는 쪽 가까이에 있다', () => {
+    const distance = surfaceDistance(up, [0, 1, 0]);
+    expect(distance).toBeGreaterThan(HOUSE.size[2] + PLAYER_RADIUS);
+    expect(distance).toBeLessThan(10);
+  });
+
+  it('해가 드는 쪽에 있다', () => {
+    expect(dot(up, STUDIO_ENVIRONMENT.lightDirection)).toBeGreaterThan(0.25);
+  });
+
+  it('바닥이 표면에 닿고, 위쪽이 표면 바깥을 향한다', () => {
+    const m = boxModel(houseBox());
+    const center: Vec3 = [m[12], m[13], m[14]];
+    const axisY: Vec3 = [m[4], m[5], m[6]];
+    expect(dot(normalize(axisY), up)).toBeCloseTo(1, 6);
+    const bottom = length(center) - HOUSE.size[1] / 2;
+    expect(bottom).toBeLessThan(PLANET.radius);
+    expect(bottom).toBeGreaterThan(PLANET.radius - 0.3);
+  });
+
+  it('걸어서 상자를 통과할 수 없다', () => {
+    const world = new World();
+    const box = houseBox();
+    const [, , halfDepth] = box.halfExtents;
+    // 시작할 때 바라보는 쪽(-Z)으로 상자를 지나칠 만큼 걷는다.
+    let closest = Infinity;
+    for (let i = 0; i < 120 * 4; i++) {
+      const position = world.player.position;
+      const up = normalize(position);
+      const forward = normalize(sub(box.center, scale(up, dot(box.center, up))));
+      world.fixedStep(DT, { direction: forward });
+      const front = dot(sub(world.player.position, box.center), box.axes[2]);
+      closest = Math.min(closest, front);
     }
+    // 정면까지 와서 부딪혔고, 구의 중심은 정면에서 반지름 이상 떨어져 있다.
+    expect(closest).toBeLessThan(halfDepth + PLAYER_RADIUS + 0.1);
+    expect(closest).toBeGreaterThan(halfDepth + PLAYER_RADIUS - 0.05);
+    expect(length(world.player.position)).toBeCloseTo(REST_DISTANCE, 1);
   });
 
-  it('발판까지 굴러가면 행성 표면의 색이 바뀌고, 기본 발판으로 돌아오면 복귀한다', () => {
-    const world = new World();
-    const coral = find('color-coral');
-
-    rollTo(world, coral);
-    expect(world.content.activeId).toBe('color-coral');
-    for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);
-    const expectColor = (actual: Vec3, expected: Vec3): void =>
-      actual.forEach((c, i) => expect(c).toBeCloseTo(expected[i], 9));
-    expectColor(world.currentPlanetColor, coral.zone.color);
-    const [planet] = world.buildDrawList(1);
-    expectColor(planet.material.baseColor, coral.zone.color);
-
-    rollTo(world, find('color-default'));
-    expect(world.content.activeId).toBe('color-default');
-    for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);
-    expectColor(world.currentPlanetColor, DEFAULT_PLANET_COLOR);
-  });
-
-  it('발판을 밟아도 플레이어 구의 재질은 바뀌지 않는다', () => {
-    const world = new World();
-    const playerMaterial = () => world.buildDrawList(1)[1].material;
-    const before = playerMaterial();
-    rollTo(world, find('color-blue'));
-    for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);
-    expect(world.content.activeId).toBe('color-blue');
-    expect(playerMaterial()).toEqual(before);
+  it('월드 그리기 목록에 상자로 들어간다', () => {
+    const boxes = new World().buildDrawList(1).filter((item) => item.mesh === 'box');
+    expect(boxes).toHaveLength(1);
   });
 });

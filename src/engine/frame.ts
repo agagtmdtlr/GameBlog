@@ -5,8 +5,8 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * three.js에 의존하지 않으므로 `World`와 테스트가 GPU 없이 쓸 수 있다.
  */
 
-/** `sphere`는 three.js 기본 구, `leg`는 `assets/character.glb`의 캐릭터 다리 스킨 메시다. */
-export type MeshKind = 'sphere' | 'leg';
+/** `sphere`는 three.js 기본 구, `box`는 한 변 1인 정육면체, `leg`는 `assets/character.glb`의 캐릭터 다리 스킨 메시다. */
+export type MeshKind = 'sphere' | 'box' | 'leg';
 
 /** 스킨 메시가 쓰는 뼈 수. `leg` 메시의 뼈 순서는 [허벅지, 정강이, 발]이다. */
 export const LEG_BONE_COUNT = 3;

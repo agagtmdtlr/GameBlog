@@ -1,14 +1,9 @@
 import type { Vec3 } from '../engine/math';
 
-/** 콘텐츠가 월드에 영향을 줄 수 있는 창구. 필요한 기능은 여기에 추가한다. */
-export interface ContentContext {
-  planet: {
-    /** 행성 표면의 색을 선형 RGB 값으로 서서히 바꾼다. */
-    setSurfaceColor(color: Vec3): void;
-  };
-}
+/** 콘텐츠가 월드에 영향을 줄 수 있는 창구. 필요한 기능은 여기에 추가한다. 지금은 비어 있다. */
+export interface ContentContext {}
 
-/** 발판으로 켜지는 그래픽스 콘텐츠 */
+/** 작동 영역으로 켜지는 그래픽스 콘텐츠 */
 export interface GraphicsContent {
   id: string;
   label: string;

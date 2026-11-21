@@ -1,4 +1,5 @@
 import {
+  BoxGeometry,
   BufferAttribute,
   BufferGeometry,
   Color,
@@ -105,6 +106,8 @@ export class Renderer {
     this.geometries = {
       // 행성에도 쓰므로 촘촘하게 나눈다. 성기면 구가 행성 표면에 살짝 묻혀 보인다.
       sphere: new SphereGeometry(1, 96, 64),
+      // 캐릭터 집 자리 표시
+      box: new BoxGeometry(1, 1, 1),
       // 캐릭터 다리의 기본 자세. 그릴 때는 메시마다 스키닝한 복사본을 쓴다.
       leg: new BufferGeometry(),
     };

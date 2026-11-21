@@ -4,11 +4,11 @@
 
 - **규칙:** [rules/content.md](../rules/content.md)
 - **색인:** [docs/README.md](../README.md)
-- **분석 기준:** 커밋 `252920b` 다음의 발판을 표면 작동 영역으로 교체
+- **분석 기준:** 커밋 `1c3831b` 다음의 행성 표면 색 변경 시스템 제거 (2026-11-21)
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline 252920b..HEAD -- src/content src/game src/engine/renderer.ts src/engine/contentRenderers src/shaders src/main.ts
+git log --oneline 1c3831b..HEAD -- src/content src/game src/engine/renderer.ts src/engine/contentRenderers src/shaders src/main.ts
 ```
 
 ## 작업 유형별 수정 파일
@@ -17,13 +17,12 @@ git log --oneline 252920b..HEAD -- src/content src/game src/engine/renderer.ts s
 
 | 유형 | 언제 | 수정할 파일 |
 |---|---|---|
-| A. 색 영역 | 행성 표면 색만 바꾼다 | `content/registry.ts` 한 줄 (`colorZone`) |
 | B. 기존 기능 조합 | `ContentContext`로 충분하다 | `content/<이름>.ts` 추가, `registry.ts` |
 | C. 새 월드 상태 | 시간에 따라 변하는 상태나 새 동작이 필요하다 | B + `game/<이름>.ts`, `content/types.ts`, `game/world.ts`, `game/game.test.ts` |
 | D. PBR 표면 변형 | 불투명 재질의 무늬나 색 변화 | C(필요 시) + `shaders/pbr.frag`, `engine/frame.ts`의 `SurfacePattern` |
 | E. 별도 셰이더 | 투명, 굴절 등 PBR로 안 되는 표현 | C + `shaders/<이름>.frag`, `engine/frame.ts`, `engine/contentRenderers/<이름>.ts`와 `registry.ts`, `game/world.ts`의 `buildContentFrames`, 필요하면 `pbr.frag` |
 
-지금은 유형 A만 있다. 예전의 물이 든 구와 달아오른 구(유형 E)는 2026-11-17에 사용자 결정으로 지웠다. 유형 E의 참고 구현이 필요하면 커밋 `78247e5`의 `content/waterSphere.ts`, `game/waterFill.ts`, `shaders/water.frag`, `engine/contentRenderers/waterSphere.ts`와 `heatSphere` 쪽 파일을 보면 된다. 유형 A~D는 `engine/renderer.ts`와 `engine/contentRenderers/`를 고치지 않는다.
+지금은 등록된 콘텐츠가 없다. 예전의 행성 표면 색 영역(콘텐츠 `planetColor`와 `game/colorTransition.ts`)은 2026-11-21에 사용자 결정으로 지웠고, 참고 구현은 커밋 `1c3831b`에 있다. 그 전의 물이 든 구와 달아오른 구(유형 E)는 2026-11-17에 사용자 결정으로 지웠다. 유형 E의 참고 구현이 필요하면 커밋 `78247e5`의 `content/waterSphere.ts`, `game/waterFill.ts`, `shaders/water.frag`, `engine/contentRenderers/waterSphere.ts`와 `heatSphere` 쪽 파일을 보면 된다. 유형 B~D는 `engine/renderer.ts`와 `engine/contentRenderers/`를 고치지 않는다.
 
 ## 콘텐츠 인터페이스
 
@@ -39,15 +38,13 @@ interface GraphicsContent {
 interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; color: Vec3 } }
 ```
 
-`ctx.planet`이 제공하는 기능:
+`ContentContext`는 지금 비어 있다. 콘텐츠가 월드를 바꿔야 하면 아래 "월드 상태 추가 순서"대로 기능을 더한다.
 
-- `setSurfaceColor(color)`: 행성 표면 색을 0.3초 동안 전환
-
-플레이어 캐릭터(몸과 다리)의 재질은 `World`의 `PLAYER_COLOR`로 고정이며 콘텐츠가 바꾸지 않는다. 캐릭터 구조는 [analysis/character.md](character.md)에 있다. 행성은 색이 바뀌므로 정적 목록이 아니라 `buildDrawList`가 매 프레임 그리기 목록의 첫 항목으로 만든다.
+행성 재질은 `World`의 `PLANET_COLOR`(흰색에 가까운 무채색), 플레이어 캐릭터(몸과 다리)의 재질은 `PLAYER_COLOR`로 고정이며 콘텐츠가 바꾸지 않는다. 캐릭터 구조는 [analysis/character.md](character.md)에 있다. `buildDrawList`는 행성을 그리기 목록의 첫 항목으로 둔다.
 
 동작:
 
-- 활성 콘텐츠는 하나다. 다른 영역에 들어가면 이전 `deactivate`, 다음 `activate` 순서로 호출된다.
+- 활성 콘텐츠는 하나다. 처음에는 켜진 콘텐츠가 없고, HUD도 숨겨져 있다. 다른 영역에 들어가면 이전 `deactivate`, 다음 `activate` 순서로 호출된다.
 - `CONTENT_ENTRIES`에 추가하면 영역 표시, 판정, 빛남, HUD가 자동으로 따라온다. HUD 색은 `zone.color`에서 만들어진다.
 - 일시 정지 중에는 `update`와 `fixedStep`이 돌지 않고 렌더링만 계속된다.
 
@@ -59,9 +56,9 @@ interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; 
 - 표면 거리는 각도 1도에 약 0.31이다.
 - 해는 경도 115, 위도 46 쪽에 있다. 그 반대쪽 절반은 밤이다.
 
-사용 중인 위치(위도, 경도): `(70, 180)` 기본색, `(35, 215)` 코랄, `(30, 150)` 앰버, `(-5, 115)` 틸, `(35, 60)` 블루.
+사용 중인 위치는 없다.
 
-`game.test.ts`가 위치 조건(간격, 시작 지점과의 거리, 해가 드는 쪽)을 검사하고, `color-default`, `color-coral`, `color-blue` id를 직접 참조한다.
+`game.test.ts`가 `CONTENT_ENTRIES`의 위치 조건(간격, 시작 지점과의 거리, 해가 드는 쪽)을 검사한다. 영역 판정과 강조, 콘텐츠 전환의 월드 통합 테스트는 등록 목록 대신 테스트 안의 가짜 콘텐츠(`testEntries`, 위치 `(35, 60)`과 `(-5, 115)`)를 `World`에 넘겨 시험한다.
 
 영역은 메시가 없다. 행성 표면에 칠한 원이다.
 
@@ -115,7 +112,6 @@ abstract class ContentRenderer<T extends ContentFrame> {
 - **켜진 콘텐츠와 그리는 콘텐츠는 다르다:** 효과가 사라지는 동안에는 활성 콘텐츠가 이미 다른 영역일 수 있다. 그래서 활성 id가 아니라 값의 유무로 그린다.
 - **`RenderContext`:** `renderer`, `camera`, `geometries`, `shared`(프레임 단위 uniform), `createPbrMesh()`, `applyItem()`, `copySceneColor()`(지금까지 그린 화면 복사)를 제공한다.
 - **`pbrUniforms`:** `Renderer`가 PBR 재질을 만들기 전에 모든 렌더러의 값을 합친다. 그래서 필드 초기값으로 선언해야 하고, `init`에서 추가하면 반영되지 않는다. 값은 `prepare`에서 고치며, `data`가 `null`이면 효과를 끈다.
-- **행성 색 영역**은 그리기 목록의 재질 값만 바꾸므로 콘텐츠 렌더러가 없다.
 
 새 콘텐츠 렌더러 추가 순서:
 

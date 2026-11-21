@@ -1,5 +1,5 @@
 import { ContentManager } from '../content/manager';
-import { CONTENT_ENTRIES, DEFAULT_PLANET_COLOR, INITIAL_CONTENT_ID } from '../content/registry';
+import { CONTENT_ENTRIES } from '../content/registry';
 import type { ContentEntry, GraphicsContent } from '../content/types';
 import {
   lerp,
@@ -26,7 +26,7 @@ import {
   type MeshKind,
   type SurfaceZoneFrame,
 } from '../engine/frame';
-import { ColorTransition } from './colorTransition';
+import { boxModel, houseBox } from './house';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
@@ -42,10 +42,16 @@ const ZONE_REARM_MARGIN = PLAYER_RADIUS;
 /** 영역 경계선의 표면 폭 */
 const ZONE_EDGE_WIDTH = 0.12;
 const ZONE_FADE_RATE = 7;
-const COLOR_TRANSITION_SECONDS = 0.3;
-/** 캐릭터의 색 (선형 RGB, sRGB #FCC812). 작동 영역은 행성 표면의 색을 바꾸고 캐릭터는 그대로 둔다. */
+/** 행성 표면의 색 (선형 RGB). 흰색에 가까운 무채색으로 고정이다. */
+const PLANET_COLOR: Vec3 = [0.74, 0.74, 0.75];
+/** 캐릭터의 색 (선형 RGB, sRGB #FCC812) */
 const PLAYER_COLOR: Vec3 = [0.973, 0.578, 0.006];
 const PLAYER_ROUGHNESS = 0.45;
+/** 집 자리 상자의 색 (선형 RGB). 흰 행성과 노란 캐릭터 사이에서 구분되는 푸른 회색 */
+const HOUSE_COLOR: Vec3 = [0.3, 0.36, 0.46];
+/** 집 자리 상자. 그리기와 충돌에 함께 쓴다. */
+const HOUSE_BOX = houseBox();
+const HOUSE_MODEL = boxModel(HOUSE_BOX);
 
 const boneMatrix = ({ origin, x, y, z }: BoneTransform): Mat4 => mat4FromBasis(origin, x, y, z);
 /** 다리 메시의 기본 자세 뼈를 원점으로 되돌리는 행렬. 지금 뼈와 곱하면 스키닝 행렬이 된다. */
@@ -108,7 +114,6 @@ export class World {
   readonly content: ContentManager;
 
   private readonly zones: readonly ZoneInstance[];
-  private readonly planetColor = new ColorTransition(DEFAULT_PLANET_COLOR, COLOR_TRANSITION_SECONDS);
 
   constructor(
     entries: readonly ContentEntry[] = CONTENT_ENTRIES,
@@ -125,19 +130,15 @@ export class World {
       presence: 0,
     }));
 
-    const { planetColor } = this;
     this.content = new ContentManager(
-      { planet: { setSurfaceColor: (color) => planetColor.setTarget(color) } },
+      {},
       entries.map((entry) => entry.content),
       onContentChange,
     );
-    if (entries.some((entry) => entry.content.id === INITIAL_CONTENT_ID)) {
-      this.content.activate(INITIAL_CONTENT_ID);
-    }
   }
 
   fixedStep(dt: number, command: MoveCommand): void {
-    this.player.step(dt, command, PLANET);
+    this.player.step(dt, command, PLANET, [HOUSE_BOX]);
     this.walker.step(dt, this.player);
 
     const fade = 1 - Math.exp(-ZONE_FADE_RATE * dt);
@@ -149,7 +150,6 @@ export class World {
       instance.glow += (targetGlow - instance.glow) * fade;
       instance.presence += (targetPresence - instance.presence) * fade;
     }
-    this.planetColor.update(dt);
     this.content.update(dt);
   }
 
@@ -158,22 +158,19 @@ export class World {
     return lerp(this.player.previousPosition, this.player.position, alpha);
   }
 
-  get currentPlanetColor(): Vec3 {
-    return this.planetColor.current;
-  }
-
   buildDrawList(alpha: number): DrawItem[] {
     const items: DrawItem[] = [
       drawItem(
         'sphere',
         PLANET.center,
         [PLANET.radius, PLANET.radius, PLANET.radius],
-        material(this.planetColor.current, 0.75, {
+        material(PLANET_COLOR, 0.75, {
           pattern: SurfacePattern.Grid,
           showsZones: true,
           receivesOccluder: true,
         }),
       ),
+      drawItemFromModel('box', HOUSE_MODEL, material(HOUSE_COLOR, 0.8)),
       ...this.characterDrawItems(alpha),
     ];
     return items;

@@ -67,6 +67,7 @@ export class Overlay {
 
   setActiveContent(label: string, color: Vec3): void {
     this.label.textContent = label;
+    this.hud.hidden = this.pauseButton.hidden;
     this.swatch.style.backgroundColor = cssColor(color);
     this.hud.classList.remove('hud--changed');
     // 레이아웃을 강제로 계산해 같은 애니메이션을 다시 재생한다.
@@ -86,7 +87,8 @@ export class Overlay {
   }
 
   private setPlaying(playing: boolean): void {
-    this.hud.hidden = !playing;
+    // 켜진 콘텐츠가 없으면 HUD를 숨긴다.
+    this.hud.hidden = !playing || !this.label.textContent;
     this.pauseButton.hidden = !playing;
     if (!playing) this.joystick.hidden = true;
   }
