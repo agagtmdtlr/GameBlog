@@ -31,6 +31,7 @@ import {
 } from '../engine/frame';
 import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
 import { PLANET, surfaceDirection } from './planet';
+import { separateBodies, Wanderer, type Random } from './npc';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SURFACE_OBJECTS } from './surfaceScene';
 import { SurfaceZone } from './surfaceZone';
@@ -60,6 +61,10 @@ const PLANET_COLOR: Vec3 = [0.74, 0.74, 0.75];
 /** 캐릭터의 색 (선형 RGB, sRGB #FCC812) */
 const PLAYER_COLOR: Vec3 = [0.973, 0.578, 0.006];
 const PLAYER_ROUGHNESS = 0.45;
+/** 돌아다니는 NPC의 시작 위치. 시작할 때 보이는 쪽, 집 자리 옆이다. */
+export const NPC_SPAWN: Vec3 = scale(surfaceDirection(74, 145), PLANET.radius + PLAYER_RADIUS);
+/** NPC의 색 (선형 RGB, sRGB #4FB0F0). 모양은 플레이어와 같고 색만 다르다. */
+export const NPC_COLOR: Vec3 = [0.078, 0.434, 0.871];
 /** 장면 파일(`scenes/surface.json`)의 표면 객체 중 캐릭터가 통과할 수 없는 상자 */
 const SURFACE_OBSTACLES = SURFACE_OBJECTS.filter((o) => o.collides).map((o) => o.box);
 
@@ -141,13 +146,16 @@ export class World {
   readonly content: ContentManager;
   readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
   readonly moon = new Moon();
+  readonly npc: Wanderer;
 
   private readonly zones: readonly ZoneInstance[];
 
   constructor(
     entries: readonly ContentEntry[] = CONTENT_ENTRIES,
     onContentChange?: (content: GraphicsContent) => void,
+    random?: Random,
   ) {
+    this.npc = new Wanderer(NPC_SPAWN, PLANET, random);
     this.zones = entries.map((entry) => ({
       entry,
       zone: new SurfaceZone(
@@ -170,7 +178,10 @@ export class World {
     this.sun.step(dt);
     this.moon.step(dt);
     this.player.step(dt, command, PLANET, SURFACE_OBSTACLES);
+    this.npc.move(dt, SURFACE_OBSTACLES);
+    separateBodies(this.player, this.npc.body);
     this.walker.step(dt, this.player);
+    this.npc.animate(dt);
 
     const fade = 1 - Math.exp(-ZONE_FADE_RATE * dt);
     for (const instance of this.zones) {
@@ -203,7 +214,8 @@ export class World {
         }),
       ),
       ...SURFACE_OBJECTS.map((o) => drawItemFromModel('box', o.model, material(o.color, o.roughness))),
-      ...this.characterDrawItems(alpha),
+      ...characterDrawItems(this.walker, alpha, PLAYER_COLOR),
+      ...characterDrawItems(this.npc.walker, alpha, NPC_COLOR),
       // 위성은 그림자 맵 범위 밖에 있으므로 그림자를 드리우지 않는다.
       drawItemFromModel('moon', this.moon.model(alpha), material(MOON_COLOR, MOON_ROUGHNESS), false),
       // 해는 빛을 내기만 하고 그림자를 드리우지 않는다.
@@ -274,20 +286,16 @@ export class World {
   buildContentFrames(_alpha: number): ContentFrame[] {
     return [];
   }
+}
 
-  /** 몸, 왼다리, 오른다리 순서 */
-  private characterDrawItems(alpha: number): DrawItem[] {
-    const pose = this.walker.pose(alpha);
-    const mat = material(PLAYER_COLOR, PLAYER_ROUGHNESS);
-    const bones = this.walker.solveLegs(pose).map(posedBoneMatrix);
-    const leg = (first: number): DrawItem => ({
-      ...drawItemFromModel('leg', mat4Identity(), mat),
-      skin: bones.slice(first, first + LEG_BONE_COUNT).map((bone, i) => mat4Multiply(bone, REST_BONE_INVERSES[i])),
-    });
-    return [
-      drawItem('sphere', pose.body, [BODY_RADIUS, BODY_RADIUS, BODY_RADIUS], mat),
-      leg(0),
-      leg(LEG_BONE_COUNT),
-    ];
-  }
+/** 캐릭터 하나의 몸, 왼다리, 오른다리 순서. 플레이어와 NPC가 같은 모양을 색만 바꿔 쓴다. */
+function characterDrawItems(walker: Walker, alpha: number, color: Vec3): DrawItem[] {
+  const pose = walker.pose(alpha);
+  const mat = material(color, PLAYER_ROUGHNESS);
+  const bones = walker.solveLegs(pose).map(posedBoneMatrix);
+  const leg = (first: number): DrawItem => ({
+    ...drawItemFromModel('leg', mat4Identity(), mat),
+    skin: bones.slice(first, first + LEG_BONE_COUNT).map((bone, i) => mat4Multiply(bone, REST_BONE_INVERSES[i])),
+  });
+  return [drawItem('sphere', pose.body, [BODY_RADIUS, BODY_RADIUS, BODY_RADIUS], mat), leg(0), leg(LEG_BONE_COUNT)];
 }

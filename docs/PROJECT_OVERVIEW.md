@@ -63,6 +63,7 @@ GameBlog/
 │  │  ├─ sunFace.ts            해 빌보드 축, 캐릭터를 보는 눈(흰자·검은자)
 │  │  ├─ moon.ts               제자리에서 자전하는 위성의 자리와 크기 ([analysis/moon.md](analysis/moon.md))
 │  │  ├─ player.ts             캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
+│  │  ├─ npc.ts                혼자 돌아다니는 NPC, 캐릭터끼리 밀어내기 ([analysis/npc.md](analysis/npc.md))
 │  │  ├─ walker.ts             서기·걷기 애니메이션 재생, 발 고정, 다리 IK ([analysis/character.md](analysis/character.md))
 │  │  ├─ characterClips.ts     캐릭터 키프레임 클립 (서기, 걷기, 내딛기)
 │  │  ├─ keyframes.ts          키프레임 트랙 샘플링 (3차 Hermite)
@@ -108,7 +109,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 1. `main.ts`가 입력을 읽어 카메라 기준 이동 방향을 계산한다.
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `fixedStep`은 해의 궤도 진행, 위성 자전, 캐릭터 물리 몸체의 이동과 충돌, 걸음(`Walker`), 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
+3. `fixedStep`은 해의 궤도 진행, 위성 자전, 캐릭터 물리 몸체의 이동과 충돌, NPC 이동과 캐릭터끼리 밀어내기, 걸음(`Walker`), 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
 4. 카메라가 보간된 물리 몸체 위치를 따라간다.
 5. `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광), `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 지금은 콘텐츠 렌더러가 없다.
 
@@ -157,6 +158,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - 행성 중심에서 110~200 떨어진 곳에 얼굴이 있는 별 48개가 카메라를 보며 떠 있다 ([analysis/starfield.md](analysis/starfield.md)).
 - 카메라의 위쪽은 캐릭터가 있는 곳의 표면 바깥 방향이다. 좌우 각도 대신 표면에 접하는 진행 방향을 들고 다녀 극점에서도 뒤집히지 않는다.
 - 검은 배경에 흰색에 가까운 무채색 행성을 둔다. 행성 색은 고정이다. 캐릭터는 노랑(#FCC812)으로 고정이다.
+- 플레이어와 같은 모양의 하늘색(#4FB0F0) NPC가 집 자리 옆에서 시작해 아무 곳으로 천천히 걸어갔다가 잠깐 서기를 되풀이한다. 플레이어와 서로 통과하지 못한다 (2026-11-21 사용자 요청, [analysis/npc.md](analysis/npc.md)).
 
 ### 작동 영역과 콘텐츠
 
@@ -221,6 +223,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | [`sunRays.test.ts`](../src/engine/sunRays.test.ts) | 4 | 해 햇살 모양 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
 | [`game.test.ts`](../src/game/game.test.ts) | 47 | 구 조작(중력, 한 바퀴 돌기), 카메라, 작동 영역, 콘텐츠 관리, 월드 통합, 집 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
+| [`npc.test.ts`](../src/game/npc.test.ts) | 8 | NPC 시작 위치, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기 |
 | [`walker.test.ts`](../src/game/walker.test.ts) | 17 | 캐릭터 다리와 걷기, 키프레임, 스킨 메시 기본 자세 |
 
 렌더러, 입력, UI, `main.ts`는 단위 테스트가 없다.
