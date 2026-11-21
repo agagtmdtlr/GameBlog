@@ -27,6 +27,7 @@ import {
   type SurfaceZoneFrame,
 } from '../engine/frame';
 import { boxModel, houseBox } from './house';
+import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
@@ -115,6 +116,7 @@ export class World {
   readonly walker = new Walker(SPAWN, PLANET);
   readonly content: ContentManager;
   readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
+  readonly moon = new Moon();
 
   private readonly zones: readonly ZoneInstance[];
 
@@ -142,6 +144,7 @@ export class World {
 
   fixedStep(dt: number, command: MoveCommand): void {
     this.sun.step(dt);
+    this.moon.step(dt);
     this.player.step(dt, command, PLANET, [HOUSE_BOX]);
     this.walker.step(dt, this.player);
 
@@ -176,6 +179,8 @@ export class World {
       ),
       drawItemFromModel('box', HOUSE_MODEL, material(HOUSE_COLOR, 0.8)),
       ...this.characterDrawItems(alpha),
+      // 위성은 그림자 맵 범위 밖에 있으므로 그림자를 드리우지 않는다.
+      drawItemFromModel('moon', this.moon.model(alpha), material(MOON_COLOR, MOON_ROUGHNESS), false),
       // 해는 빛을 내기만 하고 그림자를 드리우지 않는다.
       drawItem(
         'sphere',

@@ -8,6 +8,7 @@ import {
   DepthTexture,
   FramebufferTexture,
   GLSL3,
+  IcosahedronGeometry,
   LessEqualCompare,
   LinearFilter,
   Matrix3,
@@ -31,11 +32,13 @@ import {
   type Texture,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import meshVert from '../shaders/mesh.vert?raw';
 import pbrFrag from '../shaders/pbr.frag?raw';
 import type { ContentRenderer, PbrMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
 import type { Mat4 } from './math';
 import { skinVertices, type SkinSource } from './skinning';
+import { displaceToMoon } from './moonShape';
 import { drawStarfieldFaces } from './starfield';
 import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
 
@@ -45,6 +48,20 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const SHADOW_LAYER = 1;
 /** `frame.ts`의 `leg` 뼈 순서에 맞춘 glTF 뼈 이름 */
 const LEG_BONE_NAMES = ['Thigh', 'Shin', 'Foot'];
+
+/** 충돌구가 패인 위성. 고르게 나뉜 정이십면체 구를 밀고, 이음매 없이 부드러운 법선을 계산한다. */
+function createMoonGeometry(): BufferGeometry {
+  const sphere = new IcosahedronGeometry(1, 48);
+  // 면마다 따로인 정점을 합쳐야 법선이 부드럽게 이어진다.
+  sphere.deleteAttribute('normal');
+  sphere.deleteAttribute('uv');
+  const geometry = mergeVertices(sphere);
+  sphere.dispose();
+  displaceToMoon(geometry.getAttribute('position').array as Float32Array);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
 
 /**
  * three.js로 장면을 그린다. 게임 상태는 들고 있지 않고, 매 프레임 `FrameData`를 받아
@@ -117,6 +134,7 @@ export class Renderer {
       leg: new BufferGeometry(),
       // 해 궤적처럼 큰 원을 그리므로 둘레를 촘촘하게, 관은 가늘어서 성기게 나눈다.
       ring: new TorusGeometry(1, RING_TUBE_RATIO, 6, 512),
+      moon: createMoonGeometry(),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);

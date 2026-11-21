@@ -42,6 +42,7 @@ GameBlog/
 │  │  ├─ math.ts               Vec3, Quat, Mat4 연산
 │  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스, 콘텐츠 렌더러 호출
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
+│  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
 │  │  ├─ contentRenderers/     콘텐츠 전용 그리기
 │  │  │  ├─ contentRenderer.ts   공통 기반 클래스와 RenderContext
 │  │  │  └─ registry.ts          콘텐츠 렌더러 등록 목록 (지금은 비어 있음)
@@ -54,6 +55,7 @@ GameBlog/
 │  │  ├─ planet.ts             행성의 크기, 위도·경도를 방향으로 바꾸는 함수
 │  │  ├─ house.ts              캐릭터 집 자리(지금은 상자)의 위치와 크기
 │  │  ├─ sun.ts                행성을 도는 해, 궤적 고리, 직사광 방향 ([analysis/sun.md](analysis/sun.md))
+│  │  ├─ moon.ts               제자리에서 자전하는 위성의 자리와 크기 ([analysis/moon.md](analysis/moon.md))
 │  │  ├─ player.ts             캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
 │  │  ├─ walker.ts             서기·걷기 애니메이션 재생, 발 고정, 다리 IK ([analysis/character.md](analysis/character.md))
 │  │  ├─ characterClips.ts     캐릭터 키프레임 클립 (서기, 걷기, 내딛기)
@@ -98,7 +100,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 1. `main.ts`가 입력을 읽어 카메라 기준 이동 방향을 계산한다.
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `fixedStep`은 해의 궤도 진행, 구 이동과 충돌, 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
+3. `fixedStep`은 해의 궤도 진행, 위성 자전, 구 이동과 충돌, 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
 4. 카메라가 보간된 구 위치를 따라간다.
 5. `World.buildDrawList`, `environment`(해 방향의 직사광), `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 지금은 콘텐츠 렌더러가 없다.
 
@@ -141,6 +143,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - 원점이 중심이고 반지름이 18인 행성 하나다 (둘레 약 113). 벽과 가장자리가 없어 떨어질 곳이 없고, 다시 시작하는 처리도 없다.
 - 캐릭터는 꼭대기 `(0, 18.88, 0)`에서 시작해 -Z 쪽을 바라본다.
 - 캐릭터 집이 놓일 자리에 푸른 회색 상자(폭 3.2, 높이 2.8, 깊이 3.2)를 둔다 (2026-11-21 사용자 요청). 위치는 위도 66, 경도 180으로, 시작 지점 정면 약 7.5 거리이고 해가 드는 쪽이다. 정면이 시작 지점을 향한다. 위치와 크기는 `game/house.ts`의 `HOUSE`에서 바꾼다.
+- 행성 주변 하늘(시작 시점 왼쪽 위, 거리 40)에 충돌구가 패인 회색 위성이 떠서 제자리에서 자전한다 (2026-11-21 사용자 요청).
 - 해는 한 방향에 고정되어 있어 행성의 절반은 밤이다. 밤 쪽은 간접광으로만 보인다.
 - 카메라의 위쪽은 캐릭터가 있는 곳의 표면 바깥 방향이다. 좌우 각도 대신 표면에 접하는 진행 방향을 들고 다녀 극점에서도 뒤집히지 않는다.
 - 검은 배경에 흰색에 가까운 무채색 행성을 둔다. 행성 색은 고정이다. 캐릭터는 노랑(#FCC812)으로 고정이다.

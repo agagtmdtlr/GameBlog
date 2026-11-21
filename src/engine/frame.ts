@@ -8,8 +8,9 @@ import type { Mat3, Mat4, Vec3 } from './math';
 /**
  * `sphere`는 three.js 기본 구, `box`는 한 변 1인 정육면체, `leg`는 `assets/character.glb`의 캐릭터 다리 스킨 메시다.
  * `ring`은 XY 평면에 놓인 반지름 1의 가느다란 고리(토러스)이고, 관의 반지름은 `RING_TUBE_RATIO`다.
+ * `moon`은 반지름 1 언저리의 구에 충돌구와 바위 덩어리를 새긴 위성이다 (`moonShape.ts`).
  */
-export type MeshKind = 'sphere' | 'box' | 'leg' | 'ring';
+export type MeshKind = 'sphere' | 'box' | 'leg' | 'ring' | 'moon';
 
 /** `ring` 메시의 관 반지름. 고리 반지름에 대한 비율이라 크기를 키우면 함께 굵어진다. */
 export const RING_TUBE_RATIO = 0.0015;

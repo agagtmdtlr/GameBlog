@@ -9,6 +9,7 @@ import { boxModel, HOUSE, houseBox } from './house';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
+import { MOON } from './moon';
 import { SUN } from './sun';
 import { STUDIO_ENVIRONMENT, World } from './world';
 
@@ -393,5 +394,29 @@ describe('해', () => {
 
   it('그림자를 드리우지 않는다', () => {
     expect(sunItem(new World()).castShadow).toBe(false);
+  });
+});
+
+describe('위성', () => {
+  const moonItem = (world: World) => world.buildDrawList(1).find((item) => item.mesh === 'moon')!;
+
+  it('행성과 해의 궤도에서 떨어진 고정된 자리에서 자전한다', () => {
+    const world = new World();
+    const before = moonItem(world).model.slice();
+    for (let i = 0; i < Math.round(MOON.spinPeriodSeconds / 4 / DT); i++) world.fixedStep(DT, IDLE);
+    const after = moonItem(world).model;
+    // 자리는 그대로
+    expect([after[12], after[13], after[14]]).toEqual([before[12], before[13], before[14]]);
+    // 4분의 1바퀴 돌았으므로 자전축에 수직인 축은 방향이 바뀐다.
+    expect(Math.abs(after[0] - before[0]) + Math.abs(after[2] - before[2])).toBeGreaterThan(0.5);
+
+    const center: Vec3 = [after[12], after[13], after[14]];
+    expect(length(center) - MOON.radius * 1.25).toBeGreaterThan(PLANET.radius + 10);
+    // 해 궤도면에서 해 반지름과 위성 반지름보다 멀다.
+    expect(Math.abs(dot(center, normalize(world.sun.axis)))).toBeGreaterThan(SUN.radius + MOON.radius * 1.25);
+  });
+
+  it('그림자를 드리우지 않는다', () => {
+    expect(moonItem(new World()).castShadow).toBe(false);
   });
 });
