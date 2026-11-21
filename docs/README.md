@@ -11,6 +11,7 @@
 | 플레이어 캐릭터 | 구체 몸과 다리의 모양, Blender 모델, 서기·걷기 키프레임 애니메이션, 물리 몸체 | [rules/character.md](rules/character.md) | [analysis/character.md](analysis/character.md) |
 | 별 빌보드 | 행성 둘레의 의인화된 코믹한 별, 별 얼굴 텍스처·개수·배치 | 없음 | [analysis/starfield.md](analysis/starfield.md) |
 | 위성 | 행성 주변에 떠서 자전하는 바위 위성, 충돌구 모양 | 없음 | [analysis/moon.md](analysis/moon.md) |
+| 표면 장면 | 행성 표면에 놓는 객체(집·로켓 자리 상자)의 장면 파일, 위치·크기·색·충돌, 객체 추가 | 없음 | [analysis/surfaceScene.md](analysis/surfaceScene.md) |
 | 해 | 행성을 도는 해, 햇살 빌보드, 캐릭터를 보는 눈, 궤적 고리, 해와 맞춘 직사광 방향, 낮과 밤 | 없음 | [analysis/sun.md](analysis/sun.md) |
 | three.js 렌더러 | 렌더러, 그림자·장면 복사 패스, 셰이더 규약, three.js 버전 변경 | [rules/threejs.md](rules/threejs.md) | [analysis/threejs.md](analysis/threejs.md) |
 

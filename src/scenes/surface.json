@@ -1,0 +1,24 @@
+{
+  "objects": [
+    {
+      "id": "house",
+      "shape": "box",
+      "placement": { "latitude": 66, "longitude": 180 },
+      "size": [3.2, 2.8, 3.2],
+      "sink": 0.1,
+      "color": [0.3, 0.36, 0.46],
+      "roughness": 0.8,
+      "collides": true
+    },
+    {
+      "id": "rocket",
+      "shape": "box",
+      "placement": { "under": "moon" },
+      "size": [2.4, 2.4, 2.4],
+      "sink": 0.1,
+      "color": [0.55, 0.1, 0.08],
+      "roughness": 0.7,
+      "collides": true
+    }
+  ]
+}

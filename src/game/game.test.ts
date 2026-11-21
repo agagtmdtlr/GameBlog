@@ -5,8 +5,7 @@ import { MAX_SURFACE_ZONES } from '../engine/frame';
 import type { ContentEntry, GraphicsContent } from '../content/types';
 import { cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
-import { boxModel, HOUSE, houseBox } from './house';
-import { ROCKET, rocketBox } from './rocket';
+import { loadSurfaceScene, SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
@@ -14,6 +13,14 @@ import { MOON } from './moon';
 import { SUN } from './sun';
 import { pupilOffset, SUN_FACE, sunBillboardBasis, sunEyes } from './sunFace';
 import { STUDIO_ENVIRONMENT, World } from './world';
+
+function surfaceObject(id: string): SurfaceObject {
+  const found = SURFACE_OBJECTS.find((o) => o.id === id);
+  if (!found) throw new Error(`장면 파일에 ${id}가 없다`);
+  return found;
+}
+const HOUSE = surfaceObject('house');
+const ROCKET = surfaceObject('rocket');
 
 const DT = 1 / 120;
 const IDLE: MoveCommand = { direction: [0, 0, 0] };
@@ -297,7 +304,7 @@ describe('집 자리', () => {
   });
 
   it('바닥이 표면에 닿고, 위쪽이 표면 바깥을 향한다', () => {
-    const m = boxModel(houseBox());
+    const m = HOUSE.model;
     const center: Vec3 = [m[12], m[13], m[14]];
     const axisY: Vec3 = [m[4], m[5], m[6]];
     expect(dot(normalize(axisY), up)).toBeCloseTo(1, 6);
@@ -308,7 +315,7 @@ describe('집 자리', () => {
 
   it('걸어서 상자를 통과할 수 없다', () => {
     const world = new World();
-    const box = houseBox();
+    const box = HOUSE.box;
     const [, , halfDepth] = box.halfExtents;
     // 시작할 때 바라보는 쪽(-Z)으로 상자를 지나칠 만큼 걷는다.
     let closest = Infinity;
@@ -328,8 +335,45 @@ describe('집 자리', () => {
 
   it('월드 그리기 목록에 상자로 들어간다', () => {
     const boxes = new World().buildDrawList(1).filter((item) => item.mesh === 'box');
-    expect(boxes).toHaveLength(2);
+    expect(boxes).toHaveLength(SURFACE_OBJECTS.length);
   });
+});
+
+describe('표면 장면 파일', () => {
+  const valid = {
+    id: 'a',
+    shape: 'box',
+    placement: { latitude: 10, longitude: 20 },
+    size: [1, 1, 1],
+    sink: 0.1,
+    color: [0.5, 0.5, 0.5],
+    roughness: 0.5,
+    collides: true,
+  };
+
+  it('객체마다 id가 유일하다', () => {
+    const ids = SURFACE_OBJECTS.map((o) => o.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('위도·경도 자리를 그대로 쓰고, 위성 아래 자리는 위성 방향에서 계산한다', () => {
+    const [a, b] = loadSurfaceScene({ objects: [valid, { ...valid, id: 'b', placement: { under: 'moon' } }] });
+    expect([a.latitude, a.longitude]).toEqual([10, 20]);
+    expect(dot(surfaceDirection(b.latitude, b.longitude), MOON.direction)).toBeCloseTo(1, 6);
+  });
+
+  it('잘못된 값은 객체 id를 적어 거부한다', () => {
+    expect(() => loadSurfaceScene({})).toThrow('objects');
+    expect(() => loadSurfaceScene({ objects: [valid, valid] })).toThrow('겹친다');
+    expect(() => loadSurfaceScene({ objects: [{ ...valid, shape: 'cone' }] })).toThrow('(a).shape');
+    expect(() => loadSurfaceScene({ objects: [{ ...valid, size: [1, 0, 1] }] })).toThrow('(a).size');
+    expect(() => loadSurfaceScene({ objects: [{ ...valid, roughness: 2 }] })).toThrow('(a).roughness');
+    expect(() => loadSurfaceScene({ objects: [{ ...valid, placement: { under: 'sun' } }] })).toThrow('(a).placement');
+    expect(() => loadSurfaceScene({ objects: [{ ...valid, placement: { latitude: 100, longitude: 0 } }] })).toThrow(
+      '(a).placement',
+    );
+  });
+
 });
 
 describe('로켓 자리', () => {
@@ -347,7 +391,7 @@ describe('로켓 자리', () => {
   });
 
   it('정육면체로 표면에 서고, 위쪽이 위성을 향한다', () => {
-    const box = rocketBox();
+    const box = ROCKET.box;
     const [w, h, d] = ROCKET.size;
     expect(w).toBe(h);
     expect(h).toBe(d);
@@ -359,7 +403,7 @@ describe('로켓 자리', () => {
 
   it('걸어서 통과할 수 없다', () => {
     const world = new World();
-    const box = rocketBox();
+    const box = ROCKET.box;
     let closest = Infinity;
     for (let i = 0; i < 120 * 12; i++) {
       const position = world.player.position;
