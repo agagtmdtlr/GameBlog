@@ -56,6 +56,7 @@ GameBlog/
 │  │  ├─ planet.ts             행성의 크기, 위도·경도를 방향으로 바꾸는 함수
 │  │  ├─ house.ts              캐릭터 집 자리(지금은 상자)의 위치와 크기
 │  │  ├─ sun.ts                행성을 도는 해, 햇살 빌보드, 궤적 고리, 직사광 방향 ([analysis/sun.md](analysis/sun.md))
+│  │  ├─ sunFace.ts            해 빌보드 축, 캐릭터를 보는 눈(흰자·검은자)
 │  │  ├─ moon.ts               제자리에서 자전하는 위성의 자리와 크기 ([analysis/moon.md](analysis/moon.md))
 │  │  ├─ player.ts             캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
 │  │  ├─ walker.ts             서기·걷기 애니메이션 재생, 발 고정, 다리 IK ([analysis/character.md](analysis/character.md))

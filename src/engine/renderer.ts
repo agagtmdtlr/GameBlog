@@ -2,6 +2,7 @@ import {
   BoxGeometry,
   BufferAttribute,
   BufferGeometry,
+  CircleGeometry,
   Color,
   CanvasTexture,
   DynamicDrawUsage,
@@ -151,6 +152,8 @@ export class Renderer {
       ring: new TorusGeometry(1, RING_TUBE_RATIO, 6, 512),
       moon: createMoonGeometry(),
       sunRays: createSunRayGeometry(),
+      // 해 눈처럼 화면에 작게 보이므로 48조각이면 둥글다.
+      disk: new CircleGeometry(1, 48),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);

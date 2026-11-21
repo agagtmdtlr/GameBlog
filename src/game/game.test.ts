@@ -11,6 +11,7 @@ import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
 import { MOON } from './moon';
 import { SUN } from './sun';
+import { pupilOffset, SUN_FACE, sunBillboardBasis, sunEyes } from './sunFace';
 import { STUDIO_ENVIRONMENT, World } from './world';
 
 const DT = 1 / 120;
@@ -408,6 +409,42 @@ describe('해', () => {
     expect(dot(x, view.up)).toBeCloseTo(0, 4);
     expect(dot(y, view.up)).toBeGreaterThan(0);
     expect(rays.castShadow).toBe(false);
+  });
+
+  it('눈은 흰자와 검은자를 따로 그리고, 해 구면 앞에서 카메라를 본다', () => {
+    const world = new World();
+    const view = { position: [6, 30, -9] as Vec3, up: [0, 1, 0] as Vec3 };
+    const disks = world.buildDrawList(1, view).filter((item) => item.mesh === 'disk');
+    expect(disks).toHaveLength(4);
+    const sun = world.sun.position(1);
+    const toCamera = normalize(sub(view.position, sun));
+    for (const item of disks) {
+      const m = item.model;
+      const center: Vec3 = [m[12], m[13], m[14]];
+      expect(dot(sub(center, sun), toCamera)).toBeGreaterThan(SUN.radius);
+      expect(dot(normalize([m[8], m[9], m[10]]), toCamera)).toBeCloseTo(1, 4);
+      expect(item.castShadow).toBe(false);
+    }
+  });
+
+  it('검은자는 캐릭터 쪽으로 움직이되 흰자 밖으로 나가지 않는다', () => {
+    const sun: Vec3 = [0, 0, -70];
+    const basis = sunBillboardBasis(sun, { position: [0, 0, 0], up: [0, 1, 0] });
+    const [rx, ry] = SUN_FACE.whiteRadius;
+    const room = SUN_FACE.pupilRadius + SUN_FACE.pupilMargin;
+    // 화면 오른쪽 위에 있는 대상을 보면 검은자도 오른쪽 위로 간다.
+    const [u, v] = pupilOffset(basis, sun, [40, 30, -60]);
+    expect(u).toBeGreaterThan(0);
+    expect(v).toBeGreaterThan(0);
+    // 해와 카메라를 잇는 선 위에 있으면 가운데를 본다.
+    const centered = pupilOffset(basis, sun, [0, 0, -10]);
+    expect(Math.hypot(...centered)).toBeCloseTo(0, 6);
+    for (const target of [[500, 0, -70], [0, -500, -70], [300, 300, -70], [-1, 2, -200]] as Vec3[]) {
+      const [x, y] = pupilOffset(basis, sun, target);
+      expect((x / (rx - room)) ** 2 + (y / (ry - room)) ** 2).toBeLessThanOrEqual(1 + 1e-9);
+    }
+    const [left, right] = sunEyes(sun, SUN.radius, basis, [40, 30, -60]);
+    expect(left.pupilOffset).toEqual(right.pupilOffset);
   });
 
   it('그림자를 드리우지 않는다', () => {
