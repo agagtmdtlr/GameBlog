@@ -30,6 +30,7 @@ import { boxModel, houseBox } from './house';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
+import { Sun, SUN, SUN_EMISSIVE } from './sun';
 import { BODY_RADIUS, CHARACTER_SCALE, restBones, Walker, type BoneTransform } from './walker';
 
 /** 행성의 꼭대기에서 시작한다. */
@@ -60,6 +61,7 @@ const REST_BONE_INVERSES = restBones().map((bone) => mat4RigidInverse(boneMatrix
 const posedBoneMatrix = ({ origin, x, y, z }: BoneTransform): Mat4 =>
   mat4FromBasis(origin, scale(x, CHARACTER_SCALE), scale(y, CHARACTER_SCALE), scale(z, CHARACTER_SCALE));
 
+/** 조명 환경. `lightDirection`은 시작할 때의 해 방향이고, 플레이 중에는 `World.environment`가 해를 따라 바꾼다. */
 export const STUDIO_ENVIRONMENT: Environment = {
   // 기본 시점에서 그림자가 구의 앞쪽 옆으로 떨어져 잘 보이는 방향
   lightDirection: normalize([0.6, 0.72, -0.28]),
@@ -112,6 +114,7 @@ export class World {
   readonly player = new Player(SPAWN);
   readonly walker = new Walker(SPAWN, PLANET);
   readonly content: ContentManager;
+  readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
 
   private readonly zones: readonly ZoneInstance[];
 
@@ -138,6 +141,7 @@ export class World {
   }
 
   fixedStep(dt: number, command: MoveCommand): void {
+    this.sun.step(dt);
     this.player.step(dt, command, PLANET, [HOUSE_BOX]);
     this.walker.step(dt, this.player);
 
@@ -172,8 +176,22 @@ export class World {
       ),
       drawItemFromModel('box', HOUSE_MODEL, material(HOUSE_COLOR, 0.8)),
       ...this.characterDrawItems(alpha),
+      // 해는 빛을 내기만 하고 그림자를 드리우지 않는다.
+      drawItem(
+        'sphere',
+        this.sun.position(alpha),
+        [SUN.radius, SUN.radius, SUN.radius],
+        material([0, 0, 0], 1, { emissive: SUN_EMISSIVE }),
+        QUAT_IDENTITY,
+        false,
+      ),
     ];
     return items;
+  }
+
+  /** 직사광의 방향을 해의 방향에 맞춘 조명 환경 */
+  environment(alpha: number): Environment {
+    return { ...STUDIO_ENVIRONMENT, lightDirection: this.sun.direction(alpha) };
   }
 
   /** 앰비언트 오클루전을 만드는 캐릭터 몸 */

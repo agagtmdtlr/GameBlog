@@ -274,6 +274,9 @@ export class Renderer {
     light.far = radius * 4;
     light.updateProjectionMatrix();
     light.position.fromArray(env.lightDirection).multiplyScalar(radius * 2);
+    // 해가 궤도를 돌며 +Y 위를 지나므로, 광원 방향과 거의 나란하면 다른 축을 위쪽으로 쓴다.
+    if (Math.abs(env.lightDirection[1]) > 0.99) light.up.set(0, 0, 1);
+    else light.up.set(0, 1, 0);
     light.lookAt(0, 0, 0);
     light.updateMatrixWorld();
     this.shared.uLightViewProj.value.multiplyMatrices(light.projectionMatrix, light.matrixWorldInverse);

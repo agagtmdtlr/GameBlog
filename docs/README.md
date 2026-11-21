@@ -9,6 +9,7 @@
 | 콘텐츠와 셰이더 | 행성 표면의 작동 영역(예전 발판), 콘텐츠, 셰이더, 행성·구의 재질이나 연출 | [rules/content.md](rules/content.md) | [analysis/content.md](analysis/content.md) |
 | 입력과 조작 | 키보드·마우스·터치 입력, 가상 조이스틱, 일시 정지, 조작 안내 | 없음 | [analysis/input.md](analysis/input.md) |
 | 플레이어 캐릭터 | 구체 몸과 다리의 모양, Blender 모델, 서기·걷기 키프레임 애니메이션, 물리 몸체 | [rules/character.md](rules/character.md) | [analysis/character.md](analysis/character.md) |
+| 해 | 행성을 도는 해, 해와 맞춘 직사광 방향, 낮과 밤 | 없음 | [analysis/sun.md](analysis/sun.md) |
 | three.js 렌더러 | 렌더러, 그림자·장면 복사 패스, 셰이더 규약, three.js 버전 변경 | [rules/threejs.md](rules/threejs.md) | [analysis/threejs.md](analysis/threejs.md) |
 
 ## 프로젝트 전체

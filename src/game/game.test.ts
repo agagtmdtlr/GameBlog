@@ -9,6 +9,7 @@ import { boxModel, HOUSE, houseBox } from './house';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
+import { SUN } from './sun';
 import { STUDIO_ENVIRONMENT, World } from './world';
 
 const DT = 1 / 120;
@@ -325,5 +326,50 @@ describe('집 자리', () => {
   it('월드 그리기 목록에 상자로 들어간다', () => {
     const boxes = new World().buildDrawList(1).filter((item) => item.mesh === 'box');
     expect(boxes).toHaveLength(1);
+  });
+});
+
+describe('해', () => {
+  const stepWorld = (world: World, seconds: number) => {
+    for (let i = 0; i < Math.round(seconds / DT); i++) world.fixedStep(DT, IDLE);
+  };
+  const sunItem = (world: World) => world.buildDrawList(1).find((item) => item.material.emissive[0] > 0)!;
+  const sunCenter = (world: World): Vec3 => [sunItem(world).model[12], sunItem(world).model[13], sunItem(world).model[14]];
+
+  it('시작할 때 직사광은 기본 조명 방향이다', () => {
+    const world = new World();
+    expect(dot(world.environment(1).lightDirection, STUDIO_ENVIRONMENT.lightDirection)).toBeCloseTo(1, 6);
+  });
+
+  it('직사광은 언제나 행성 중심에서 해 구체를 향한다', () => {
+    const world = new World();
+    for (let i = 0; i < 6; i++) {
+      stepWorld(world, SUN.periodSeconds / 7);
+      const center = sunCenter(world);
+      expect(length(center)).toBeCloseTo(SUN.orbitRadius, 4);
+      expect(dot(normalize(center), world.environment(1).lightDirection)).toBeCloseTo(1, 6);
+    }
+  });
+
+  it('행성 둘레를 돌아 한 주기 뒤 제자리로 온다', () => {
+    const world = new World();
+    stepWorld(world, SUN.periodSeconds / 2);
+    expect(dot(world.environment(1).lightDirection, STUDIO_ENVIRONMENT.lightDirection)).toBeCloseTo(-1, 3);
+    stepWorld(world, SUN.periodSeconds / 2);
+    expect(dot(world.environment(1).lightDirection, STUDIO_ENVIRONMENT.lightDirection)).toBeCloseTo(1, 3);
+  });
+
+  it('시작 지점의 머리 위를 지난다', () => {
+    const world = new World();
+    let highest = -1;
+    for (let i = 0; i < 240; i++) {
+      stepWorld(world, SUN.periodSeconds / 240);
+      highest = Math.max(highest, world.environment(1).lightDirection[1]);
+    }
+    expect(highest).toBeGreaterThan(0.999);
+  });
+
+  it('그림자를 드리우지 않는다', () => {
+    expect(sunItem(new World()).castShadow).toBe(false);
   });
 });

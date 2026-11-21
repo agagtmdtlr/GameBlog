@@ -7,7 +7,7 @@ import { add, length, scale, type Vec3 } from './engine/math';
 import { Renderer } from './engine/renderer';
 import { CameraRig } from './game/cameraRig';
 import { PLANET } from './game/planet';
-import { STUDIO_ENVIRONMENT, World } from './game/world';
+import { World } from './game/world';
 import { FixedStepper } from './physics/fixedStepper';
 import { Overlay } from './ui/overlay';
 import './style.css';
@@ -144,7 +144,7 @@ function main(): void {
       {
         items: world.buildDrawList(alpha),
         camera: camera.view,
-        environment: STUDIO_ENVIRONMENT,
+        environment: world.environment(alpha),
         occluder: world.occluder(alpha),
         surfaceZones: world.buildSurfaceZones(),
         contents: world.buildContentFrames(alpha),

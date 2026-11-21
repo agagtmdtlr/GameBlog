@@ -61,7 +61,7 @@ git log --oneline 0bb670f..HEAD -- src/engine src/shaders src/main.ts package.js
 - `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
 - 콘텐츠 렌더러는 필요하면 자기 장면을 가진다. 지금은 등록된 렌더러가 없다.
 - `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
-- `lightCamera`: 그림자용 `OrthographicCamera`
+- `lightCamera`: 그림자용 `OrthographicCamera`. 광원 방향은 해를 따라 매 프레임 바뀌고([analysis/sun.md](sun.md)), 방향이 +Y와 거의 나란하면 `lookAt`이 퇴화하지 않게 위쪽을 +Z로 바꾼다
 
 프레임 순서는 포팅 전과 같다. `renderer.autoClear = false`로 두고 지우기를 직접 호출한다.
 

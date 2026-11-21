@@ -2,7 +2,7 @@
 
 현재 구현된 구조와 기능을 기록하는 문서다. 결정 배경과 앞으로의 계획은 [개발 계획서](DEVELOPMENT_PLAN.md)에 둔다.
 
-- **분석 기준:** 커밋 `1c3831b` 다음의 행성 표면 색 변경 시스템 제거 (2026-11-21)
+- **분석 기준:** 커밋 `61671b7` 다음의 해 추가 (2026-11-21)
 - **공개 URL:** <https://agagtmdtlr.github.io/GameBlog/>
 - **관리 규칙:** 폴더 구조, 기능, 조작, 알려진 한계가 바뀌면 같은 변경에서 이 문서도 고치고 기준 커밋을 갱신한다.
 
@@ -53,6 +53,7 @@ GameBlog/
 │  │  ├─ world.ts              월드 조립, 게임 규칙, 그리기 목록
 │  │  ├─ planet.ts             행성의 크기, 위도·경도를 방향으로 바꾸는 함수
 │  │  ├─ house.ts              캐릭터 집 자리(지금은 상자)의 위치와 크기
+│  │  ├─ sun.ts                행성을 도는 해와 직사광 방향 ([analysis/sun.md](analysis/sun.md))
 │  │  ├─ player.ts             캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
 │  │  ├─ walker.ts             서기·걷기 애니메이션 재생, 발 고정, 다리 IK ([analysis/character.md](analysis/character.md))
 │  │  ├─ characterClips.ts     캐릭터 키프레임 클립 (서기, 걷기, 내딛기)
@@ -97,9 +98,9 @@ main.ts ─┬─ game/ ─┬─ content/
 
 1. `main.ts`가 입력을 읽어 카메라 기준 이동 방향을 계산한다.
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `fixedStep`은 구 이동과 충돌, 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
+3. `fixedStep`은 해의 궤도 진행, 구 이동과 충돌, 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
 4. 카메라가 보간된 구 위치를 따라간다.
-5. `World.buildDrawList`와 `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 지금은 콘텐츠 렌더러가 없다.
+5. `World.buildDrawList`, `environment`(해 방향의 직사광), `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 지금은 콘텐츠 렌더러가 없다.
 
 ### 게임 상태
 
