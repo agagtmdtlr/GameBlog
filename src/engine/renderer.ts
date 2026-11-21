@@ -21,6 +21,7 @@ import {
   SkinnedMesh,
   SphereGeometry,
   SRGBColorSpace,
+  TorusGeometry,
   Vector2,
   Vector3,
   Vector4,
@@ -34,7 +35,7 @@ import pbrFrag from '../shaders/pbr.frag?raw';
 import type { ContentRenderer, PbrMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
 import type { Mat4 } from './math';
 import { skinVertices, type SkinSource } from './skinning';
-import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
+import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
 
 const SHADOW_MAP_SIZE = 2048;
 const MAX_DEVICE_PIXEL_RATIO = 2;
@@ -110,6 +111,8 @@ export class Renderer {
       box: new BoxGeometry(1, 1, 1),
       // 캐릭터 다리의 기본 자세. 그릴 때는 메시마다 스키닝한 복사본을 쓴다.
       leg: new BufferGeometry(),
+      // 해 궤적처럼 큰 원을 그리므로 둘레를 촘촘하게, 관은 가늘어서 성기게 나눈다.
+      ring: new TorusGeometry(1, RING_TUBE_RATIO, 6, 512),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);

@@ -5,8 +5,14 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * three.js에 의존하지 않으므로 `World`와 테스트가 GPU 없이 쓸 수 있다.
  */
 
-/** `sphere`는 three.js 기본 구, `box`는 한 변 1인 정육면체, `leg`는 `assets/character.glb`의 캐릭터 다리 스킨 메시다. */
-export type MeshKind = 'sphere' | 'box' | 'leg';
+/**
+ * `sphere`는 three.js 기본 구, `box`는 한 변 1인 정육면체, `leg`는 `assets/character.glb`의 캐릭터 다리 스킨 메시다.
+ * `ring`은 XY 평면에 놓인 반지름 1의 가느다란 고리(토러스)이고, 관의 반지름은 `RING_TUBE_RATIO`다.
+ */
+export type MeshKind = 'sphere' | 'box' | 'leg' | 'ring';
+
+/** `ring` 메시의 관 반지름. 고리 반지름에 대한 비율이라 크기를 키우면 함께 굵어진다. */
+export const RING_TUBE_RATIO = 0.0015;
 
 /** 스킨 메시가 쓰는 뼈 수. `leg` 메시의 뼈 순서는 [허벅지, 정강이, 발]이다. */
 export const LEG_BONE_COUNT = 3;

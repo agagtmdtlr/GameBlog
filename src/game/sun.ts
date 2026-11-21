@@ -15,12 +15,17 @@ export const SUN = {
  * 셰이더의 ACES 톤 매핑이 밝은 값을 눌러 노랗게 만들므로 세기를 1 가까이로 둔다.
  */
 export const SUN_EMISSIVE: Vec3 = [1.2, 0.18, 0.01];
+/** 해 궤적 고리의 색 (선형 RGB). 해보다 어두운 주황색이다. */
+export const SUN_ORBIT_EMISSIVE: Vec3 = [0.35, 0.07, 0.006];
 
 /** 행성 중심을 도는 해. 궤도는 시작 방향과 시작 지점(+Y) 위를 지나는 대원이다. */
 export class Sun {
-  private readonly start: Vec3;
+  /** 시작할 때 해가 있는 방향 */
+  readonly start: Vec3;
   /** 궤도면 안에서 `start`와 직교하고, 해가 나아가는 쪽의 방향 */
-  private readonly ahead: Vec3;
+  readonly ahead: Vec3;
+  /** 궤도면의 법선. `start`, `ahead`와 함께 오른손 좌표계를 이룬다. */
+  readonly axis: Vec3;
   private angle = 0;
   private previousAngle = 0;
 
@@ -28,8 +33,8 @@ export class Sun {
     this.start = normalize(startDirection);
     // 시작 방향에서 +Y(시작 지점의 머리 위)를 향해 떠오르도록 돈다.
     const up: Vec3 = [0, 1, 0];
-    const axis = normalize(cross(this.start, up));
-    this.ahead = cross(axis, this.start);
+    this.axis = normalize(cross(this.start, up));
+    this.ahead = cross(this.axis, this.start);
   }
 
   step(dt: number): void {

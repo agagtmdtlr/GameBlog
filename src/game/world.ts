@@ -30,7 +30,7 @@ import { boxModel, houseBox } from './house';
 import { PLANET, surfaceDirection } from './planet';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
-import { Sun, SUN, SUN_EMISSIVE } from './sun';
+import { Sun, SUN, SUN_EMISSIVE, SUN_ORBIT_EMISSIVE } from './sun';
 import { BODY_RADIUS, CHARACTER_SCALE, restBones, Walker, type BoneTransform } from './walker';
 
 /** 행성의 꼭대기에서 시작한다. */
@@ -185,8 +185,16 @@ export class World {
         QUAT_IDENTITY,
         false,
       ),
+      drawItemFromModel('ring', this.sunOrbitModel(), material([0, 0, 0], 1, { emissive: SUN_ORBIT_EMISSIVE }), false),
     ];
     return items;
+  }
+
+  /** 해 궤적 고리의 모델 행렬. 고리의 XY 평면을 궤도면에 맞추고 궤도 반지름만큼 키운다. */
+  private sunOrbitModel(): Mat4 {
+    const { start, ahead, axis } = this.sun;
+    const r = SUN.orbitRadius;
+    return mat4FromBasis(PLANET.center, scale(start, r), scale(ahead, r), scale(axis, r));
   }
 
   /** 직사광의 방향을 해의 방향에 맞춘 조명 환경 */

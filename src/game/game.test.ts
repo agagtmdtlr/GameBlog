@@ -369,6 +369,28 @@ describe('해', () => {
     expect(highest).toBeGreaterThan(0.999);
   });
 
+  it('궤적 고리는 해가 지나는 궤도와 같은 원이고 그림자를 드리우지 않는다', () => {
+    const world = new World();
+    const ring = world.buildDrawList(1).find((item) => item.mesh === 'ring')!;
+    expect(ring.castShadow).toBe(false);
+    const m = ring.model;
+    // 고리 위의 점 (cos t, sin t, 0)을 옮겨 해 궤도 위에 있는지 본다.
+    const normal = normalize(world.sun.axis);
+    for (let t = 0; t < 2 * Math.PI; t += 0.7) {
+      const p: Vec3 = [
+        m[0] * Math.cos(t) + m[4] * Math.sin(t) + m[12],
+        m[1] * Math.cos(t) + m[5] * Math.sin(t) + m[13],
+        m[2] * Math.cos(t) + m[6] * Math.sin(t) + m[14],
+      ];
+      expect(length(p)).toBeCloseTo(SUN.orbitRadius, 4);
+      expect(dot(p, normal)).toBeCloseTo(0, 4);
+    }
+    for (let i = 0; i < 5; i++) {
+      stepWorld(world, SUN.periodSeconds / 6);
+      expect(dot(world.sun.position(1), normal)).toBeCloseTo(0, 4);
+    }
+  });
+
   it('그림자를 드리우지 않는다', () => {
     expect(sunItem(new World()).castShadow).toBe(false);
   });
