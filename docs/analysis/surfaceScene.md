@@ -50,7 +50,7 @@ git log --oneline cc0d160..HEAD -- src/scenes src/game/surfaceScene.ts src/game/
 ## 객체 추가 순서
 
 1. `scenes/surface.json`의 `objects`에 한 항목을 더한다. 코드는 고치지 않아도 그리기와 충돌이 따라온다.
-2. 다른 객체, 시작 지점과 겹치지 않게 둔다. 표면 거리는 각도 1도에 약 0.31이다. 해는 시작할 때 위도 약 47, 경도 약 115 쪽에 있고 48초에 한 바퀴 돌아 낮과 밤이 바뀐다 ([analysis/sun.md](sun.md)).
+2. 다른 객체, 시작 지점, 기차 선로(위도 46~54, [analysis/train.md](train.md))와 겹치지 않게 둔다. 표면 거리는 각도 1도에 약 0.31이다. 해는 시작할 때 위도 약 47, 경도 약 115 쪽에 있고 48초에 한 바퀴 돌아 낮과 밤이 바뀐다 ([analysis/sun.md](sun.md)).
 3. 위치 조건이 중요한 객체면 `game.test.ts`에 id로 찾아 검사하는 블록을 더한다.
 
 새 모양(`shape`)이나 새 자리 종류(`placement`)는 `surfaceScene.ts`의 타입, 검사, `loadSurfaceScene`과 `world.ts`의 그리기를 함께 고친다.

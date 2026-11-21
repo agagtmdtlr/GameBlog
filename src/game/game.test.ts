@@ -14,6 +14,7 @@ import { SurfaceZone } from './surfaceZone';
 import { MOON } from './moon';
 import { SUN } from './sun';
 import { pupilOffset, SUN_FACE, sunBillboardBasis, sunEyes } from './sunFace';
+import { TRAIN_CARS } from './train';
 import { NPCS, STUDIO_ENVIRONMENT, World } from './world';
 
 function surfaceObject(id: string): SurfaceObject {
@@ -341,7 +342,9 @@ describe('집 자리', () => {
     const shapes = SURFACE_OBJECTS.map((o) => o.shape);
     // 정육면체 몸의 NPC도 `box` 메시를 쓴다.
     const cubeNpcs = NPCS.filter((npc) => npc.shape === 'cube').length;
-    expect(count('box')).toBe(shapes.filter((v) => v === 'box').length + cubeNpcs);
+    // 기차 차량도 `box` 부품을 쓴다.
+    const trainBoxes = TRAIN_CARS.flatMap((car) => car.parts).filter((part) => part.mesh === 'box').length;
+    expect(count('box')).toBe(shapes.filter((v) => v === 'box').length + cubeNpcs + trainBoxes);
     expect(count('rocket')).toBe(shapes.filter((v) => v === 'rocket').length);
     expect(count('rocketGlass')).toBe(count('rocket'));
   });
@@ -429,7 +432,7 @@ describe('해', () => {
   const stepWorld = (world: World, seconds: number) => {
     for (let i = 0; i < Math.round(seconds / DT); i++) world.fixedStep(DT, IDLE);
   };
-  const sunItem = (world: World) => world.buildDrawList(1).find((item) => item.material.emissive[0] > 0)!;
+  const sunItem = (world: World) => world.buildDrawList(1).find((item) => item.mesh === 'sphere' && item.material.emissive[0] > 0)!;
   const sunCenter = (world: World): Vec3 => [sunItem(world).model[12], sunItem(world).model[13], sunItem(world).model[14]];
 
   it('시작할 때 직사광은 기본 조명 방향이다', () => {
@@ -499,8 +502,9 @@ describe('해', () => {
     // 가장 긴 햇살의 끝까지 덮는다.
     expect(ray.size[0] / 2).toBeGreaterThan((SUN_RAYS.innerRadius + SUN_RAYS.maxLength) * SUN.radius);
     expect(ray.toneMapped).toBe(true);
-    // 해 빌보드는 그리기 목록(그림자 패스)에 들어가지 않는다.
-    expect(world.buildDrawList(1).filter((item) => item.material.emissive[0] > 0)).toHaveLength(2);
+    // 해 빌보드는 그리기 목록(그림자 패스)에 들어가지 않는다. 빛나는 항목은 해 구체, 궤적 고리, 기차 전조등뿐이다.
+    const lamps = TRAIN_CARS.flatMap((car) => car.parts).filter((part) => part.emissive).length;
+    expect(world.buildDrawList(1).filter((item) => item.material.emissive[0] > 0)).toHaveLength(2 + lamps);
   });
 
   it('눈은 흰자와 검은자를 따로 그리고, 해 구면 앞에 놓인다', () => {

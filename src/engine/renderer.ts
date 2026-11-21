@@ -4,6 +4,7 @@ import {
   BufferGeometry,
   CapsuleGeometry,
   CircleGeometry,
+  CylinderGeometry,
   Color,
   DynamicDrawUsage,
   DepthTexture,
@@ -44,6 +45,7 @@ import { skinVertices, type SkinSource } from './skinning';
 import { displaceToMoon } from './moonShape';
 import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from './rocketShape';
 import { BillboardBatch } from './billboardRenderer';
+import type { TriangleMesh } from './trackPath';
 import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
 
 const SHADOW_MAP_SIZE = 2048;
@@ -219,6 +221,11 @@ export class Renderer {
       // 로켓 자리의 모형. 장면 파일의 `size`가 한 변 1인 상자를 늘린다.
       rocket: createRocketGeometry(),
       rocketGlass: createRocketGlassGeometry(),
+      // 축을 Z로 돌린 원기둥. 기차 바퀴와 보일러에 쓴다.
+      cylinder: new CylinderGeometry(0.5, 0.5, 1, 24).rotateX(Math.PI / 2),
+      // 선로. setTrack 전에는 비어 있다.
+      rails: new BufferGeometry(),
+      sleepers: new BufferGeometry(),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -309,6 +316,18 @@ export class Renderer {
     this.geometries.leg.dispose();
     this.geometries.leg = geometry;
     this.legSkin = source;
+  }
+
+  /** 선로의 레일과 침목 지오메트리를 채운다. 정점은 월드 좌표다 (`trackPath.ts`의 `trackMesh`). */
+  setTrack(track: { rails: TriangleMesh; sleepers: TriangleMesh }): void {
+    for (const kind of ['rails', 'sleepers'] as const) {
+      const geometry = new BufferGeometry();
+      geometry.setAttribute('position', new BufferAttribute(track[kind].positions, 3));
+      geometry.setAttribute('normal', new BufferAttribute(track[kind].normals, 3));
+      geometry.computeBoundingSphere();
+      this.geometries[kind].dispose();
+      this.geometries[kind] = geometry;
+    }
   }
 
   /** 개발용 확인(`getError`)에 쓰는 WebGL 컨텍스트 */
