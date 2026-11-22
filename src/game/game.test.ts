@@ -344,7 +344,9 @@ describe('집 자리', () => {
     const cubeNpcs = NPCS.filter((npc) => npc.shape === 'cube').length;
     // 기차 차량도 `box` 부품을 쓴다.
     const trainBoxes = TRAIN_CARS.flatMap((car) => car.parts).filter((part) => part.mesh === 'box').length;
-    expect(count('box')).toBe(shapes.filter((v) => v === 'box').length + cubeNpcs + trainBoxes);
+    // 외계인의 광선총 손잡이도 `box`다.
+    const alienBoxes = new World().aliens.flatMap((alien) => alien.parts(1)).filter((part) => part.mesh === 'box').length;
+    expect(count('box')).toBe(shapes.filter((v) => v === 'box').length + cubeNpcs + trainBoxes + alienBoxes);
     expect(count('rocket')).toBe(shapes.filter((v) => v === 'rocket').length);
     expect(count('rocketGlass')).toBe(count('rocket'));
   });

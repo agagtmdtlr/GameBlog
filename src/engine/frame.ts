@@ -14,9 +14,11 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * `rails`와 `sleepers`는 선로의 레일과 침목이고, 월드 좌표로 만든 지오메트리라 단위 행렬로 그린다 (`trackPath.ts`).
  * `terrain`은 높낮이가 있는 행성 땅이고, 역시 월드 좌표라 단위 행렬로 그린다 (`Renderer.setTerrain`).
  * `mound`(종 모양 언덕)와 `pillar`(끝이 둥근 기둥)는 y 0~1, 바닥 반지름 0.5인 회전체다 (`dreamShape.ts`).
+ * `alienHead`, `alienVisor`, `alienSlit`은 문어 꼴 외계인의 챙 달린 머리, 눈가리개, 눈가리개 틈이다 (`alienShape.ts`).
+ * `tentacle`은 외계인의 촉수 스킨 메시로, `leg`처럼 `DrawItem.skin`으로 그린다.
  * 카메라를 보는 평면(별, 햇살, 해 눈)은 메시가 아니라 `FrameData.billboards`로 그린다.
  */
-export type MeshKind = 'sphere' | 'box' | 'pyramid' | 'leg' | 'ring' | 'moon' | 'rocket' | 'rocketGlass' | 'cylinder' | 'rails' | 'sleepers' | 'terrain' | 'mound' | 'pillar';
+export type MeshKind = 'sphere' | 'box' | 'pyramid' | 'leg' | 'ring' | 'moon' | 'rocket' | 'rocketGlass' | 'cylinder' | 'rails' | 'sleepers' | 'terrain' | 'mound' | 'pillar' | 'alienHead' | 'alienVisor' | 'alienSlit' | 'tentacle';
 
 /** `ring` 메시의 관 반지름. 고리 반지름에 대한 비율이라 크기를 키우면 함께 굵어진다. */
 export const RING_TUBE_RATIO = 0.0015;
