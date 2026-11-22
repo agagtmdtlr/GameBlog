@@ -43,6 +43,7 @@ GameBlog/
 │  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스, 콘텐츠 렌더러 호출
 │  │  ├─ billboard.ts          빌보드 모양, 아틀라스 배치, 그리기 순서 ([analysis/billboard.md](analysis/billboard.md))
 │  │  ├─ billboardAtlas.ts     빌보드 그림을 한 캔버스에 그림
+│  │  ├─ speechBubble.ts       NPC 인사말 목록과 말풍선 그림 ([analysis/npc.md](analysis/npc.md))
 │  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
 │  │  ├─ bubbleRenderer.ts     비눗방울을 인스턴스 한 번으로 가산 혼합해 그리는 BubbleBatch ([analysis/bubbles.md](analysis/bubbles.md))
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
@@ -178,7 +179,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - 행성 중심에서 110~200 떨어진 곳에 얼굴이 있는 별 48개가 카메라를 보며 떠 있다 ([analysis/starfield.md](analysis/starfield.md)).
 - 카메라의 위쪽은 캐릭터가 있는 곳의 표면 바깥 방향이다. 좌우 각도 대신 표면에 접하는 진행 방향을 들고 다녀 극점에서도 뒤집히지 않는다.
 - 검은 배경에 파스텔 무지개 색이 물결치는 몽환적인 행성을 둔다. 땅과 지형물은 가장자리가 은은하게 빛나고 밤 쪽에서도 스스로 조금 빛난다. 처음에는 흰색 무채색이었고 2026-11-22에 사용자 요청으로 바꿨다. 캐릭터는 노랑(#FCC812)으로 고정이다.
-- 플레이어와 같은 다리에 색과 몸 모양(구, 정육면체, 피라미드)이 다른 NPC 5마리(하늘색, 분홍, 초록, 보라, 주황)가 행성 둘레에서 시작해 아무 곳으로 천천히 걸어갔다가 잠깐 서기를 되풀이한다. 하늘색이 집 자리 옆에서 시작한다. 플레이어와 NPC는 서로 통과하지 못한다 (2026-11-21 사용자 요청, [analysis/npc.md](analysis/npc.md)).
+- 플레이어와 같은 다리에 색과 몸 모양(구, 정육면체, 피라미드)이 다른 NPC 5마리(하늘색, 분홍, 초록, 보라, 주황)가 행성 둘레에서 시작해 아무 곳으로 천천히 걸어갔다가 잠깐 서기를 되풀이한다. 하늘색이 집 자리 옆에서 시작한다. 플레이어와 NPC는 서로 통과하지 못한다 (2026-11-21 사용자 요청, [analysis/npc.md](analysis/npc.md)). 플레이어가 다가가면 NPC가 멈춰 서서 머리 위에 인사말 말풍선(안녕!, 반가워! 등)을 띄우고, 멀어지면 거두고 다시 걷는다 (2026-11-22 사용자 요청).
 
 ### 작동 영역과 콘텐츠
 
@@ -245,7 +246,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
 | [`game.test.ts`](../src/game/game.test.ts) | 47 | 구 조작(중력, 한 바퀴 돌기), 카메라, 작동 영역, 콘텐츠 관리, 월드 통합, 집 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
 | [`bubbleBelt.test.ts`](../src/game/bubbleBelt.test.ts) | 5 | 비눗방울 띠의 기저, 씨앗 재현, 크기 분포, 카메라·위성·해 궤도와의 간격, 떠다니기 |
-| [`npc.test.ts`](../src/game/npc.test.ts) | 9 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기 |
+| [`npc.test.ts`](../src/game/npc.test.ts) | 12 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기, 인사 말풍선 |
 | [`bodyShape.test.ts`](../src/game/bodyShape.test.ts) | 10 | NPC 몸 모양의 엉덩이 자리, 땅과의 간격, 방향과 기저 |
 | [`terrain.test.ts`](../src/game/terrain.test.ts) | 9 | 땅 높낮이와 평평한 곳, 비탈, 언덕 위에 서기, 땅·캡슐 충돌, 지형물 배치 |
 | [`walker.test.ts`](../src/game/walker.test.ts) | 17 | 캐릭터 다리와 걷기, 키프레임, 스킨 메시 기본 자세 |

@@ -1,4 +1,5 @@
 import { atlasKey, BILLBOARD_IMAGES, type AtlasLayout, type AtlasRect, type BillboardImage } from './billboard';
+import { drawSpeechBubble, GREETINGS } from './speechBubble';
 import { drawStarFace, STAR_FACES } from './starfield';
 import { sunRayPositions, sunRaysExtent } from './sunRays';
 
@@ -47,6 +48,10 @@ const DRAW: Record<BillboardImage, Draw> = {
 
   starFace(ctx, rect, frame) {
     ctx.drawImage(drawStarFace(STAR_FACES[frame], rect.width), rect.x, rect.y, rect.width, rect.height);
+  },
+
+  speechBubble(ctx, rect, frame) {
+    drawSpeechBubble(ctx, rect, GREETINGS[frame]);
   },
 
   disk(ctx, { x, y, width, height }) {

@@ -1,4 +1,5 @@
 import type { Vec3 } from './math';
+import { GREETINGS } from './speechBubble';
 import { STAR_FACES } from './starfield';
 
 /**
@@ -12,8 +13,9 @@ import { STAR_FACES } from './starfield';
  * `disk`는 칸을 꽉 채운 흰 원, `sunRays`는 `sunRays.ts`의 햇살을 흰색으로 칠한 것이다.
  * `astronaut`는 `assets/astronaut-sticker.png`(잡지에서 오린 스티커 꼴의 우주인 사진)다. 파일을 비동기로 불러와
  * 칸에 그리므로, 불러오기 전에는 투명해 보이지 않는다.
+ * `speechBubble`은 NPC 말풍선이고 `GREETINGS`의 인사말마다 프레임이 있다.
  */
-export type BillboardImage = 'starFace' | 'disk' | 'sunRays' | 'astronaut';
+export type BillboardImage = 'starFace' | 'disk' | 'sunRays' | 'astronaut' | 'speechBubble';
 
 /** 파일에서 불러와 칸에 그리는 그림 */
 export const FILE_BILLBOARD_IMAGES: readonly BillboardImage[] = ['astronaut'];
@@ -30,6 +32,7 @@ export const BILLBOARD_IMAGES: Readonly<Record<BillboardImage, BillboardImageSpe
   // 원본 사진이 466×580이라 512칸이면 충분하다.
   astronaut: { size: 512, frames: 1 },
   starFace: { size: 256, frames: STAR_FACES.length },
+  speechBubble: { size: 256, frames: GREETINGS.length },
   disk: { size: 128, frames: 1 },
 };
 

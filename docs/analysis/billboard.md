@@ -1,6 +1,6 @@
 # 빌보드 일괄 렌더링 분석
 
-카메라를 보는 사각 빌보드(별, 햇살, 해 눈, 우주인 스티커)를 한 목록으로 모아 한 번의 인스턴스 그리기로 그리는 렌더링 계층이다.
+카메라를 보는 사각 빌보드(별, 햇살, 해 눈, 우주인 스티커, NPC 인사 말풍선)를 한 목록으로 모아 한 번의 인스턴스 그리기로 그리는 렌더링 계층이다.
 
 - **규칙:** 없음 ([rules/threejs.md](../rules/threejs.md)의 three.js 가져오기 범위는 지킨다)
 - **색인:** [docs/README.md](../README.md)
@@ -27,13 +27,14 @@
 | `engine/billboardRenderer.ts` | `BillboardBatch`. 아틀라스 텍스처, 사각형 하나의 `InstancedBufferGeometry`, 인스턴스 속성, `RawShaderMaterial` |
 | `shaders/billboard.vert`, `shaders/billboard.frag` | 빌보드를 카메라 쪽으로 세우고, 아틀라스를 읽어 색을 곱하고, 필요하면 ACES 톤 매핑을 건다 |
 | `engine/frame.ts` | `FrameData.billboards` |
-| `game/world.ts` | `buildBillboards(alpha, view)`. 별(한 번만 만든 목록), 햇살, 눈 흰자·검은자 |
+| `game/world.ts` | `buildBillboards(alpha, view)`. 별(한 번만 만든 목록), 우주인, NPC 인사 말풍선, 햇살, 눈 흰자·검은자 |
+| `engine/speechBubble.ts` | 인사말 목록과 말풍선 그림 ([npc.md](npc.md)) |
 | `engine/renderer.ts` | `billboardScene`에 배치 메시 하나를 넣고 메인 장면 뒤에 그린다 |
 | `engine/billboard.test.ts` | 아틀라스 칸 크기·겹침·여백, 텍스처 좌표, 햇살 칸, 그리기 순서 |
 
 ## 세부
 
-- **아틀라스:** 그림은 `sunRays`(512px), `astronaut`(512px), `starFace` 프레임 4개(256px), `disk`(128px)다. 큰 칸부터 가로 1024px 안에서 줄을 채운다. 지금 배치는 928×1304px다 (2026-11-22 `astronaut` 추가 전에는 928×784px). 칸 둘레에 4px를 비워 밉맵에서 이웃 칸이 번지지 않게 하고, 텍스처 좌표는 반 픽셀 안쪽으로 잡는다. `colorSpace = SRGBColorSpace`라 셰이더는 선형 색을 읽는다.
+- **아틀라스:** 그림은 `sunRays`(512px), `astronaut`(512px), `starFace` 프레임 4개(256px), `speechBubble` 프레임 5개(256px, 인사말마다 하나), `disk`(128px)다. 큰 칸부터 가로 1024px 안에서 줄을 채운다. 지금 배치는 792×1832px다 (2026-11-22 `speechBubble` 추가 전 928×1304px, `astronaut` 추가 전 928×784px). 512px 칸은 둘이 한 줄에 들어가지 않아 줄마다 하나씩 놓인다. 칸 둘레에 4px를 비워 밉맵에서 이웃 칸이 번지지 않게 하고, 텍스처 좌표는 반 픽셀 안쪽으로 잡는다. `colorSpace = SRGBColorSpace`라 셰이더는 선형 색을 읽는다.
 - **파일 그림 (2026-11-22):** `FILE_BILLBOARD_IMAGES`(지금은 `astronaut`)의 칸은 처음에 비워 두고, `main.ts`가 `Renderer.loadBillboardImage`로 PNG를 불러오면 `BillboardBatch.loadImage`가 아틀라스 캔버스의 그 칸에 그리고 `texture.needsUpdate`로 다시 올린다. 불러오기 전에는 투명이라 알파 검사로 버려져 보이지 않는다. 자세한 내용은 [analysis/astronaut.md](astronaut.md)에 있다.
 - **흰 그림과 색:** `disk`와 `sunRays`는 흰색으로 그려 두고 빌보드의 `color`가 색을 정한다. 별 얼굴은 색이 있는 그림이라 `color`가 [1, 1, 1]이다.
 - **톤 매핑:** `toneMapped`를 켠 빌보드는 `toon.frag`와 같은 ACES를 거친다. 햇살과 해 눈은 툰 발광색(`SUN_EMISSIVE`, `SUN_EYE_WHITE_EMISSIVE`)을 그대로 넣어 해 구체와 같은 색으로 보인다. 별은 끄므로 도입 전 `SpriteMaterial`(톤 매핑 없음)과 같은 색이다. 끝에 sRGB로 바꾼다.

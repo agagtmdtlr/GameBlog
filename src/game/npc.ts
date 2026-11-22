@@ -19,6 +19,14 @@ const STUCK_SECONDS = 0.8;
 /** 한 목표를 향해 걷는 최대 시간. 넘으면 포기하고 쉰다. */
 const MAX_WALK_SECONDS = 12;
 
+/** 플레이어 몸 중심이 이 거리 안으로 들어오면 인사한다. 몸이 맞닿는 거리(2.64)보다 조금 멀다. */
+export const GREET_DISTANCE = 3 * CHARACTER_SCALE;
+/** 인사하는 중에는 이 거리보다 멀어져야 그친다. 경계에서 말풍선이 깜빡이지 않게 한다. */
+export const GREET_LEAVE_DISTANCE = 4 * CHARACTER_SCALE;
+/** 말풍선이 나타나는 시간과 사라지는 시간 (초) */
+const GREET_SHOW_SECONDS = 0.3;
+const GREET_HIDE_SECONDS = 0.2;
+
 const IDLE: MoveCommand = { direction: [0, 0, 0] };
 
 /** 0 이상 1 미만의 난수를 내는 함수 */
@@ -48,6 +56,12 @@ export class Wanderer {
   /** 걸어가는 목표의 표면 방향 (행성 중심 기준 단위 벡터). 쉬는 중이면 null이다. */
   target: Vec3 | null = null;
 
+  /** 플레이어에게 인사하는 중인지. 인사하는 동안은 멈춰 선다. */
+  greeting = false;
+  /** 말풍선이 나타난 정도 0~1. 인사하면 1로, 그치면 0으로 일정하게 움직인다. */
+  greetAmount = 0;
+  previousGreetAmount = 0;
+
   private pause: number;
   private walkTime = 0;
   private slowTime = 0;
@@ -63,6 +77,20 @@ export class Wanderer {
     this.pause = this.between(MIN_PAUSE, MAX_PAUSE);
   }
 
+  /** 플레이어가 가까이 왔는지 보고 인사를 시작하거나 그친다. `move` 전에 부른다. */
+  notice(dt: number, playerPosition: Vec3): void {
+    const distance = length(sub(playerPosition, this.body.position));
+    this.greeting = distance < (this.greeting ? GREET_LEAVE_DISTANCE : GREET_DISTANCE);
+    this.previousGreetAmount = this.greetAmount;
+    const rate = this.greeting ? 1 / GREET_SHOW_SECONDS : -1 / GREET_HIDE_SECONDS;
+    this.greetAmount = Math.min(1, Math.max(0, this.greetAmount + rate * dt));
+  }
+
+  /** 렌더링 보간이 적용된 말풍선의 나타난 정도 */
+  greetAmountAt(alpha: number): number {
+    return this.previousGreetAmount + (this.greetAmount - this.previousGreetAmount) * alpha;
+  }
+
   /** 다음 행동을 정하고 물리 몸체를 움직인다. */
   move(dt: number, obstacles: readonly Obstacle[] = []): void {
     this.body.step(dt, this.decide(dt), this.ground, obstacles);
@@ -74,6 +102,12 @@ export class Wanderer {
   }
 
   private decide(dt: number): MoveCommand {
+    if (this.greeting) {
+      // 인사하는 동안 멈춰 선다. 다시 걸을 때 멈춘 시간을 막힘이나 시간 초과로 세지 않는다.
+      this.walkTime = 0;
+      this.slowTime = 0;
+      return IDLE;
+    }
     if (!this.target) {
       this.pause -= dt;
       if (this.pause > 0) return IDLE;
