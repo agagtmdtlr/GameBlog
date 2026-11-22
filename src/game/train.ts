@@ -3,6 +3,7 @@ import type { MeshKind } from '../engine/frame';
 import { RAIL_TOP, SphereTrackPath, TRACK_SHAPE, type TrackFrame } from '../engine/trackPath';
 import type { OrientedBox } from '../physics/collision';
 import { PLANET, surfaceDirection } from './planet';
+import { SmokeTrail, type SmokeSource } from './smoke';
 
 /**
  * 행성 표면의 스플라인 선로와 그 위를 끝없이 도는 기차.
@@ -60,6 +61,8 @@ export interface CarSpec {
   /** 지붕까지의 높이 (표면 기준). 충돌 상자의 위 끝이다. */
   height: number;
   parts: readonly CarPart[];
+  /** 연기가 나오는 굴뚝 꼭대기 자리 [오른쪽, 위, 앞]. 굴뚝이 없는 차량은 없다. */
+  chimney?: Vec3;
 }
 
 function running(length: number): CarPart[] {
@@ -90,13 +93,16 @@ function locomotive(color: Vec3): CarSpec {
   const length = 2.2;
   const { deck } = TRAIN;
   const boiler = 0.75;
+  const chimneyBase = deck + boiler;
+  const chimneyHeight = 0.4;
   return {
     length,
+    chimney: [0, chimneyBase + chimneyHeight, 0.75],
     height: deck + 1.15,
     parts: [
       ...running(length),
       { mesh: 'cylinder', offset: [0, deck + boiler / 2, 0.35], size: [boiler, boiler, 1.4], color, roughness: 0.4 },
-      { mesh: 'cylinder', axis: 'up', offset: [0, deck + boiler + 0.2, 0.75], size: [0.28, 0.28, 0.4], color: DARK, roughness: 0.5 },
+      { mesh: 'cylinder', axis: 'up', offset: [0, chimneyBase + chimneyHeight / 2, 0.75], size: [0.28, 0.28, chimneyHeight], color: DARK, roughness: 0.5 },
       { mesh: 'box', offset: [0, deck + 0.5, -0.7], size: [1.0, 1.0, 0.75], color, roughness: 0.4 },
       { mesh: 'box', offset: [0, deck + 1.05, -0.7], size: [1.15, 0.1, 0.9], color: ROOF, roughness: 0.6 },
       {
@@ -158,6 +164,8 @@ export interface CarPose {
 
 /** 선로를 따라 일정한 빠르기로 도는 기차. 기관차 중심이 경로에서 간 거리만 상태로 갖는다. */
 export class Train {
+  /** 굴뚝 연기. 굴뚝이 있는 첫 차량(기관차)에서 나온다. */
+  readonly smoke = new SmokeTrail();
   private distance: number;
   private previousDistance: number;
 
@@ -175,6 +183,17 @@ export class Train {
     this.distance = this.path.wrap(this.distance + TRAIN.speed * dt);
     // 한 바퀴를 넘으면 보간이 거꾸로 가지 않도록 이전 값도 함께 접는다.
     if (this.distance < this.previousDistance) this.previousDistance -= this.path.length;
+    const source = this.chimneyTop();
+    if (source) this.smoke.step(dt, source);
+  }
+
+  /** 굴뚝 꼭대기의 월드 자리. 굴뚝이 있는 차량이 없으면 null이다. */
+  chimneyTop(alpha = 1): SmokeSource | null {
+    const pose = this.poses(alpha).find((p) => p.spec.chimney);
+    if (!pose?.spec.chimney) return null;
+    const { position, right, up, forward } = pose.frame;
+    const [x, y, z] = pose.spec.chimney;
+    return { position: add(position, add(scale(right, x), add(scale(up, y), scale(forward, z)))), up, right, forward };
   }
 
   /** 기관차 중심이 간 거리. 렌더링 보간을 적용한다. */
