@@ -12,7 +12,7 @@ import {
   sub,
   type Vec3,
 } from '../engine/math';
-import type { Sphere } from '../physics/collision';
+import { groundRadius, type Ground } from '../physics/collision';
 import { IDLE_CLIP, STEP_CLIP, WALK_CLIP } from './characterClips';
 import { sampleClip } from './keyframes';
 
@@ -183,7 +183,7 @@ export class Walker {
 
   constructor(
     position: Vec3,
-    private readonly ground: Sphere,
+    private readonly ground: Ground,
     forward: Vec3 = [0, 0, -1],
     /** 엉덩이 관절 자리. 다리 메시가 몸 안에서 시작하도록 몸 모양에 맞춘다. */
     private readonly hip: WalkerHip = SPHERE_HIP,
@@ -438,9 +438,10 @@ export class Walker {
     return normalize(sub(p, this.ground.center));
   }
 
-  /** 행성 표면으로 옮긴 점 */
+  /** 행성 표면으로 옮긴 점. 땅의 높낮이를 따른다. */
   private project(p: Vec3): Vec3 {
-    return add(this.ground.center, scale(this.upAt(p), this.ground.radius));
+    const up = this.upAt(p);
+    return add(this.ground.center, scale(up, groundRadius(this.ground, up)));
   }
 }
 

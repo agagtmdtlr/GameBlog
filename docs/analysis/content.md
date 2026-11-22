@@ -40,7 +40,7 @@ interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; 
 
 `ContentContext`는 지금 비어 있다. 콘텐츠가 월드를 바꿔야 하면 아래 "월드 상태 추가 순서"대로 기능을 더한다.
 
-행성 재질은 `World`의 `PLANET_COLOR`(흰색에 가까운 무채색), 플레이어 캐릭터(몸과 다리)의 재질은 `PLAYER_COLOR`로 고정이며 콘텐츠가 바꾸지 않는다. 캐릭터 구조는 [analysis/character.md](character.md)에 있다. `buildDrawList`는 행성을 그리기 목록의 첫 항목으로 둔다.
+행성 땅의 재질은 `World`의 `PLANET_COLOR`와 셰이더의 파스텔 물결(`SurfacePattern.Dreamy`, [analysis/terrain.md](terrain.md)), 플레이어 캐릭터(몸과 다리)의 재질은 `PLAYER_COLOR`로 고정이며 콘텐츠가 바꾸지 않는다. 캐릭터 구조는 [analysis/character.md](character.md)에 있다. `buildDrawList`는 행성 땅(`terrain` 메시)을 그리기 목록의 첫 항목으로, 지형물을 그 뒤에 둔다.
 
 동작:
 
@@ -50,7 +50,7 @@ interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; 
 
 ## 작동 영역
 
-행성은 원점이 중심이고 반지름이 18이다(`game/planet.ts`의 `PLANET`). 영역 위치는 위도와 경도(도)로 적고, `surfaceDirection(위도, 경도)`가 행성 중심에서 영역 중심을 향하는 단위 벡터로 바꾼다.
+행성은 원점이 중심이고 반지름이 18이다(`game/planet.ts`의 `PLANET`). 땅은 그 위에 높낮이가 있다(`game/terrain.ts`의 `TERRAIN`). 영역 위치는 위도와 경도(도)로 적고, `surfaceDirection(위도, 경도)`가 행성 중심에서 영역 중심을 향하는 단위 벡터로 바꾼다.
 
 - 위도 90이 시작 지점(+Y)이다. 경도 180이 시작할 때 바라보는 방향(-Z)이고, 경도 90이 오른쪽(+X)이다.
 - 표면 거리는 각도 1도에 약 0.31이다.
@@ -64,7 +64,7 @@ interface ContentEntry { content: GraphicsContent; zone: { latitude; longitude; 
 
 - **판정:** `SurfaceZone`(`game/surfaceZone.ts`)이 행성 중심에서 캐릭터 물리 몸체(충돌 구)의 중심을 향하는 방향과 영역 방향의 각도를 본다. 각도가 반지름(표면 1.5) 안이면 작동한다. 높이는 보지 않으므로 몸체가 떠 있어도 작동한다. 경계에서 `PLAYER_RADIUS`만큼 더 벗어나야 다시 작동할 수 있다.
 - **상태:** `World`가 영역마다 `glow`(켜진 콘텐츠의 영역이면 1)와 `presence`(캐릭터가 영역 위에 있으면 1)를 지수적으로 따라가게 한다.
-- **그리기:** `World.buildSurfaceZones()`가 `SurfaceZoneFrame[]`을 만들고 `FrameData.surfaceZones`로 넘긴다. `Renderer`는 이를 툰 공용 uniform 배열(`uZoneDir`, `uZoneColor`, `uZoneParams`, `uZoneCount`)에 옮기고, 재질의 `showsZones`가 켜진 메시(행성)만 `toon.frag`의 `applySurfaceZones`로 칠한다. 안쪽은 영역 색을 80% 섞고, 경계선은 어둡게 칠한다. 켜진 영역은 안쪽과 경계가 빛나고, 캐릭터가 올라서면 경계선이 영역 색으로 밝아진다.
+- **그리기:** 셰이더는 법선이 아니라 중심에서 본 방향(`normalize(vObjectPos)`)으로 칠하므로 언덕 위에서도 원이 찌그러지지 않는다. `World.buildSurfaceZones()`가 `SurfaceZoneFrame[]`을 만들고 `FrameData.surfaceZones`로 넘긴다. `Renderer`는 이를 툰 공용 uniform 배열(`uZoneDir`, `uZoneColor`, `uZoneParams`, `uZoneCount`)에 옮기고, 재질의 `showsZones`가 켜진 메시(행성)만 `toon.frag`의 `applySurfaceZones`로 칠한다. 안쪽은 영역 색을 80% 섞고, 경계선은 어둡게 칠한다. 켜진 영역은 안쪽과 경계가 빛나고, 캐릭터가 올라서면 경계선이 영역 색으로 밝아진다.
 - **한계:** 영역은 `MAX_SURFACE_ZONES`(8)개까지 그린다. `frame.ts`와 `toon.frag`의 `MAX_ZONES`를 함께 바꿔야 한다. 평평하게 칠한 원이라 지평선 너머에서는 보이지 않는다.
 
 ## 월드 상태 추가 순서
@@ -129,7 +129,8 @@ abstract class ContentRenderer<T extends ContentFrame> {
 - **uniform:** 프레임 단위 값은 `RenderContext.shared`의 객체를 함께 참조한다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
 - **시간:** 전역 시계는 없다. 시간이 필요한 셰이더는 상태 클래스가 진행한 시간을 프레임 값으로 받는다.
 - **위쪽:** 셰이더에서도 위쪽을 +Y로 가정하지 않는다.
-- **격자:** `SurfacePattern.Grid`는 구 메시 전용이다. 오브젝트 공간 방향을 정육면체 면에 투영해 격자를 그린다.
+- **격자:** `SurfacePattern.Grid`는 구 메시 전용이다. 오브젝트 공간 방향을 정육면체 면에 투영해 격자를 그린다. 지금은 쓰는 곳이 없다.
+- **몽환 무늬:** `SurfacePattern.Dreamy`(땅)와 `Gradient`(지형물)는 [analysis/terrain.md](terrain.md)에 있다.
 
 ## 현재 구조의 한계
 

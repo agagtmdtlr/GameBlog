@@ -1,5 +1,5 @@
 import { add, dot, normalize, scale, sub, type Vec3 } from '../engine/math';
-import { reflectVelocity, sphereVsBox, sphereVsSphere, type OrientedBox, type Sphere } from '../physics/collision';
+import { reflectVelocity, sphereVsGround, sphereVsObstacle, type Ground, type Obstacle } from '../physics/collision';
 import { CHARACTER_SCALE } from './walker';
 
 /**
@@ -41,10 +41,10 @@ export class Player {
   }
 
   /**
-   * @param ground 캐릭터가 걸어 다니는 행성. 중력은 그 중심을 향한다.
-   * @param obstacles 통과할 수 없는 상자들
+   * @param ground 캐릭터가 걸어 다니는 행성 땅. 중력은 그 중심을 향한다.
+   * @param obstacles 통과할 수 없는 상자와 캡슐
    */
-  step(dt: number, command: MoveCommand, ground: Sphere, obstacles: readonly OrientedBox[] = []): void {
+  step(dt: number, command: MoveCommand, ground: Ground, obstacles: readonly Obstacle[] = []): void {
     this.previousPosition = this.position;
 
     const onGround = this.groundGrace > 0;
@@ -64,21 +64,21 @@ export class Player {
     this.velocity = add(horizontal, scale(up, vertical));
     this.position = add(this.position, scale(this.velocity, dt));
     this.resolveCollision(ground);
-    for (const box of obstacles) this.resolveObstacle(box, up);
+    for (const obstacle of obstacles) this.resolveObstacle(obstacle, up);
 
     this.groundGrace = this.grounded ? GROUND_GRACE_SECONDS : Math.max(0, this.groundGrace - dt);
   }
 
-  private resolveCollision(ground: Sphere): void {
-    const contact = sphereVsSphere(this.position, PLAYER_RADIUS, ground);
+  private resolveCollision(ground: Ground): void {
+    const contact = sphereVsGround(this.position, PLAYER_RADIUS, ground);
     this.grounded = contact !== null;
     if (!contact) return;
     this.position = add(this.position, scale(contact.normal, contact.depth));
     this.velocity = reflectVelocity(this.velocity, contact.normal, RESTITUTION, REST_THRESHOLD);
   }
 
-  private resolveObstacle(box: OrientedBox, up: Vec3): void {
-    const contact = sphereVsBox(this.position, PLAYER_RADIUS, box);
+  private resolveObstacle(obstacle: Obstacle, up: Vec3): void {
+    const contact = sphereVsObstacle(this.position, PLAYER_RADIUS, obstacle);
     if (!contact) return;
     this.position = add(this.position, scale(contact.normal, contact.depth));
     this.velocity = reflectVelocity(this.velocity, contact.normal, OBSTACLE_RESTITUTION, REST_THRESHOLD);

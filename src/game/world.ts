@@ -33,6 +33,8 @@ import {
 } from '../engine/frame';
 import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
 import { PLANET, surfaceDirection } from './planet';
+import { DREAM_PROPS, PROP_COLLIDERS, TERRAIN, type DreamProp } from './terrain';
+import { groundRadius, type Obstacle } from '../physics/collision';
 import { separateBodies, Wanderer, type Random } from './npc';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
@@ -62,8 +64,10 @@ const ZONE_REARM_MARGIN = PLAYER_RADIUS;
 /** 영역 경계선의 표면 폭 */
 const ZONE_EDGE_WIDTH = 0.12;
 const ZONE_FADE_RATE = 7;
-/** 행성 표면의 색 (선형 RGB). 흰색에 가까운 무채색으로 고정이다. */
-const PLANET_COLOR: Vec3 = [0.74, 0.74, 0.75];
+/** 행성 땅의 바탕 색 (선형 RGB). 셰이더(`SurfacePattern.Dreamy`)가 여기에 파스텔 물결을 곱한다. */
+const PLANET_COLOR: Vec3 = [0.95, 0.95, 0.95];
+/** 지형물의 거칠기. 은은한 하이라이트가 남는다. */
+const PROP_ROUGHNESS = 0.6;
 /** 캐릭터의 색 (선형 RGB, sRGB #FCC812) */
 const PLAYER_COLOR: Vec3 = [0.973, 0.578, 0.006];
 const PLAYER_ROUGHNESS = 0.45;
@@ -77,7 +81,10 @@ export interface NpcSpec {
 }
 
 const npcAt = (latitude: number, longitude: number, color: Vec3, shape: BodyShape): NpcSpec => ({
-  spawn: scale(surfaceDirection(latitude, longitude), PLANET.radius + PLAYER_RADIUS),
+  spawn: scale(
+    surfaceDirection(latitude, longitude),
+    groundRadius(TERRAIN, surfaceDirection(latitude, longitude)) + PLAYER_RADIUS,
+  ),
   color,
   shape,
 });
@@ -94,7 +101,10 @@ export const NPCS: readonly NpcSpec[] = [
   npcAt(-60, 200, [0.871, 0.254, 0.045], 'pyramid'), // 주황 #F08A3C
 ];
 /** 장면 파일(`scenes/surface.json`)의 표면 객체 중 캐릭터가 통과할 수 없는 상자 */
-const SURFACE_OBSTACLES = SURFACE_OBJECTS.filter((o) => o.collides).map((o) => o.box);
+const SURFACE_OBSTACLES: readonly Obstacle[] = [
+  ...SURFACE_OBJECTS.filter((o) => o.collides).map((o) => o.box),
+  ...PROP_COLLIDERS,
+];
 
 const boneMatrix = ({ origin, x, y, z }: BoneTransform): Mat4 => mat4FromBasis(origin, x, y, z);
 /** 다리 메시의 기본 자세 뼈를 원점으로 되돌리는 행렬. 지금 뼈와 곱하면 스키닝 행렬이 된다. */
@@ -161,6 +171,21 @@ function trainPartDrawItem(part: TrainPartModel): DrawItem {
   return drawItemFromModel(part.mesh, part.model, mat, !part.emissive);
 }
 
+/** 지형물의 그리기 항목. 작은 장식 공은 그림자를 드리우지 않는다. */
+function propDrawItems(prop: DreamProp): DrawItem[] {
+  return prop.parts.map((part) =>
+    drawItemFromModel(
+      part.mesh,
+      part.model,
+      material(part.color, PROP_ROUGHNESS, { pattern: SurfacePattern.Gradient, receivesOccluder: true }),
+      prop.shape !== 'pebble',
+    ),
+  );
+}
+
+/** 움직이지 않는 지형물이므로 한 번만 만든다. */
+const PROP_DRAW_ITEMS: readonly DrawItem[] = DREAM_PROPS.flatMap(propDrawItems);
+
 const DEFAULT_VIEW: BillboardView = { position: [0, 0, 0], up: [0, 1, 0] };
 
 /** 행성 둘레의 별. 움직이지 않으므로 한 번만 만든다. 조명을 받지 않아 얼굴 색 그대로 보인다. */
@@ -189,7 +214,7 @@ interface ZoneInstance {
 /** 월드를 구성하고 게임 규칙을 진행한다. GPU와 DOM에 의존하지 않는다. */
 export class World {
   readonly player = new Player(SPAWN);
-  readonly walker = new Walker(SPAWN, PLANET);
+  readonly walker = new Walker(SPAWN, TERRAIN);
   readonly content: ContentManager;
   readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
   readonly moon = new Moon();
@@ -205,7 +230,7 @@ export class World {
     onContentChange?: (content: GraphicsContent) => void,
     random?: Random,
   ) {
-    this.npcs = NPCS.map((npc) => new Wanderer(npc.spawn, PLANET, random, BODY_FORMS[npc.shape].hip));
+    this.npcs = NPCS.map((npc) => new Wanderer(npc.spawn, TERRAIN, random, BODY_FORMS[npc.shape].hip));
     this.bodies = [this.player, ...this.npcs.map((npc) => npc.body)];
     this.zones = entries.map((entry) => ({
       entry,
@@ -230,8 +255,8 @@ export class World {
     this.moon.step(dt);
     this.train.step(dt);
     // 기차는 움직이는 벽이다. 이번 걸음의 자리로 캐릭터를 밀어낸다.
-    const obstacles = [...SURFACE_OBSTACLES, ...this.train.obstacles()];
-    this.player.step(dt, command, PLANET, obstacles);
+    const obstacles: Obstacle[] = [...SURFACE_OBSTACLES, ...this.train.obstacles()];
+    this.player.step(dt, command, TERRAIN, obstacles);
     for (const npc of this.npcs) npc.move(dt, obstacles);
     for (let i = 0; i < this.bodies.length; i++) {
       for (let j = i + 1; j < this.bodies.length; j++) separateBodies(this.bodies[i], this.bodies[j]);
@@ -259,16 +284,16 @@ export class World {
   buildDrawList(alpha: number): DrawItem[] {
     const sunPosition = this.sun.position(alpha);
     const items: DrawItem[] = [
-      drawItem(
-        'sphere',
-        PLANET.center,
-        [PLANET.radius, PLANET.radius, PLANET.radius],
-        material(PLANET_COLOR, 0.75, {
-          pattern: SurfacePattern.Grid,
+      drawItemFromModel(
+        'terrain',
+        mat4Identity(),
+        material(PLANET_COLOR, 0.8, {
+          pattern: SurfacePattern.Dreamy,
           showsZones: true,
           receivesOccluder: true,
         }),
       ),
+      ...PROP_DRAW_ITEMS,
       ...SURFACE_OBJECTS.flatMap(surfaceObjectDrawItems),
       drawItemFromModel(
         'rails',
