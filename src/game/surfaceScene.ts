@@ -11,8 +11,8 @@ import { PLANET, surfaceDirection } from './planet';
 
 /** 표면 위의 자리. 위도·경도(도)로 적거나, 하늘의 천체 바로 아래로 정한다. */
 /** 표면 객체의 모양 */
-export type SurfaceShape = 'box' | 'rocket';
-const SURFACE_SHAPES: readonly SurfaceShape[] = ['box', 'rocket'];
+export type SurfaceShape = 'box' | 'rocket' | 'tv';
+const SURFACE_SHAPES: readonly SurfaceShape[] = ['box', 'rocket', 'tv'];
 
 export type SurfacePlacement = { latitude: number; longitude: number } | { under: 'moon' };
 
@@ -20,7 +20,7 @@ export type SurfacePlacement = { latitude: number; longitude: number } | { under
 export interface SurfaceObjectData {
   /** 장면 안에서 유일한 이름 */
   id: string;
-  /** `box`는 상자, `rocket`은 로켓 모형(`engine/rocketShape.ts`)이다. 둘 다 `size` 상자 안에 들어가고, 충돌은 그 상자로 한다. */
+  /** `box`는 상자, `rocket`은 로켓 모형(`engine/rocketShape.ts`), `tv`는 아날로그 텔레비전 모형(`engine/tvShape.ts`)이다. 모두 `size` 상자 안에 들어가고, 충돌은 그 상자로 한다. */
   shape: SurfaceShape;
   placement: SurfacePlacement;
   /** 폭, 높이, 깊이 */

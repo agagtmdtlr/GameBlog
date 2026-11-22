@@ -19,7 +19,7 @@ function surfaceObject(id: string): SurfaceObject {
   if (!found) throw new Error(`장면 파일에 ${id}가 없다`);
   return found;
 }
-const HOUSE = surfaceObject('house');
+const TV = surfaceObject('tv');
 const ROCKET = surfaceObject('rocket');
 
 const DT = 1 / 120;
@@ -116,14 +116,14 @@ describe('월드 통합', () => {
   });
 });
 
-describe('집 자리', () => {
-  const up = surfaceDirection(HOUSE.latitude, HOUSE.longitude);
+describe('텔레비전 자리', () => {
+  const up = surfaceDirection(TV.latitude, TV.longitude);
   const surfaceDistance = (a: Vec3, b: Vec3): number =>
     Math.acos(Math.min(1, Math.max(-1, dot(a, b)))) * PLANET.radius;
 
   it('시작 지점을 덮지 않고, 시작할 때 바라보는 쪽 가까이에 있다', () => {
     const distance = surfaceDistance(up, [0, 1, 0]);
-    expect(distance).toBeGreaterThan(HOUSE.size[2] + PLAYER_RADIUS);
+    expect(distance).toBeGreaterThan(TV.size[2] + PLAYER_RADIUS);
     expect(distance).toBeLessThan(10);
   });
 
@@ -132,18 +132,18 @@ describe('집 자리', () => {
   });
 
   it('바닥이 표면에 닿고, 위쪽이 표면 바깥을 향한다', () => {
-    const m = HOUSE.model;
+    const m = TV.model;
     const center: Vec3 = [m[12], m[13], m[14]];
     const axisY: Vec3 = [m[4], m[5], m[6]];
     expect(dot(normalize(axisY), up)).toBeCloseTo(1, 6);
-    const bottom = length(center) - HOUSE.size[1] / 2;
+    const bottom = length(center) - TV.size[1] / 2;
     expect(bottom).toBeLessThan(PLANET.radius);
     expect(bottom).toBeGreaterThan(PLANET.radius - 0.3);
   });
 
   it('걸어서 상자를 통과할 수 없다', () => {
     const world = new World();
-    const box = HOUSE.box;
+    const box = TV.box;
     const [, , halfDepth] = box.halfExtents;
     // 시작할 때 바라보는 쪽(-Z)으로 상자를 지나칠 만큼 걷는다.
     let closest = Infinity;
@@ -176,6 +176,13 @@ describe('집 자리', () => {
     expect(count('box')).toBe(shapes.filter((v) => v === 'box').length + cubeNpcs + trainBoxes + alienBoxes + satelliteBoxes);
     expect(count('rocket')).toBe(shapes.filter((v) => v === 'rocket').length);
     expect(count('rocketGlass')).toBe(count('rocket'));
+    const tvs = shapes.filter((v) => v === 'tv').length;
+    for (const mesh of ['tv', 'tvTrim', 'tvDark', 'tvScreen']) expect(count(mesh)).toBe(tvs);
+  });
+
+  it('텔레비전 모형으로 서고, 화면이 시작 지점 쪽을 본다', () => {
+    expect(TV.shape).toBe('tv');
+    expect(dot(TV.box.axes[2], normalize(sub([0, PLANET.radius, 0], TV.box.center)))).toBeGreaterThan(0.9);
   });
 });
 
@@ -223,10 +230,10 @@ describe('로켓 자리', () => {
     expect(dot(up, MOON.direction)).toBeCloseTo(1, 6);
   });
 
-  it('집 자리, 시작 지점과 떨어져 있다', () => {
+  it('텔레비전 자리, 시작 지점과 떨어져 있다', () => {
     const angle = (a: Vec3, b: Vec3) => Math.acos(Math.min(1, dot(a, b))) * PLANET.radius;
-    const house = surfaceDirection(HOUSE.latitude, HOUSE.longitude);
-    expect(angle(up, house)).toBeGreaterThan(HOUSE.size[0] + ROCKET.size[0] + 2 * PLAYER_RADIUS);
+    const tv = surfaceDirection(TV.latitude, TV.longitude);
+    expect(angle(up, tv)).toBeGreaterThan(TV.size[0] + ROCKET.size[0] + 2 * PLAYER_RADIUS);
     expect(angle(up, [0, 1, 0])).toBeGreaterThan(ROCKET.size[0] + PLAYER_RADIUS);
   });
 

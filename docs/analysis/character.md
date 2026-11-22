@@ -16,7 +16,7 @@ git log --oneline cc0d160..HEAD -- tools/blender src/assets src/game/walker.ts s
 | 단계 | 파일 | 하는 일 |
 |---|---|---|
 | 모델링 | `tools/blender/build_character.py` | Blender 스크립트로 다리 스킨 메시 `Leg`와 뼈 `Thigh`, `Shin`, `Foot`을 만들어 `src/assets/character.glb`로 내보낸다 |
-| 물리 | `game/player.ts` | 반지름 0.88 × `CHARACTER_SCALE`(1.32)의 보이지 않는 충돌 구. 중심이 몸의 중심이고, 반지름이 다리가 몸을 받치는 높이다. 굴러가는 회전은 계산하지 않는다. 행성 말고도 `obstacles`로 받은 상자(지금은 집 자리와 로켓 자리)와 충돌한다 |
+| 물리 | `game/player.ts` | 반지름 0.88 × `CHARACTER_SCALE`(1.32)의 보이지 않는 충돌 구. 중심이 몸의 중심이고, 반지름이 다리가 몸을 받치는 높이다. 굴러가는 회전은 계산하지 않는다. 행성 말고도 `obstacles`로 받은 상자(지금은 텔레비전과 로켓 자리)와 충돌한다 |
 | 클립 | `game/characterClips.ts`, `game/keyframes.ts` | 서기·걷기·내딛기 키프레임 클립과 트랙 샘플링 |
 | 걸음 | `game/walker.ts` | 물리 결과(위치, 속도, 접지)를 보고 클립을 재생해 몸의 위치·엉덩이 기울기와 두 발의 위치를 정한다. 그릴 때 두 마디 IK로 무릎을 풀어 다리마다 뼈 3개의 위치와 축을 낸다 |
 | 그리기 목록 | `game/world.ts` | 몸(`sphere`)과 다리마다 `leg` 항목 하나를 만든다. 전체 순서는 행성, 표면 장면 상자들, 몸, 왼다리, 오른다리, NPC마다 몸·왼다리·오른다리([npc.md](npc.md)), 위성, 해, 해 궤적 고리다. 플레이어와 NPC가 `characterDrawItems(walker, alpha, color)`를 함께 쓴다. 다리 항목의 `skin`은 뼈마다 `지금 뼈 × 기본 자세 뼈의 역행렬`이다 |

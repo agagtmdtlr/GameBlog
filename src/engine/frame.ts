@@ -19,7 +19,7 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * `satelliteDish`는 인공위성의 접시 안테나로, 반지름 1에 오목한 쪽이 -Y를 본다 (`satelliteShape.ts`).
  * 카메라를 보는 평면(별, 햇살, 해 눈)은 메시가 아니라 `FrameData.billboards`로 그린다.
  */
-export type MeshKind = 'sphere' | 'box' | 'pyramid' | 'leg' | 'ring' | 'moon' | 'rocket' | 'rocketGlass' | 'cylinder' | 'rails' | 'sleepers' | 'terrain' | 'mound' | 'pillar' | 'alienHead' | 'alienVisor' | 'alienSlit' | 'tentacle' | 'satelliteDish';
+export type MeshKind = 'sphere' | 'box' | 'pyramid' | 'leg' | 'ring' | 'moon' | 'rocket' | 'rocketGlass' | 'tv' | 'tvTrim' | 'tvDark' | 'tvScreen' | 'cylinder' | 'rails' | 'sleepers' | 'terrain' | 'mound' | 'pillar' | 'alienHead' | 'alienVisor' | 'alienSlit' | 'tentacle' | 'satelliteDish';
 
 /** `ring` 메시의 관 반지름. 고리 반지름에 대한 비율이라 크기를 키우면 함께 굵어진다. */
 export const RING_TUBE_RATIO = 0.0015;
