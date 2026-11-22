@@ -46,6 +46,8 @@ GameBlog/
 │  │  ├─ speechBubble.ts       NPC 인사말 목록과 말풍선 그림 ([analysis/npc.md](analysis/npc.md))
 │  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
 │  │  ├─ bubbleRenderer.ts     비눗방울을 인스턴스 한 번으로 가산 혼합해 그리는 BubbleBatch ([analysis/bubbles.md](analysis/bubbles.md))
+│  │  ├─ videoScreenLayer.ts   텔레비전 화면의 YouTube iframe을 캔버스 뒤 3D 자리에 놓는 CSS3D 층
+│  │  ├─ tvShape.ts            아날로그 텔레비전 모형의 모양 값과 부품 계산
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
 │  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
 │  │  ├─ satelliteShape.ts     인공위성 접시 안테나 단면 ([analysis/satellite.md](analysis/satellite.md))
@@ -110,7 +112,7 @@ main.ts ─┬─ game/ ─┬─ physics/ ─ engine/math
 
 - `engine/`은 게임 규칙을 모른다.
 - `World`는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다.
-- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/bubbleRenderer.ts`, `main.ts`에서만 쓴다.
+- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/bubbleRenderer.ts`, `engine/videoScreenLayer.ts`, `main.ts`에서만 쓴다.
 
 ### 프레임 흐름
 
@@ -158,7 +160,7 @@ main.ts ─┬─ game/ ─┬─ physics/ ─ engine/math
 
 - 원점이 중심이고 반지름이 18인 행성 하나다 (둘레 약 113). 땅에는 완만한 언덕과 잔물결이 있고, 종 모양 언덕·둥근 기둥·공·막대사탕 같은 파스텔 지형물이 흩어져 있다. 선로·텔레비전·로켓·시작 지점 둘레는 평평하다 (2026-11-22 사용자 요청, [analysis/terrain.md](analysis/terrain.md)). 벽과 가장자리가 없어 떨어질 곳이 없고, 다시 시작하는 처리도 없다.
 - 캐릭터는 꼭대기 `(0, 18.88, 0)`에서 시작해 -Z 쪽을 바라본다.
-- 시작 지점 정면에 다리 넷 달린 나무 상자 아날로그 텔레비전 모형(폭 3.3, 높이 3.0, 깊이 2.5)을 세운다. 처음에는 캐릭터 집이 놓일 자리의 푸른 회색 상자였고(2026-11-21 사용자 요청), 사용자가 보여 준 브라운관 텔레비전 사진을 단순화해 바꿨다 (2026-11-22 사용자 요청). 위치는 위도 66, 경도 180으로, 시작 지점 정면 약 7.5 거리이고 해가 드는 쪽이다. 화면이 시작 지점을 향한다. 충돌은 모형을 감싼 상자로 한다. 위치, 크기, 나무 색은 장면 파일 `scenes/surface.json`의 `tv`에서 바꾼다 ([analysis/surfaceScene.md](analysis/surfaceScene.md)).
+- 시작 지점 정면에 다리 넷 달린 나무 상자 아날로그 텔레비전 모형(폭 6.6, 높이 6.0, 깊이 5.0)을 세운다. 처음 크기(폭 3.3)에서 두 배로 키웠다 (2026-11-22 사용자 요청). 처음에는 캐릭터 집이 놓일 자리의 푸른 회색 상자였고(2026-11-21 사용자 요청), 사용자가 보여 준 브라운관 텔레비전 사진을 단순화해 바꿨다 (2026-11-22 사용자 요청). 위치는 위도 66, 경도 180으로, 시작 지점 정면 약 7.5 거리이고 해가 드는 쪽이다. 화면이 시작 지점을 향한다. 충돌은 모형을 감싼 상자로 한다. 화면에서는 YouTube 영상이 음소거로 반복 재생되고, 플레이 중에 가까이 가면 소리가 난다 (2026-11-22 사용자 요청). 위치, 크기, 나무 색, 영상 id는 장면 파일 `scenes/surface.json`의 `tv`에서 바꾼다 ([analysis/surfaceScene.md](analysis/surfaceScene.md)).
 - 로켓이 놓일 자리에 단순화한 주황색 로켓 모형(달걀 몸통, 짧은 다리 넷, 정면의 둥근 창, 옆문, 리벳 줄)을 세운다. 처음에는 붉은 정육면체였고, 사용자가 보여 준 리벳 박힌 달걀 모양 로켓 사진을 단순화해 바꿨다 (2026-11-21 사용자 요청). 충돌은 모형을 감싼 상자(폭 6.5, 높이 7.5)로 한다. 처음 크기(폭 2.6, 높이 3.0)에서 2.5배로 키웠다 (2026-11-21 사용자 요청). 위성으로 향하는 부근이라는 요청에 따라 위성 바로 아래 표면(위도 약 30, 경도 약 207.5)에 두었고, 위쪽이 위성을 향한다. 위치는 `MOON.direction`에서 계산하므로 위성을 옮기면 따라간다. 텔레비전과 같이 충돌체다. 크기와 색은 장면 파일 `scenes/surface.json`의 `rocket`에서 바꾼다.
 - 시작 지점을 둘러싸고 위도 46~54 사이를 물결치는 닫힌 스플라인 선로에 기관차와 객차 셋이 끝없이 돈다. 차량은 움직이는 충돌 상자라 선로 위의 캐릭터를 밀어낸다 (2026-11-21 사용자 요청, [analysis/train.md](analysis/train.md)).
 - 행성 주변 하늘(시작 시점 왼쪽 위, 거리 40)에 충돌구가 패인 회색 위성이 떠서 제자리에서 자전한다 (2026-11-21 사용자 요청).
@@ -209,7 +211,7 @@ main.ts ─┬─ game/ ─┬─ physics/ ─ engine/math
 | [`starfield.test.ts`](../src/engine/starfield.test.ts) | 3 | 별 배치와 윤곽 |
 | [`sunRays.test.ts`](../src/engine/sunRays.test.ts) | 4 | 해 햇살 모양 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
-| [`game.test.ts`](../src/game/game.test.ts) | 39 | 구 조작(중력, 한 바퀴 돌기), 카메라, 월드 통합, 텔레비전 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
+| [`game.test.ts`](../src/game/game.test.ts) | 42 | 구 조작(중력, 한 바퀴 돌기), 카메라, 월드 통합, 텔레비전 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
 | [`bubbleBelt.test.ts`](../src/game/bubbleBelt.test.ts) | 5 | 비눗방울 띠의 기저, 씨앗 재현, 크기 분포, 카메라·위성·해 궤도와의 간격, 떠다니기 |
 | [`npc.test.ts`](../src/game/npc.test.ts) | 12 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기, 인사 말풍선 |
 | [`bodyShape.test.ts`](../src/game/bodyShape.test.ts) | 10 | NPC 몸 모양의 엉덩이 자리, 땅과의 간격, 방향과 기저 |
@@ -235,6 +237,7 @@ main.ts ─┬─ game/ ─┬─ physics/ ─ engine/math
 | 집 자리 상자 (2026-11-21) | 시작 화면, 코드로 구를 상자 앞에 이동 | 시작할 때 정면에 상자가 보임. 표면에 붙어 서고 그림자가 짐. WebGL·콘솔 오류 없음 |
 | 집 자리 상자 충돌 (2026-11-21) | 시작 후 W 키 3.5초 | 상자 정면(위도 약 74.7)에서 멈추고 통과하지 않음. 표면 높이 유지. WebGL 오류 없음 |
 | 아날로그 텔레비전 모형 (2026-11-22) | 시작하기 클릭, 코드로 캐릭터를 텔레비전 쪽으로 걷게 함 | 집 자리 상자 대신 나무 몸통, 다리 넷, 은색 테 화면, 손잡이 둘, 스피커 살이 보이고 화면이 시작 지점을 봄. 콘솔 오류 없음 |
+| 텔레비전 2배와 YouTube 화면 (2026-11-22) | 시작하기 클릭, 정면과 비스듬한 쪽에서 스크린샷 | 화면 유리 자리에만 영상이 재생되고 둥근 테가 가장자리를 가림. 비스듬히 봐도 원근이 맞음. `getError()` 0, 콘솔 오류 없음. 소리는 귀로 확인하지 못함 |
 | 로켓 자리 정육면체 (2026-11-21) | 시작하기 클릭, 코드로 구를 위도 44·경도 207.5에 이동 | 붉은 정육면체가 표면에 붙어 섬. WebGL·콘솔 오류 없음. 충돌은 테스트로만 확인 |
 | 로켓 모형 (2026-11-21) | 시작하기 클릭, 코드로 구를 위도 42·경도 207.5, 위도 37·경도 222에 이동 | 달걀 몸통, 리벳, 정면 창, 다리가 보이고 다리로 표면에 섬. WebGL·콘솔 오류 없음 |
 | 로켓 모형 2.5배 (2026-11-21) | 시작하기 클릭, 코드로 구를 위도 50·경도 212에 이동 | 캐릭터보다 훨씬 큰 로켓이 다리로 표면에 섬. WebGL·콘솔 오류 없음 |

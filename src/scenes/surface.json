@@ -4,11 +4,12 @@
       "id": "tv",
       "shape": "tv",
       "placement": { "latitude": 66, "longitude": 180 },
-      "size": [3.3, 3.0, 2.5],
-      "sink": 0.12,
+      "size": [6.6, 6.0, 5.0],
+      "sink": 0.25,
       "color": [0.2, 0.075, 0.03],
       "roughness": 0.6,
-      "collides": true
+      "collides": true,
+      "youtube": "aqz-KE-bpKQ"
     },
     {
       "id": "rocket",
