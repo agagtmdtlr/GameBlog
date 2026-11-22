@@ -8,6 +8,7 @@ import { Renderer } from './engine/renderer';
 import { trackMesh } from './engine/trackPath';
 import { CameraRig } from './game/cameraRig';
 import { PLANET } from './game/planet';
+import { TERRAIN, terrainHeight } from './game/terrain';
 import { TRACK_PATH } from './game/train';
 import { World } from './game/world';
 import { FixedStepper } from './physics/fixedStepper';
@@ -62,6 +63,7 @@ function main(): void {
   }
 
   renderer.setTrack(trackMesh(TRACK_PATH));
+  renderer.setTerrain({ center: PLANET.center, radius: PLANET.radius, heightAt: terrainHeight });
 
   // 다리 모델은 비동기로 불러온다. 불러오기 전에는 몸만 보인다.
   renderer.loadCharacter(characterModelUrl).catch((error: unknown) => {
@@ -75,7 +77,7 @@ function main(): void {
   const world = new World(CONTENT_ENTRIES, (content) => {
     overlay.setActiveContent(content.label, accentById.get(content.id) ?? [1, 1, 1]);
   });
-  const camera = new CameraRig(world.player.position, PLANET.center);
+  const camera = new CameraRig(world.player.position, PLANET.center, TERRAIN);
 
   let hadPointerLock = false;
   let lastTime = performance.now();

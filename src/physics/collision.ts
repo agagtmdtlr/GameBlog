@@ -1,4 +1,4 @@
-import { add, dot, length, scale, sub, type Vec3 } from '../engine/math';
+import { add, cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 
 export interface Sphere {
   center: Vec3;
@@ -72,4 +72,77 @@ export function sphereVsBox(center: Vec3, radius: number, box: OrientedBox): Con
   }
   const sign = local[axisIndex] < 0 ? -1 : 1;
   return { normal: scale(box.axes[axisIndex], sign), depth: shallowest + radius };
+}
+
+/**
+ * 높낮이가 있는 행성 땅. 중심에서 방향 `dir`(단위 벡터)으로 나간 표면까지의 거리가
+ * `radius + heightAt(dir)`이다. `heightAt`이 없으면 반지름 `radius`인 구다.
+ */
+export interface Ground extends Sphere {
+  heightAt?(dir: Vec3): number;
+}
+
+/** 방향 `dir`의 표면이 중심에서 떨어진 거리 */
+export function groundRadius(ground: Ground, dir: Vec3): number {
+  return ground.radius + (ground.heightAt ? ground.heightAt(dir) : 0);
+}
+
+/** 법선을 차분으로 구할 때 옮기는 각도 (라디안) */
+const NORMAL_STEP = 0.004;
+
+/** 방향 `dir`의 표면에서 바깥을 향하는 단위 법선. 높이의 기울기를 중앙 차분으로 구한다. */
+export function groundNormal(ground: Ground, dir: Vec3): Vec3 {
+  if (!ground.heightAt) return dir;
+  const helper: Vec3 = Math.abs(dir[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const t1 = normalize(cross(helper, dir));
+  const t2 = cross(dir, t1);
+  const r = groundRadius(ground, dir);
+  const slope = (t: Vec3): number => {
+    const ahead = groundRadius(ground, normalize(add(dir, scale(t, NORMAL_STEP))));
+    const behind = groundRadius(ground, normalize(add(dir, scale(t, -NORMAL_STEP))));
+    return (ahead - behind) / (2 * NORMAL_STEP * r);
+  };
+  return normalize(sub(dir, add(scale(t1, slope(t1)), scale(t2, slope(t2)))));
+}
+
+/**
+ * 움직이는 구와 높낮이가 있는 땅의 충돌. 구 아래 표면을 그 자리의 접평면으로 보고,
+ * 구가 그 평면에 닿는 높이까지 중심 바깥 방향(위쪽)으로 밀어낸다. 법선도 위쪽이라
+ * 비탈에서 미끄러지지 않고 캐릭터처럼 서 있다. 기울기가 완만하다고 가정한다.
+ */
+export function sphereVsGround(center: Vec3, radius: number, ground: Ground): Contact | null {
+  if (!ground.heightAt) return sphereVsSphere(center, radius, ground);
+  const delta = sub(center, ground.center);
+  const distance = length(delta);
+  const dir: Vec3 = distance > 1e-9 ? scale(delta, 1 / distance) : [0, 1, 0];
+  const above = distance - groundRadius(ground, dir);
+  if (above >= radius * 2) return null;
+  // 기울기가 cos인 평면에 닿는 구의 중심은 표면에서 위쪽으로 radius / cos만큼 떠 있다.
+  const cos = Math.max(dot(dir, groundNormal(ground, dir)), 0.5);
+  const depth = radius / cos - above;
+  if (depth <= 0) return null;
+  return { normal: dir, depth };
+}
+
+/** 양 끝 `a`, `b`를 잇는 선분에서 `radius`만큼 퍼진 캡슐. `a`와 `b`가 같으면 구다. */
+export interface Capsule {
+  a: Vec3;
+  b: Vec3;
+  radius: number;
+}
+
+/** 움직이는 구와 고정된 캡슐의 충돌 */
+export function sphereVsCapsule(center: Vec3, radius: number, capsule: Capsule): Contact | null {
+  const axis = sub(capsule.b, capsule.a);
+  const axisLength2 = dot(axis, axis);
+  const t = axisLength2 > 1e-12 ? Math.max(0, Math.min(1, dot(sub(center, capsule.a), axis) / axisLength2)) : 0;
+  return sphereVsSphere(center, radius, { center: add(capsule.a, scale(axis, t)), radius: capsule.radius });
+}
+
+/** 캐릭터가 통과할 수 없는 고정 물체 */
+export type Obstacle = OrientedBox | Capsule;
+
+/** 움직이는 구와 고정 물체의 충돌 */
+export function sphereVsObstacle(center: Vec3, radius: number, obstacle: Obstacle): Contact | null {
+  return 'axes' in obstacle ? sphereVsBox(center, radius, obstacle) : sphereVsCapsule(center, radius, obstacle);
 }

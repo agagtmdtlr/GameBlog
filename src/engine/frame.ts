@@ -12,9 +12,11 @@ import type { Mat3, Mat4, Vec3 } from './math';
  * `moon`은 반지름 1 언저리의 구에 충돌구와 바위 덩어리를 새긴 위성이다 (`moonShape.ts`).
  * `cylinder`는 축이 Z인 지름 1, 길이 1의 원기둥이다(기차 바퀴, 보일러).
  * `rails`와 `sleepers`는 선로의 레일과 침목이고, 월드 좌표로 만든 지오메트리라 단위 행렬로 그린다 (`trackPath.ts`).
+ * `terrain`은 높낮이가 있는 행성 땅이고, 역시 월드 좌표라 단위 행렬로 그린다 (`Renderer.setTerrain`).
+ * `mound`(종 모양 언덕)와 `pillar`(끝이 둥근 기둥)는 y 0~1, 바닥 반지름 0.5인 회전체다 (`dreamShape.ts`).
  * 카메라를 보는 평면(별, 햇살, 해 눈)은 메시가 아니라 `FrameData.billboards`로 그린다.
  */
-export type MeshKind = 'sphere' | 'box' | 'pyramid' | 'leg' | 'ring' | 'moon' | 'rocket' | 'rocketGlass' | 'cylinder' | 'rails' | 'sleepers';
+export type MeshKind = 'sphere' | 'box' | 'pyramid' | 'leg' | 'ring' | 'moon' | 'rocket' | 'rocketGlass' | 'cylinder' | 'rails' | 'sleepers' | 'terrain' | 'mound' | 'pillar';
 
 /** `ring` 메시의 관 반지름. 고리 반지름에 대한 비율이라 크기를 키우면 함께 굵어진다. */
 export const RING_TUBE_RATIO = 0.0015;
@@ -22,7 +24,11 @@ export const RING_TUBE_RATIO = 0.0015;
 /** 스킨 메시가 쓰는 뼈 수. `leg` 메시의 뼈 순서는 [허벅지, 정강이, 발]이다. */
 export const LEG_BONE_COUNT = 3;
 
-export const SurfacePattern = { None: 0, Grid: 2 } as const;
+/**
+ * `Grid`는 구 메시 전용 격자다. `Dreamy`는 방향에 따라 파스텔 색이 물결치는 땅, `Gradient`는 아래에서 위로
+ * 색이 옅어지는 지형물이다. 둘 다 가장자리가 은은하게 빛나고 밤에 스스로 조금 빛난다.
+ */
+export const SurfacePattern = { None: 0, Grid: 2, Dreamy: 3, Gradient: 4 } as const;
 export type SurfacePattern = (typeof SurfacePattern)[keyof typeof SurfacePattern];
 
 export interface Material {

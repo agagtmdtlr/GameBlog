@@ -37,6 +37,10 @@ out vec4 fragColor;
 
 const float PI = 3.14159265359;
 const int PATTERN_GRID = 2;
+const int PATTERN_DREAMY = 3;
+const int PATTERN_GRADIENT = 4;
+/** 지형물 아래쪽에 스미는 보랏빛 (선형 RGB) */
+const vec3 DREAM_SHADE = vec3(0.3, 0.2, 0.9);
 /** 정육면체 한 면의 절반에 들어가는 격자 칸 수 */
 const float GRID_CELLS = 7.0;
 
@@ -84,7 +88,28 @@ vec3 linearToSrgb(vec3 c) {
   return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
 }
 
+// 파스텔 무지개. 코사인 팔레트를 sRGB로 만들고 선형으로 푼다.
+vec3 dreamPalette(float t) {
+  vec3 srgb = 0.7 + 0.3 * cos(2.0 * PI * (t + vec3(0.0, 0.33, 0.67)));
+  return pow(srgb, vec3(2.2));
+}
+
 vec3 applySurfacePattern(vec3 albedo, vec3 N) {
+  if (uPattern == PATTERN_DREAMY) {
+    // 방향에 따라 여러 겹의 물결로 색이 천천히 바뀐다. 원점 기준 구나 월드 좌표 땅 모두 같은 무늬다.
+    vec3 p = normalize(vObjectPos);
+    float w = sin(dot(p, vec3(5.1, 3.7, -4.3)) + 0.6)
+      + 0.6 * sin(dot(p, vec3(-7.9, 6.3, 5.2)) + 2.1)
+      + 0.35 * sin(dot(p, vec3(13.0, -11.0, 9.0)));
+    return albedo * dreamPalette(0.5 + 0.22 * w);
+  }
+  if (uPattern == PATTERN_GRADIENT) {
+    // 아래는 보랏빛으로 가라앉고 위로 갈수록 옅어진다. 지형물 메시는 y가 위쪽이다.
+    float t = smoothstep(-0.6, 1.0, vObjectPos.y);
+    vec3 bottom = mix(albedo, DREAM_SHADE, 0.4) * 0.85;
+    vec3 top = mix(albedo, vec3(1.0), 0.15);
+    return mix(bottom, top, t);
+  }
   if (uPattern == PATTERN_GRID) {
     // 구를 정육면체의 여섯 면으로 나눠 격자를 그린다. 위도·경도 격자와 달리 극점에서 선이 몰리지 않는다.
     vec3 p = normalize(vObjectPos);
@@ -101,8 +126,10 @@ vec3 applySurfacePattern(vec3 albedo, vec3 N) {
 
 // 구 표면에 원형 영역을 칠한다. 안쪽은 영역 색으로 물들이고 경계에 선을 두른다.
 // 활성 영역은 빛나고, 구가 올라서 있으면 경계선이 밝아진다.
-void applySurfaceZones(vec3 N, inout vec3 albedo, inout vec3 emissive) {
+void applySurfaceZones(inout vec3 albedo, inout vec3 emissive) {
   if (!uShowZones) return;
+  // 땅에 높낮이가 있으므로 법선이 아니라 중심에서 이 점을 향하는 방향으로 잰다.
+  vec3 N = normalize(vObjectPos);
   for (int i = 0; i < MAX_ZONES; i++) {
     if (i >= uZoneCount) break;
     vec4 p = uZoneParams[i];
@@ -126,7 +153,7 @@ void main() {
 
   vec3 albedo = applySurfacePattern(uBaseColor, N);
   vec3 emissive = uEmissive;
-  applySurfaceZones(N, albedo, emissive);
+  applySurfaceZones(albedo, emissive);
   float roughness = clamp(uRoughness, 0.04, 1.0);
   vec3 diffuseColor = albedo * (1.0 - uMetallic);
 
@@ -157,6 +184,12 @@ void main() {
   float visibility = 1.0 - 0.45 * toonStep(0.18, occlusion);
   vec3 ambientLight = mix(mix(uGroundColor, uSkyColor, 0.6), uNightAmbient, night);
   vec3 ambient = (diffuseColor + albedo * uMetallic * 0.5) * ambientLight * visibility;
+
+  // 몽환적인 땅과 지형물은 가장자리가 은은하게 빛나고, 밤에는 스스로 조금 빛난다.
+  if (uPattern == PATTERN_DREAMY || uPattern == PATTERN_GRADIENT) {
+    float rim = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+    emissive += albedo * (rim * 0.18 + night * 0.16);
+  }
 
   fragColor = vec4(linearToSrgb(acesFilm(direct + ambient + emissive)), 1.0);
 }

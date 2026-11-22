@@ -12,6 +12,7 @@ import {
   sub,
   type Vec3,
 } from '../engine/math';
+import { groundRadius, type Ground } from '../physics/collision';
 
 const DISTANCE = 10;
 const MIN_PITCH = 0.1;
@@ -20,6 +21,8 @@ const LOOK_SENSITIVITY = 0.0025;
 const FOLLOW_RATE = 9;
 const TARGET_HEIGHT = 0.6;
 const FOV_Y = (55 * Math.PI) / 180;
+/** 카메라가 언덕 속으로 들어가지 않도록 땅에서 띄우는 최소 높이 */
+const GROUND_CLEARANCE = 0.8;
 
 /**
  * 구를 따라가는 3인칭 궤도 카메라.
@@ -33,10 +36,14 @@ export class CameraRig {
   /** 카메라가 바라보는 수평 방향. 항상 `up`에 수직이다. */
   private heading: Vec3;
 
-  /** @param center 행성의 중심 */
+  /**
+   * @param center 행성의 중심
+   * @param ground 높낮이가 있는 땅. 주면 카메라가 땅 속으로 들어가지 않게 띄운다.
+   */
   constructor(
     initialTarget: Vec3,
     private readonly center: Vec3,
+    private readonly ground?: Ground,
   ) {
     this.target = initialTarget;
     this.up = normalize(sub(initialTarget, center));
@@ -56,7 +63,13 @@ export class CameraRig {
       scale(this.heading, -Math.cos(this.pitch)),
       scale(this.up, Math.sin(this.pitch)),
     );
-    return add(this.lookTarget, scale(offset, DISTANCE));
+    const position = add(this.lookTarget, scale(offset, DISTANCE));
+    if (!this.ground) return position;
+    const fromCenter = sub(position, this.center);
+    const dir = normalize(fromCenter);
+    const lowest = groundRadius(this.ground, dir) + GROUND_CLEARANCE;
+    const distance = Math.hypot(fromCenter[0], fromCenter[1], fromCenter[2]);
+    return distance >= lowest ? position : add(this.center, scale(dir, lowest));
   }
 
   private get lookTarget(): Vec3 {

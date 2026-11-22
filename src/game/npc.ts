@@ -1,5 +1,5 @@
 import { add, cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
-import type { OrientedBox, Sphere } from '../physics/collision';
+import type { Ground, Obstacle } from '../physics/collision';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { CHARACTER_SCALE, Walker, type WalkerHip } from './walker';
 
@@ -54,7 +54,7 @@ export class Wanderer {
 
   constructor(
     spawn: Vec3,
-    private readonly ground: Sphere,
+    private readonly ground: Ground,
     private readonly random: Random = Math.random,
     hip?: WalkerHip,
   ) {
@@ -64,7 +64,7 @@ export class Wanderer {
   }
 
   /** 다음 행동을 정하고 물리 몸체를 움직인다. */
-  move(dt: number, obstacles: readonly OrientedBox[] = []): void {
+  move(dt: number, obstacles: readonly Obstacle[] = []): void {
     this.body.step(dt, this.decide(dt), this.ground, obstacles);
   }
 

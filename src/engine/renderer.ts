@@ -41,9 +41,10 @@ import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometr
 import meshVert from '../shaders/mesh.vert?raw';
 import toonFrag from '../shaders/toon.frag?raw';
 import type { ContentRenderer, ToonMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
-import type { Mat4 } from './math';
+import type { Mat4, Vec3 } from './math';
 import { skinVertices, type SkinSource } from './skinning';
 import { displaceToMoon } from './moonShape';
+import { DREAM_SHAPE, moundProfile, pillarProfile, type Profile } from './dreamShape';
 import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from './rocketShape';
 import { BillboardBatch } from './billboardRenderer';
 import { drawSkyboxFaces } from './skybox';
@@ -66,6 +67,50 @@ function createMoonGeometry(): BufferGeometry {
   const geometry = mergeVertices(sphere);
   sphere.dispose();
   displaceToMoon(geometry.getAttribute('position').array as Float32Array);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+/** 높낮이가 있는 행성 땅. `radius + heightAt(방향)`이 표면까지의 거리다. */
+export interface HeightField {
+  center: Vec3;
+  radius: number;
+  heightAt(dir: Vec3): number;
+}
+
+/** 땅을 나누는 정이십면체 세분 수. 정점 간격이 0.3쯤이라 언덕이 매끄럽다. */
+const TERRAIN_DETAIL = 72;
+
+/** 고르게 나뉜 정이십면체 구를 높이 함수대로 밀어 땅을 만든다. 정점은 월드 좌표다. */
+function createTerrainGeometry(field: HeightField): BufferGeometry {
+  const sphere = new IcosahedronGeometry(1, TERRAIN_DETAIL);
+  sphere.deleteAttribute('normal');
+  sphere.deleteAttribute('uv');
+  const geometry = mergeVertices(sphere);
+  sphere.dispose();
+  const position = geometry.getAttribute('position').array as Float32Array;
+  const [cx, cy, cz] = field.center;
+  for (let i = 0; i < position.length; i += 3) {
+    const len = Math.hypot(position[i], position[i + 1], position[i + 2]);
+    const dir: Vec3 = [position[i] / len, position[i + 1] / len, position[i + 2] / len];
+    const r = field.radius + field.heightAt(dir);
+    position[i] = cx + dir[0] * r;
+    position[i + 1] = cy + dir[1] * r;
+    position[i + 2] = cz + dir[2] * r;
+  }
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+/** 단면을 돌린 회전체. 이음매 법선이 부드럽게 이어지도록 정점을 합친다. */
+function createLatheGeometry(profile: Profile): BufferGeometry {
+  const lathe = new LatheGeometry(profile.map(([r, y]) => new Vector2(r, y)), DREAM_SHAPE.radialSegments);
+  lathe.deleteAttribute('normal');
+  lathe.deleteAttribute('uv');
+  const geometry = mergeVertices(lathe);
+  lathe.dispose();
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   return geometry;
@@ -232,6 +277,11 @@ export class Renderer {
       // 선로. setTrack 전에는 비어 있다.
       rails: new BufferGeometry(),
       sleepers: new BufferGeometry(),
+      // 행성 땅. setTerrain 전에는 비어 있다.
+      terrain: new BufferGeometry(),
+      // 몽환적인 지형물 (`dreamShape.ts`)
+      mound: createLatheGeometry(moundProfile()),
+      pillar: createLatheGeometry(pillarProfile()),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -340,6 +390,12 @@ export class Renderer {
       this.geometries[kind].dispose();
       this.geometries[kind] = geometry;
     }
+  }
+
+  /** 행성 땅 지오메트리를 높이 함수로 채운다. 정점은 월드 좌표다. */
+  setTerrain(field: HeightField): void {
+    this.geometries.terrain.dispose();
+    this.geometries.terrain = createTerrainGeometry(field);
   }
 
   /** 개발용 확인(`getError`)에 쓰는 WebGL 컨텍스트 */
