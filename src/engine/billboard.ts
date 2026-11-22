@@ -10,8 +10,13 @@ import { STAR_FACES } from './starfield';
 /**
  * 아틀라스에 들어가는 그림. `starFace`는 `STAR_FACES`만큼 프레임이 있다.
  * `disk`는 칸을 꽉 채운 흰 원, `sunRays`는 `sunRays.ts`의 햇살을 흰색으로 칠한 것이다.
+ * `astronaut`는 `assets/astronaut-sticker.png`(잡지에서 오린 스티커 꼴의 우주인 사진)다. 파일을 비동기로 불러와
+ * 칸에 그리므로, 불러오기 전에는 투명해 보이지 않는다.
  */
-export type BillboardImage = 'starFace' | 'disk' | 'sunRays';
+export type BillboardImage = 'starFace' | 'disk' | 'sunRays' | 'astronaut';
+
+/** 파일에서 불러와 칸에 그리는 그림 */
+export const FILE_BILLBOARD_IMAGES: readonly BillboardImage[] = ['astronaut'];
 
 export interface BillboardImageSpec {
   /** 아틀라스 칸 한 변의 픽셀 수 */
@@ -22,6 +27,8 @@ export interface BillboardImageSpec {
 export const BILLBOARD_IMAGES: Readonly<Record<BillboardImage, BillboardImageSpec>> = {
   // 화면에 크게 보일 수 있어 가장 크게 둔다.
   sunRays: { size: 512, frames: 1 },
+  // 원본 사진이 466×580이라 512칸이면 충분하다.
+  astronaut: { size: 512, frames: 1 },
   starFace: { size: 256, frames: STAR_FACES.length },
   disk: { size: 128, frames: 1 },
 };

@@ -34,6 +34,7 @@ import {
 } from '../engine/frame';
 import { Alien, ALIEN_ROUGHNESS, alienSpawn, type AlienPart } from './alien';
 import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
+import { FloatingAstronaut } from './astronaut';
 import { Satellite, SATELLITE_ORBIT_EMISSIVE, type SatellitePart } from './satellite';
 import { BubbleBelt } from './bubbleBelt';
 import { PLANET, surfaceDirection } from './planet';
@@ -242,6 +243,7 @@ export class World {
   readonly content: ContentManager;
   readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
   readonly moon = new Moon();
+  readonly astronaut = new FloatingAstronaut();
   readonly satellite = new Satellite();
   readonly bubbles = new BubbleBelt();
   readonly train = new Train();
@@ -281,6 +283,7 @@ export class World {
   fixedStep(dt: number, command: MoveCommand): void {
     this.sun.step(dt);
     this.moon.step(dt);
+    this.astronaut.step(dt);
     this.satellite.step(dt);
     this.bubbles.step(dt);
     this.train.step(dt);
@@ -357,7 +360,7 @@ export class World {
   }
 
   /**
-   * 카메라를 보는 빌보드: 별, 햇살, 해 눈(흰자·검은자). 해 빌보드는 해 구체와 같은 색으로 보이도록
+   * 카메라를 보는 빌보드: 별, 햇살, 해 눈(흰자·검은자), 위성 곁의 우주인 스티커. 해 빌보드는 해 구체와 같은 색으로 보이도록
    * 툰 셰이더와 같은 톤 매핑을 건다. 렌더러가 모두 모아 한 번에 그린다.
    * `view`는 이번 프레임의 카메라이고, 해 눈을 해 얼굴 위에 놓는 데 쓴다. 없으면 행성 중심에서 보는 것으로 친다.
    */
@@ -369,6 +372,7 @@ export class World {
     const eyes = sunEyes(sunPosition, r, sunBillboardBasis(sunPosition, view), this.walker.pose(alpha).body);
     return [
       ...STAR_BILLBOARDS,
+      this.astronaut.billboard(alpha),
       { image: 'sunRays', position: sunPosition, size: [SUN_RAYS_SIZE * r, SUN_RAYS_SIZE * r], color: SUN_EMISSIVE, toneMapped: true },
       ...eyes.flatMap((eye): Billboard[] => [
         { image: 'disk', position: eye.white, size: [rx * 2 * r, ry * 2 * r], color: SUN_EYE_WHITE_EMISSIVE, toneMapped: true },

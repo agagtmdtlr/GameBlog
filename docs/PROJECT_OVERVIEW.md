@@ -69,6 +69,7 @@ GameBlog/
 │  │  ├─ sun.ts                행성을 도는 해, 햇살 빌보드, 궤적 고리, 직사광 방향 ([analysis/sun.md](analysis/sun.md))
 │  │  ├─ sunFace.ts            해 빌보드 축, 캐릭터를 보는 눈(흰자·검은자)
 │  │  ├─ moon.ts               제자리에서 자전하는 위성의 자리와 크기 ([analysis/moon.md](analysis/moon.md))
+│  │  ├─ astronaut.ts          위성 곁에 떠 있는 우주인 스티커 빌보드 ([analysis/astronaut.md](analysis/astronaut.md))
 │  │  ├─ satellite.ts          궤도를 도는 인공위성의 부품과 궤적 고리 ([analysis/satellite.md](analysis/satellite.md))
 │  │  ├─ bubbleBelt.ts         행성을 감싸고 떠다니는 비눗방울 띠 ([analysis/bubbles.md](analysis/bubbles.md))
 │  │  ├─ train.ts              선로 노선과 그 위를 도는 기차 ([analysis/train.md](analysis/train.md))
@@ -86,10 +87,12 @@ GameBlog/
 │  │  ├─ manager.ts            활성 콘텐츠 관리
 │  │  └─ registry.ts           작동 영역과 콘텐츠 등록 목록 (지금은 비어 있음)
 │  ├─ assets/character.glb     Blender에서 내보낸 다리 스킨 메시
+│  ├─ assets/astronaut-sticker.png  잡지에서 오린 스티커 꼴의 우주인 그림 ([analysis/astronaut.md](analysis/astronaut.md))
 │  ├─ scenes/surface.json      행성 표면에 놓는 객체(집·로켓 자리)의 장면 파일
 │  ├─ shaders/                 mesh.vert, toon.frag, billboard.vert, billboard.frag, bubble.vert, bubble.frag
 │  └─ ui/overlay.ts            화면 안내와 HUD 제어
 ├─ tools/blender/build_character.py  캐릭터 다리 모델(character.glb)을 만드는 Blender 스크립트
+├─ tools/sticker/                    우주인 원본 사진과 스티커 그림을 만드는 Python 스크립트
 ├─ docs/
 │  ├─ README.md                기능별 규칙과 분석 문서의 색인
 │  ├─ rules/                   기능별 규칙
@@ -167,6 +170,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - 로켓이 놓일 자리에 단순화한 주황색 로켓 모형(달걀 몸통, 짧은 다리 넷, 정면의 둥근 창, 옆문, 리벳 줄)을 세운다. 처음에는 붉은 정육면체였고, 사용자가 보여 준 리벳 박힌 달걀 모양 로켓 사진을 단순화해 바꿨다 (2026-11-21 사용자 요청). 충돌은 모형을 감싼 상자(폭 6.5, 높이 7.5)로 한다. 처음 크기(폭 2.6, 높이 3.0)에서 2.5배로 키웠다 (2026-11-21 사용자 요청). 위성으로 향하는 부근이라는 요청에 따라 위성 바로 아래 표면(위도 약 30, 경도 약 207.5)에 두었고, 위쪽이 위성을 향한다. 위치는 `MOON.direction`에서 계산하므로 위성을 옮기면 따라간다. 집 자리와 같이 충돌체다. 크기와 색은 장면 파일 `scenes/surface.json`의 `rocket`에서 바꾼다.
 - 시작 지점을 둘러싸고 위도 46~54 사이를 물결치는 닫힌 스플라인 선로에 기관차와 객차 셋이 끝없이 돈다. 차량은 움직이는 충돌 상자라 선로 위의 캐릭터를 밀어낸다 (2026-11-21 사용자 요청, [analysis/train.md](analysis/train.md)).
 - 행성 주변 하늘(시작 시점 왼쪽 위, 거리 40)에 충돌구가 패인 회색 위성이 떠서 제자리에서 자전한다 (2026-11-21 사용자 요청).
+- 사용자가 준 우주인 사진을 3D로 만들지 않고 잡지에서 오린 스티커처럼 다듬어, 위성 오른쪽 가장자리 앞에 둥실거리는 빌보드로 붙였다 (2026-11-22 사용자 요청, [analysis/astronaut.md](analysis/astronaut.md)).
 - 인공위성(은색 몸통, 행성을 보는 접시 안테나, 해를 따라 도는 파란 태양 전지판 두 장)이 거리 57의 비스듬한 궤도를 36초에 한 바퀴 돌고, 궤도는 옅은 하늘색 고리로 그린다 (2026-11-22 사용자 요청, [analysis/satellite.md](analysis/satellite.md)).
 - 비눗방울 240개가 소행성대처럼 행성을 감싼 띠(행성 중심에서 32~44, 적도에서 조금 기운 평면)를 이루어 천천히 공전하며 둥실거린다. 가장자리가 무지개빛이고 가운데는 비친 창과 반짝임만 보인다 (2026-11-22 사용자 요청, [analysis/bubbles.md](analysis/bubbles.md)).
 - 주황색 해가 행성 중심에서 70 떨어진 궤도를 48초에 한 바퀴 돈다. 직사광이 해를 따라 움직여 낮과 밤이 바뀌고, 밤 쪽은 간접광으로만 보인다. 해는 둘레의 햇살과 캐릭터를 바라보는 눈을 가지며, 궤적이 가는 고리로 보인다 ([analysis/sun.md](analysis/sun.md)).

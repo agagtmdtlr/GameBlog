@@ -12,6 +12,7 @@ import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
 import { MOON } from './moon';
+import { ASTRONAUT } from './astronaut';
 import { SATELLITE } from './satellite';
 import { SUN } from './sun';
 import { pupilOffset, SUN_FACE, sunBillboardBasis, sunEyes } from './sunFace';
@@ -626,6 +627,32 @@ describe('인공위성', () => {
     expect(dot(dishDown, normalize(scale(center, -1)))).toBeCloseTo(1, 4);
     const satelliteItems = world.buildDrawList(1).filter((item) => item.mesh === 'satelliteDish');
     expect(satelliteItems.every((item) => !item.castShadow)).toBe(true);
+  });
+});
+
+describe('우주인 스티커', () => {
+  const sticker = (world: World) => world.buildBillboards(1).filter((b) => b.image === 'astronaut');
+
+  it('위성 곁에 하나 떠 있고, 어느 쪽에서 보아도 위성 속에 묻히지 않는다', () => {
+    const world = new World();
+    const [b] = sticker(world);
+    expect(sticker(world)).toHaveLength(1);
+    const moonCenter = scale(MOON.direction, MOON.distance);
+    const gap = length(sub(b.position, moonCenter));
+    expect(gap - (ASTRONAUT.size / 2) * Math.SQRT2 - ASTRONAUT.bobAmplitude).toBeGreaterThan(MOON.radius * 1.25);
+    expect(gap).toBeLessThan(MOON.radius * 3);
+    // 사진 색 그대로, 조명과 톤 매핑을 받지 않는다.
+    expect(b.toneMapped).toBe(false);
+    expect(b.color).toEqual([1, 1, 1]);
+  });
+
+  it('시간이 흐르면 둥실거리고 기우뚱한다', () => {
+    const world = new World();
+    const before = sticker(world)[0];
+    for (let i = 0; i < Math.round(ASTRONAUT.bobPeriodSeconds / 4 / DT); i++) world.fixedStep(DT, IDLE);
+    const after = sticker(world)[0];
+    expect(length(sub(after.position, before.position))).toBeGreaterThan(ASTRONAUT.bobAmplitude * 0.8);
+    expect(after.rotation).not.toBeCloseTo(before.rotation!, 3);
   });
 });
 
