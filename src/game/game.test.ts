@@ -17,6 +17,7 @@ import { SATELLITE } from './satellite';
 import { SUN } from './sun';
 import { pupilOffset, SUN_FACE, sunBillboardBasis, sunEyes } from './sunFace';
 import { TRAIN_CARS } from './train';
+import { SMOKE } from './smoke';
 import { NPCS, STUDIO_ENVIRONMENT, World } from './world';
 
 function surfaceObject(id: string): SurfaceObject {
@@ -284,7 +285,12 @@ describe('월드 통합', () => {
   it('영역을 밟아도 행성과 캐릭터의 재질은 바뀌지 않는다', () => {
     const entries = testEntries([]);
     const world = new World(entries);
-    const materials = () => world.buildDrawList(1).map((item) => item.material);
+    // 기차 연기 퍼프는 시간이 지나며 생기고 사라지므로 뺀다.
+    const materials = () =>
+      world
+        .buildDrawList(1)
+        .filter((item) => item.material.baseColor !== SMOKE.color)
+        .map((item) => item.material);
     const before = materials();
     rollTo(world, entries[0]);
     for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);

@@ -8,7 +8,7 @@
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline -- src/engine/trackPath.ts src/game/train.ts
+git log --oneline -- src/engine/trackPath.ts src/game/train.ts src/game/smoke.ts
 ```
 
 ## 동작
@@ -16,6 +16,7 @@ git log --oneline -- src/engine/trackPath.ts src/game/train.ts
 - 선로는 시작 지점(위도 90)을 둘러싸고 위도 46~54 사이를 물결치며 행성을 한 바퀴 도는 닫힌 고리다 (2026-11-21 사용자 요청). 길이는 약 73이다.
 - 기차는 기관차(짙은 파랑) 하나와 객차 셋(노랑, 청록, 산호)이다. 초당 3.2씩 선로를 따라가 한 바퀴에 약 23초 걸린다.
 - 시작 지점에서는 지평선 너머라 보이지 않는다. 집 자리 쪽으로 조금 걸어가면 선로가 보인다.
+- 기관차 굴뚝에서 하얀 연기 공(퍼프)이 피어올라 기차 뒤에 꼬리로 남는다 (2026-11-22 사용자 요청).
 - 차량은 움직이는 충돌 상자다. 캐릭터(플레이어, NPC)가 선로 위에 서 있으면 기차가 밀어낸다. 차량 위에 올라타도 실려 가지는 않는다.
 - `World.fixedStep`에서만 움직이므로 시작 화면과 일시 정지 중에는 멈춘다.
 
@@ -27,11 +28,13 @@ git log --oneline -- src/engine/trackPath.ts src/game/train.ts
 |---|---|
 | `engine/trackPath.ts` | `TRACK_SHAPE`(레일·침목 치수와 색), `RAIL_TOP`, `SphereTrackPath`(구 표면 닫힌 스플라인), `trackMesh`(레일·침목 삼각형 배열). three.js를 쓰지 않는다 |
 | `game/train.ts` | `TRACK_ROUTE`(조절점 위도·경도), `TRACK_PATH`, `TRAIN`(빠르기, 틈, 폭, 바퀴), `TRAIN_CARS`(차량 목록과 부품), `Train` 클래스(`step`, `position`, `poses`, `obstacles`, `parts`) |
-| `game/world.ts` | `World.train`을 `fixedStep`에서 캐릭터보다 먼저 진행하고, 차량 상자를 표면 객체 상자와 함께 `obstacles`로 넘긴다. 그리기 목록에 `rails`, `sleepers`(단위 행렬)와 차량 부품을 넣는다 |
+| `game/smoke.ts` | `SMOKE`(간격, 수명, 크기, 떠오르는 빠르기, 색), `puffRadius`, `SmokeTrail`(`step`, `models`). `Train.smoke`가 들고 `Train.step`이 굴뚝 꼭대기(`chimneyTop`)를 넘겨 진행한다 |
+| `game/world.ts` | `World.train`을 `fixedStep`에서 캐릭터보다 먼저 진행하고, 차량 상자를 표면 객체 상자와 함께 `obstacles`로 넘긴다. 그리기 목록에 `rails`, `sleepers`(단위 행렬)와 차량 부품, 연기 퍼프(`sphere`, 그림자 없음)를 넣는다 |
 | `engine/frame.ts` | `MeshKind`에 `cylinder`, `rails`, `sleepers` |
 | `engine/renderer.ts` | `cylinder`: 축을 Z로 돌린 `CylinderGeometry(0.5, 0.5, 1)`. `setTrack()`: `trackMesh`의 배열로 `rails`, `sleepers` 지오메트리를 채운다 |
 | `main.ts` | 렌더러를 만든 뒤 `renderer.setTrack(trackMesh(TRACK_PATH))`를 한 번 부른다 |
 | `game/train.test.ts` | 스플라인, 선로 자리, 기차 테스트 |
+| `game/smoke.test.ts` | 굴뚝 연기 테스트 |
 
 ## 스플라인
 
@@ -50,6 +53,15 @@ git log --oneline -- src/engine/trackPath.ts src/game/train.ts
 - 객차(길이 1.8): 바퀴 넷, 차대, 몸통 상자, 지붕.
 - 차량 사이 틈은 0.3이다. 차량을 더하거나 빼려면 `TRAIN_CARS`에 줄을 더하거나 뺀다.
 
+## 굴뚝 연기
+
+- 차량의 `chimney`(굴뚝 꼭대기 자리, [오른쪽, 위, 앞])가 연기가 나오는 곳이다. 지금은 기관차만 있다. 굴뚝이 있는 첫 차량에서만 나온다.
+- 0.14초마다 퍼프를 하나 내보낸다. 퍼프는 내보낸 월드 자리에서 위(표면 바깥)로 초당 1.6씩 떠오르고, 그 빠르기는 초당 1.4의 비율로 줄어든다. 옆으로는 퍼프마다 황금각만큼 돌린 방향으로 0.35씩 흩어진다. 무작위가 아니라 늘 같은 모양이다.
+- 퍼프는 기차를 따라가지 않으므로 기차가 앞으로 가면 뒤에 연기 꼬리가 남는다.
+- 반지름은 0.1에서 빠르게 0.42 가까이 부풀고, 수명(1.8초)의 마지막 30% 동안 0으로 줄어 사라진다(`puffRadius`). 반투명으로 흐려지지 않고 크기로만 사라지는 만화풍이다.
+- 퍼프는 늘 13개 안팎이다. 밝은 회색(`SMOKE.color`) 툰 재질의 `sphere`이고 그림자를 드리우지 않는다.
+- 렌더링 보간: 퍼프마다 이전 자리를 두고, 나이는 마지막 걸음의 `dt`로 되돌려 계산한다.
+
 ## 노선 바꾸기
 
 1. `TRACK_ROUTE`의 위도·경도를 고친다. 조절점은 4개 이상이어야 한다.
@@ -59,7 +71,8 @@ git log --oneline -- src/engine/trackPath.ts src/game/train.ts
 ## 테스트
 
 - `game/train.test.ts`: 스플라인(표면 위, 조절점 통과, 닫힌 고리, 호 길이, 정규직교 축, 굽음 정도, 조절점 수), 선로 자리(시작 지점·표면 객체·NPC와의 간격, 레일 높이), 기차(한 바퀴 주기, 보간, 차량 간격, 행렬식 양수, 캐릭터 밀어내기).
-- `game/game.test.ts`: 그리기 목록의 `box` 수와 빛나는 항목 수에 기차 부품을 더해 센다. 해 구체는 `sphere` 메시로 찾는다.
+- `game/smoke.test.ts`: 퍼프 크기 곡선, 퍼프 수가 늘지 않음, 떠오름, 달리는 기관차 굴뚝에서 나와 뒤에 남음.
+- `game/game.test.ts`: "영역을 밟아도 재질은 바뀌지 않는다"는 생기고 사라지는 연기 퍼프(`SMOKE.color`)를 빼고 비교한다. 그리기 목록의 `box` 수와 빛나는 항목 수에 기차 부품을 더해 센다. 해 구체는 `sphere` 메시로 찾는다.
 
 ## 브라우저 확인 (2026-11-21, 작업 브랜치 개발 서버)
 
@@ -68,6 +81,8 @@ git log --oneline -- src/engine/trackPath.ts src/game/train.ts
 | 선로 | 레일 두 줄과 침목이 행성 곡면을 따라 깔림 |
 | 기차 | 기관차와 객차 셋이 굽은 선로를 따라 이어져 달림 |
 | `gl.getError()` | 0, 콘솔 오류 없음 |
+
+2026-11-22에는 굴뚝 연기도 확인했다: 굴뚝 위로 하얀 퍼프가 피어올라 기차 뒤로 꼬리를 이룸, `gl.getError()` 0, 콘솔 오류 없음.
 
 확인하지 않은 것: 기차가 캐릭터를 미는 모습(테스트로만 확인), 공개 URL.
 

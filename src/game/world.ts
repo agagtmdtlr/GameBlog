@@ -46,6 +46,7 @@ import { SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
 import { ROCKET_SHAPE } from '../engine/rocketShape';
 import { SurfaceZone } from './surfaceZone';
 import { Train, type TrainPartModel } from './train';
+import { SMOKE } from './smoke';
 import { TRACK_SHAPE } from '../engine/trackPath';
 import { Sun, SUN, SUN_EMISSIVE, SUN_ORBIT_EMISSIVE } from './sun';
 import {
@@ -337,6 +338,12 @@ export class World {
       ),
       drawItemFromModel('sleepers', mat4Identity(), material(TRACK_SHAPE.sleeperColor, TRACK_SHAPE.sleeperRoughness)),
       ...this.train.parts(alpha).map(trainPartDrawItem),
+      // 연기 퍼프는 가볍게 보이도록 그림자를 드리우지 않는다.
+      ...this.train.smoke
+        .models(alpha)
+        .map(({ position, radius }) =>
+          drawItem('sphere', position, [radius, radius, radius], material(SMOKE.color, SMOKE.roughness), QUAT_IDENTITY, false),
+        ),
       ...characterDrawItems(this.walker, alpha, PLAYER_COLOR, 'sphere'),
       ...this.npcs.flatMap((npc, i) => characterDrawItems(npc.walker, alpha, NPCS[i].color, NPCS[i].shape)),
       ...this.aliens.flatMap((alien) => alien.parts(alpha).map(alienPartDrawItem)),
