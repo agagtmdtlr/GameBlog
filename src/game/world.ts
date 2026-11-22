@@ -24,6 +24,7 @@ import { sunRaysExtent } from '../engine/sunRays';
 import {
   LEG_BONE_COUNT,
   SurfacePattern,
+  type BubbleFrame,
   type ContentFrame,
   type DrawItem,
   type Environment,
@@ -32,6 +33,7 @@ import {
   type SurfaceZoneFrame,
 } from '../engine/frame';
 import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
+import { BubbleBelt } from './bubbleBelt';
 import { PLANET, surfaceDirection } from './planet';
 import { DREAM_PROPS, PROP_COLLIDERS, TERRAIN, type DreamProp } from './terrain';
 import { groundRadius, type Obstacle } from '../physics/collision';
@@ -218,6 +220,7 @@ export class World {
   readonly content: ContentManager;
   readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
   readonly moon = new Moon();
+  readonly bubbles = new BubbleBelt();
   readonly train = new Train();
   readonly npcs: readonly Wanderer[];
   /** 서로 통과하지 못하는 캐릭터 몸체들. 플레이어가 먼저다. */
@@ -253,6 +256,7 @@ export class World {
   fixedStep(dt: number, command: MoveCommand): void {
     this.sun.step(dt);
     this.moon.step(dt);
+    this.bubbles.step(dt);
     this.train.step(dt);
     // 기차는 움직이는 벽이다. 이번 걸음의 자리로 캐릭터를 밀어낸다.
     const obstacles: Obstacle[] = [...SURFACE_OBSTACLES, ...this.train.obstacles()];
@@ -339,6 +343,11 @@ export class World {
         { image: 'disk', position: eye.pupil, size: [pupil, pupil], color: SUN_PUPIL_COLOR, toneMapped: true },
       ]),
     ];
+  }
+
+  /** 행성을 감싸고 떠다니는 비눗방울 띠 */
+  buildBubbles(alpha: number): BubbleFrame[] {
+    return this.bubbles.bubbles(alpha);
   }
 
   /** 해 궤적 고리의 모델 행렬. 고리의 XY 평면을 궤도면에 맞추고 궤도 반지름만큼 키운다. */

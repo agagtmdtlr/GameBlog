@@ -150,6 +150,7 @@ function main(): void {
       {
         items: world.buildDrawList(alpha),
         billboards: world.buildBillboards(alpha, camera.view),
+        bubbles: world.buildBubbles(alpha),
         camera: camera.view,
         environment: world.environment(alpha),
         occluder: world.occluder(alpha),

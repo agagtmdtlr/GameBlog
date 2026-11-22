@@ -109,10 +109,20 @@ export interface SurfaceZoneFrame {
   presence: number;
 }
 
+/** 행성 둘레를 떠다니는 비눗방울 하나 (`game/bubbleBelt.ts`) */
+export interface BubbleFrame {
+  center: Vec3;
+  radius: number;
+  /** 막의 무지개 물결이 흐른 정도. 방울마다 다르게 천천히 바뀐다. */
+  swirl: number;
+}
+
 export interface FrameData {
   items: readonly DrawItem[];
   /** 카메라를 보는 사각 빌보드. 순서는 상관없고, 렌더러가 한 번에 모아 그린다 (`billboard.ts`). */
   billboards: readonly Billboard[];
+  /** 반투명 비눗방울. 렌더러가 인스턴스로 한 번에 가산 혼합해 그린다 (`bubbleRenderer.ts`). */
+  bubbles: readonly BubbleFrame[];
   camera: CameraView;
   environment: Environment;
   /** 앰비언트 오클루전을 만드는 구 */
