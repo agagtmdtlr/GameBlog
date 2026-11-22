@@ -72,7 +72,7 @@ git log --oneline -- src/engine/trackPath.ts src/game/train.ts src/game/smoke.ts
 
 - `game/train.test.ts`: 스플라인(표면 위, 조절점 통과, 닫힌 고리, 호 길이, 정규직교 축, 굽음 정도, 조절점 수), 선로 자리(시작 지점·표면 객체·NPC와의 간격, 레일 높이), 기차(한 바퀴 주기, 보간, 차량 간격, 행렬식 양수, 캐릭터 밀어내기).
 - `game/smoke.test.ts`: 퍼프 크기 곡선, 퍼프 수가 늘지 않음, 떠오름, 달리는 기관차 굴뚝에서 나와 뒤에 남음.
-- `game/game.test.ts`: "영역을 밟아도 재질은 바뀌지 않는다"는 생기고 사라지는 연기 퍼프(`SMOKE.color`)를 빼고 비교한다. 그리기 목록의 `box` 수와 빛나는 항목 수에 기차 부품을 더해 센다. 해 구체는 `sphere` 메시로 찾는다.
+- `game/game.test.ts`: 그리기 목록의 `box` 수와 빛나는 항목 수에 기차 부품을 더해 센다. 해 구체는 `sphere` 메시로 찾는다.
 
 ## 브라우저 확인 (2026-11-21, 작업 브랜치 개발 서버)
 

@@ -1,6 +1,6 @@
 # WebGL 게임형 그래픽스 포트폴리오 블로그 — 구성·개발 계획서
 
-> 첫 버전의 계획서다. 구, 발판, 점프처럼 지금은 바뀐 내용이 남아 있고, 바뀐 결정은 날짜와 함께 일부만 적혀 있다. 현재 구조와 기능은 [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md), 기능별 규칙은 [README.md](README.md)의 색인을 본다.
+> 첫 버전의 계획서다. 구, 발판, 점프처럼 지금은 바뀐 내용이 남아 있고, 바뀐 결정은 날짜와 함께 일부만 적혀 있다. 현재 구조와 기능은 [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md), 기능별 규칙은 [README.md](README.md)의 색인을 본다. 발판(뒤의 작동 영역)과 콘텐츠 인터페이스는 등록된 콘텐츠가 없어 2026-11-22에 지웠다 ([rules/world.md](rules/world.md)).
 
 ## 1. 배경과 목표
 

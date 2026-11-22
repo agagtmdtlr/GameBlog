@@ -22,14 +22,6 @@ uniform vec3 uNightAmbient;
 uniform vec4 uOccluder;
 uniform bool uReceiveOccluder;
 
-/** 표면 영역. uZoneParams x: 반지름(라디안), y: 경계선 폭(라디안), z: 빛남, w: 구가 위에 있음 */
-const int MAX_ZONES = 8;
-uniform bool uShowZones;
-uniform int uZoneCount;
-uniform vec3 uZoneDir[MAX_ZONES];
-uniform vec3 uZoneColor[MAX_ZONES];
-uniform vec4 uZoneParams[MAX_ZONES];
-
 uniform sampler2DShadow uShadowMap;
 uniform float uShadowTexel;
 
@@ -145,27 +137,6 @@ vec3 applySurfacePattern(vec3 albedo, vec3 N) {
   return albedo;
 }
 
-// 구 표면에 원형 영역을 칠한다. 안쪽은 영역 색으로 물들이고 경계에 선을 두른다.
-// 활성 영역은 빛나고, 구가 올라서 있으면 경계선이 밝아진다.
-void applySurfaceZones(inout vec3 albedo, inout vec3 emissive) {
-  if (!uShowZones) return;
-  // 땅에 높낮이가 있으므로 법선이 아니라 중심에서 이 점을 향하는 방향으로 잰다.
-  vec3 N = normalize(vObjectPos);
-  for (int i = 0; i < MAX_ZONES; i++) {
-    if (i >= uZoneCount) break;
-    vec4 p = uZoneParams[i];
-    float angle = acos(clamp(dot(N, uZoneDir[i]), -1.0, 1.0));
-    float aa = fwidth(angle);
-    float inside = 1.0 - smoothstep(p.x - aa, p.x + aa, angle);
-    float edge = inside * (1.0 - smoothstep(p.y - aa, p.y + aa, p.x - angle));
-    vec3 color = uZoneColor[i];
-    albedo = mix(albedo, color, inside * 0.8);
-    // 영역 색이 바탕과 같아도 보이도록 경계선은 어둡게, 구가 올라서면 영역 색으로 밝힌다.
-    albedo = mix(albedo, albedo * 0.35, edge * (1.0 - p.w));
-    emissive += color * (inside * p.z * 0.35 + edge * (p.z * 0.6 + p.w * 1.2));
-  }
-}
-
 void main() {
   vec3 N = normalize(vNormal);
   vec3 V = normalize(uCameraPos - vWorldPos);
@@ -174,7 +145,6 @@ void main() {
 
   vec3 albedo = applySurfacePattern(uBaseColor, N);
   vec3 emissive = uEmissive;
-  applySurfaceZones(albedo, emissive);
   float roughness = clamp(uRoughness, 0.04, 1.0);
   vec3 diffuseColor = albedo * (1.0 - uMetallic);
 

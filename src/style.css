@@ -130,48 +130,6 @@ kbd {
   outline-offset: 2px;
 }
 
-#hud {
-  position: fixed;
-  left: calc(20px + env(safe-area-inset-left));
-  bottom: calc(20px + env(safe-area-inset-bottom));
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  backdrop-filter: blur(8px);
-  font-size: 14px;
-  font-weight: 600;
-  pointer-events: none;
-}
-
-#hud-swatch {
-  width: 14px;
-  height: 14px;
-  /* 기본색처럼 어두운 색도 보이도록 테두리를 둔다. */
-  border: 1px solid rgb(255 255 255 / 0.45);
-  border-radius: 50%;
-  transition: background-color 0.3s;
-}
-
-.hud--changed {
-  animation: hud-pop 0.35s ease-out;
-}
-
-@keyframes hud-pop {
-  40% {
-    transform: scale(1.08);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hud--changed {
-    animation: none;
-  }
-}
-
 /* 터치가 주 입력이면 터치 조작 안내를, 아니면 키보드·마우스 안내를 보여 준다. */
 .controls-touch {
   display: none !important;

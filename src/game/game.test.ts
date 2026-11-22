@@ -1,23 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { ContentManager } from '../content/manager';
-import { CONTENT_ENTRIES } from '../content/registry';
-import { MAX_SURFACE_ZONES } from '../engine/frame';
 import { STARFIELD } from '../engine/starfield';
 import { SUN_RAYS } from '../engine/sunRays';
-import type { ContentEntry, GraphicsContent } from '../content/types';
 import { add, cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
 import { loadSurfaceScene, SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
-import { SurfaceZone } from './surfaceZone';
 import { MOON } from './moon';
 import { ASTRONAUT } from './astronaut';
 import { SATELLITE } from './satellite';
 import { SUN } from './sun';
 import { pupilOffset, SUN_FACE, sunBillboardBasis, sunEyes } from './sunFace';
 import { TRAIN_CARS } from './train';
-import { SMOKE } from './smoke';
 import { NPCS, STUDIO_ENVIRONMENT, World } from './world';
 
 function surfaceObject(id: string): SurfaceObject {
@@ -115,187 +109,10 @@ describe('카메라', () => {
   });
 });
 
-describe('작동 영역', () => {
-  const RADIUS = 1.5 / PLANET.radius;
-  const MARGIN = PLAYER_RADIUS / PLANET.radius;
-  const zone = (): SurfaceZone => new SurfaceZone([0, 1, 0], RADIUS, MARGIN);
-  /** 영역 중심에서 표면을 따라 `distance`만큼 떨어진 곳에 놓인 구의 중심 */
-  const at = (distance: number, height = REST_DISTANCE): Vec3 => {
-    const angle = distance / PLANET.radius;
-    return [Math.sin(angle) * height, Math.cos(angle) * height, 0];
-  };
-
-  it('구가 영역 안으로 들어오면 한 번만 작동한다', () => {
-    const z = zone();
-    expect(z.update(at(2), PLANET.center)).toBe(false);
-    expect(z.update(at(1.4), PLANET.center)).toBe(true);
-    for (let i = 0; i < 100; i++) expect(z.update(at(0), PLANET.center)).toBe(false);
-  });
-
-  it('영역 위의 공중에 있어도 작동한다', () => {
-    expect(zone().update(at(0, REST_DISTANCE + 2), PLANET.center)).toBe(true);
-  });
-
-  it('경계를 오가도 충분히 벗어나기 전에는 다시 작동하지 않는다', () => {
-    const z = zone();
-    z.update(at(1.4), PLANET.center);
-    z.update(at(1.6), PLANET.center);
-    expect(z.update(at(1.4), PLANET.center)).toBe(false);
-  });
-
-  it('충분히 벗어난 뒤 돌아오면 다시 작동한다', () => {
-    const z = zone();
-    z.update(at(0), PLANET.center);
-    z.update(at(3), PLANET.center);
-    expect(z.update(at(0), PLANET.center)).toBe(true);
-  });
-
-  it('행성 반대편에 있는 구는 작동시키지 않는다', () => {
-    const z = zone();
-    expect(z.update([0, -REST_DISTANCE, 0], PLANET.center)).toBe(false);
-    expect(z.contains([0, -REST_DISTANCE, 0], PLANET.center)).toBe(false);
-    expect(z.contains(TOP, PLANET.center)).toBe(true);
-  });
-});
-
-describe('콘텐츠 관리', () => {
-  function fakeContent(id: string, log: string[]): GraphicsContent {
-    return {
-      id,
-      label: id,
-      activate: () => log.push(`+${id}`),
-      deactivate: () => log.push(`-${id}`),
-    };
-  }
-  const ctx = {};
-
-  it('새 콘텐츠를 켜기 전에 이전 콘텐츠를 끈다', () => {
-    const log: string[] = [];
-    const manager = new ContentManager(ctx, [fakeContent('a', log), fakeContent('b', log)]);
-    manager.activate('a');
-    manager.activate('b');
-    expect(log).toEqual(['+a', '-a', '+b']);
-  });
-
-  it('같은 콘텐츠를 다시 켜면 아무 일도 하지 않는다', () => {
-    const log: string[] = [];
-    const manager = new ContentManager(ctx, [fakeContent('a', log)]);
-    manager.activate('a');
-    manager.activate('a');
-    expect(log).toEqual(['+a']);
-  });
-
-  it('id가 중복되면 바로 알린다', () => {
-    const log: string[] = [];
-    expect(() => new ContentManager(ctx, [fakeContent('a', log), fakeContent('a', log)])).toThrow();
-  });
-});
-
 describe('월드 통합', () => {
-  const directionOf = ({ zone }: ContentEntry): Vec3 => surfaceDirection(zone.latitude, zone.longitude);
-
-  /** 시험용 콘텐츠 두 개. 켜고 끈 순서를 `log`에 남긴다. */
-  function testEntries(log: string[]): ContentEntry[] {
-    const entry = (id: string, latitude: number, longitude: number): ContentEntry => ({
-      content: {
-        id,
-        label: id,
-        activate: () => log.push(`+${id}`),
-        deactivate: () => log.push(`-${id}`),
-      },
-      zone: { latitude, longitude, color: [1, 0, 0] },
-    });
-    return [entry('a', 35, 60), entry('b', -5, 115)];
-  }
-
-  /** 영역을 향해 표면을 따라 굴러간다. */
-  function rollTo(world: World, entry: ContentEntry): void {
-    const target = scale(directionOf(entry), REST_DISTANCE);
-    for (let i = 0; i < 2400; i++) {
-      const position = world.player.position;
-      const toTarget = sub(target, position);
-      if (length(toTarget) < 0.3) return;
-      const up = normalize(position);
-      const direction = normalize(sub(toTarget, scale(up, dot(toTarget, up))));
-      world.fixedStep(DT, { direction });
-    }
-  }
-
-  it('처음에는 켜진 콘텐츠가 없다', () => {
-    expect(new World().content.activeId).toBeNull();
-    expect(new World(testEntries([])).content.activeId).toBeNull();
-  });
-
   it('구는 행성 꼭대기에서 시작한다', () => {
     const world = new World();
     expect(world.player.position).toEqual(TOP);
-  });
-
-  it('영역은 서로 겹치지 않고 시작 지점을 덮지 않는다', () => {
-    const surfaceDistance = (a: Vec3, b: Vec3): number =>
-      Math.acos(Math.min(1, Math.max(-1, dot(a, b)))) * PLANET.radius;
-    CONTENT_ENTRIES.forEach((entry, i) => {
-      expect(Math.abs(entry.zone.latitude)).toBeLessThanOrEqual(90);
-      expect(surfaceDistance(directionOf(entry), [0, 1, 0])).toBeGreaterThan(3.4);
-      CONTENT_ENTRIES.slice(i + 1).forEach((other) => {
-        expect(surfaceDistance(directionOf(entry), directionOf(other))).toBeGreaterThan(3.4);
-      });
-    });
-  });
-
-  it('영역 수는 렌더러가 그릴 수 있는 만큼이다', () => {
-    expect(CONTENT_ENTRIES.length).toBeLessThanOrEqual(MAX_SURFACE_ZONES);
-  });
-
-  it('모든 영역은 해가 드는 쪽에 있다', () => {
-    for (const entry of CONTENT_ENTRIES) {
-      expect(dot(directionOf(entry), STUDIO_ENVIRONMENT.lightDirection)).toBeGreaterThan(0.25);
-    }
-  });
-
-  it('구가 올라선 영역만 강조되고, 켜진 영역은 빛난다', () => {
-    const entries = testEntries([]);
-    const world = new World(entries);
-    rollTo(world, entries[1]);
-    // 멈추지 않고 영역 위에 있는 동안 0.3초를 보낸다.
-    const p = world.player.position;
-    for (let i = 0; i < 36; i++) {
-      world.player.position = p;
-      world.player.velocity = [0, 0, 0];
-      world.fixedStep(DT, IDLE);
-    }
-    const [other, target] = world.buildSurfaceZones();
-    expect(target.presence).toBeGreaterThan(0.8);
-    expect(target.glow).toBeGreaterThan(0.8);
-    expect(other.presence).toBeLessThan(0.2);
-    expect(other.glow).toBeLessThan(0.2);
-  });
-
-  it('영역까지 굴러가면 그 콘텐츠가 켜지고, 다른 영역으로 가면 바뀐다', () => {
-    const log: string[] = [];
-    const entries = testEntries(log);
-    const world = new World(entries);
-    rollTo(world, entries[0]);
-    expect(world.content.activeId).toBe('a');
-    rollTo(world, entries[1]);
-    expect(world.content.activeId).toBe('b');
-    expect(log).toEqual(['+a', '-a', '+b']);
-  });
-
-  it('영역을 밟아도 행성과 캐릭터의 재질은 바뀌지 않는다', () => {
-    const entries = testEntries([]);
-    const world = new World(entries);
-    // 기차 연기 퍼프는 시간이 지나며 생기고 사라지므로 뺀다.
-    const materials = () =>
-      world
-        .buildDrawList(1)
-        .filter((item) => item.material.baseColor !== SMOKE.color)
-        .map((item) => item.material);
-    const before = materials();
-    rollTo(world, entries[0]);
-    for (let i = 0; i < 60; i++) world.fixedStep(DT, IDLE);
-    expect(world.content.activeId).toBe('a');
-    expect(materials()).toEqual(before);
   });
 });
 

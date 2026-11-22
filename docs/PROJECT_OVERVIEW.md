@@ -8,7 +8,7 @@
 
 ## 1. 컨셉
 
-사이트 전체가 하나의 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다니고, 표면에 칠해진 원형 영역에 들어가 콘텐츠를 켠다(지금은 등록된 콘텐츠가 없다). 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
+사이트 전체가 하나의 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다닌다. 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
 
 ## 2. 기술 구성
 
@@ -33,14 +33,14 @@ npm run preview  # 빌드 결과 미리 보기
 
 ```
 GameBlog/
-├─ index.html                  캔버스, HUD, 시작·일시 정지 화면의 뼈대
+├─ index.html                  캔버스, 시작·일시 정지 화면의 뼈대
 ├─ src/
 │  ├─ main.ts                  진입점, 게임 루프, 게임 상태 전환
-│  ├─ style.css                오버레이와 HUD 스타일
+│  ├─ style.css                오버레이 스타일
 │  ├─ engine/                  게임을 모르는 범용 코드
 │  │  ├─ frame.ts              렌더러 입력 타입 (three.js와 무관)
 │  │  ├─ math.ts               Vec3, Quat, Mat4 연산
-│  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스, 콘텐츠 렌더러 호출
+│  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스
 │  │  ├─ billboard.ts          빌보드 모양, 아틀라스 배치, 그리기 순서 ([analysis/billboard.md](analysis/billboard.md))
 │  │  ├─ billboardAtlas.ts     빌보드 그림을 한 캔버스에 그림
 │  │  ├─ speechBubble.ts       NPC 인사말 목록과 말풍선 그림 ([analysis/npc.md](analysis/npc.md))
@@ -56,9 +56,6 @@ GameBlog/
 │  │  ├─ trackPath.ts          구 표면 닫힌 스플라인 경로와 레일·침목 모양 ([analysis/train.md](analysis/train.md))
 │  │  ├─ starfield.ts          별 배치와 별 얼굴 그림 ([analysis/starfield.md](analysis/starfield.md))
 │  │  ├─ sunRays.ts            해 둘레 삼각형 햇살의 모양 ([analysis/sun.md](analysis/sun.md))
-│  │  ├─ contentRenderers/     콘텐츠 전용 그리기
-│  │  │  ├─ contentRenderer.ts   공통 기반 클래스와 RenderContext
-│  │  │  └─ registry.ts          콘텐츠 렌더러 등록 목록 (지금은 비어 있음)
 │  │  └─ input.ts              키보드, 마우스, 포인터 잠금 상태
 │  ├─ physics/
 │  │  ├─ collision.ts          구-땅(높이 함수), 구-상자, 구-캡슐 충돌과 반발
@@ -83,16 +80,11 @@ GameBlog/
 │  │  ├─ characterClips.ts     캐릭터 키프레임 클립 (서기, 걷기, 내딛기)
 │  │  ├─ keyframes.ts          키프레임 트랙 샘플링 (3차 Hermite)
 │  │  ├─ cameraRig.ts          행성 표면을 따라가는 3인칭 궤도 카메라
-│  │  └─ surfaceZone.ts        행성 표면 원형 영역의 작동 판정
-│  ├─ content/
-│  │  ├─ types.ts              콘텐츠 인터페이스
-│  │  ├─ manager.ts            활성 콘텐츠 관리
-│  │  └─ registry.ts           작동 영역과 콘텐츠 등록 목록 (지금은 비어 있음)
 │  ├─ assets/character.glb     Blender에서 내보낸 다리 스킨 메시
 │  ├─ assets/astronaut-sticker.png  잡지에서 오린 스티커 꼴의 우주인 그림 ([analysis/astronaut.md](analysis/astronaut.md))
 │  ├─ scenes/surface.json      행성 표면에 놓는 객체(집·로켓 자리)의 장면 파일
 │  ├─ shaders/                 mesh.vert, toon.frag, billboard.vert, billboard.frag, bubble.vert, bubble.frag
-│  └─ ui/overlay.ts            화면 안내와 HUD 제어
+│  └─ ui/overlay.ts            화면 안내, 일시 정지 버튼, 조이스틱 표시
 ├─ README.md                  저장소 소개, 조작, 시작 방법
 ├─ tools/blender/build_character.py  캐릭터 다리 모델(character.glb)을 만드는 Blender 스크립트
 ├─ tools/sticker/                    우주인 원본 사진과 스티커 그림을 만드는 Python 스크립트
@@ -110,8 +102,7 @@ GameBlog/
 ### 의존 방향
 
 ```
-main.ts ─┬─ game/ ─┬─ content/
-         │         ├─ physics/ ─ engine/math
+main.ts ─┬─ game/ ─┬─ physics/ ─ engine/math
          │         └─ engine/
          ├─ engine/
          └─ ui/
@@ -119,17 +110,15 @@ main.ts ─┬─ game/ ─┬─ content/
 
 - `engine/`은 게임 규칙을 모른다.
 - `World`는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다.
-- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/bubbleRenderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 쓴다.
-- `Renderer`는 특정 콘텐츠를 모른다. 콘텐츠 전용 그리기는 `ContentRenderer`를 상속한 클래스가 맡는다.
-- 콘텐츠는 `ContentContext`를 통해서만 월드에 영향을 준다. 작동 영역은 콘텐츠의 내용을 모른다.
+- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/bubbleRenderer.ts`, `main.ts`에서만 쓴다.
 
 ### 프레임 흐름
 
 1. `main.ts`가 입력을 읽어 카메라 기준 이동 방향을 계산한다.
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `fixedStep`은 해의 궤도 진행, 위성 자전, 인공위성 공전, 비눗방울 떠다니기, 기차 진행, 캐릭터 물리 몸체의 이동과 충돌, NPC 이동과 캐릭터끼리 밀어내기, 걸음(`Walker`), 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
+3. `fixedStep`은 해의 궤도 진행, 위성 자전, 인공위성 공전, 비눗방울 떠다니기, 기차 진행, 캐릭터 물리 몸체의 이동과 충돌, NPC 이동과 캐릭터끼리 밀어내기, 걸음(`Walker`)을 순서대로 처리한다.
 4. 카메라가 보간된 물리 몸체 위치를 따라간다.
-5. `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광), `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 지금은 콘텐츠 렌더러가 없다.
+5. `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광)가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한다.
 
 ### 게임 상태
 
@@ -162,7 +151,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - 점프는 없다 (2026-11-15 제거). 캐릭터는 걸어서만 움직인다.
 - 바닥에서 잠깐 떠도 0.1초 동안은 지면 가속과 감쇠를 유지한다.
 - 굴러가는 회전은 계산하지 않는다. 몸의 방향과 발은 `Walker`가 정한다 ([analysis/character.md](analysis/character.md)).
-- 충돌체는 높낮이가 있는 땅(구-땅 충돌, 비탈에서 미끄러지지 않게 위쪽으로 밀어냄), 집 자리·로켓 자리 상자(구-방향 있는 상자 충돌, 2026-11-21 사용자 요청), 둥근 지형물의 캡슐(2026-11-22)이다. 상자에 부딪히면 튕기지 않고 면을 따라 미끄러진다. 위를 향한 면에 닿으면 서 있는 것으로 본다. 상자는 `World`가 `Player.step`의 `obstacles`로 넘긴다. 다리와 발은 상자를 모르므로, 벽에 붙으면 발이 상자에 묻힐 수 있다. 작동 영역은 충돌체가 아니라 표면에 칠한 판정 영역이다.
+- 충돌체는 높낮이가 있는 땅(구-땅 충돌, 비탈에서 미끄러지지 않게 위쪽으로 밀어냄), 집 자리·로켓 자리 상자(구-방향 있는 상자 충돌, 2026-11-21 사용자 요청), 둥근 지형물의 캡슐(2026-11-22)이다. 상자에 부딪히면 튕기지 않고 면을 따라 미끄러진다. 위를 향한 면에 닿으면 서 있는 것으로 본다. 상자는 `World`가 `Player.step`의 `obstacles`로 넘긴다. 다리와 발은 상자를 모르므로, 벽에 붙으면 발이 상자에 묻힐 수 있다.
 - 최고 속도로 걸어도 표면에서 뜨지 않는다. 한 바퀴를 도는 테스트가 이를 확인한다.
 
 ### 월드
@@ -181,18 +170,6 @@ main.ts ─┬─ game/ ─┬─ content/
 - 카메라의 위쪽은 캐릭터가 있는 곳의 표면 바깥 방향이다. 좌우 각도 대신 표면에 접하는 진행 방향을 들고 다녀 극점에서도 뒤집히지 않는다.
 - 검은 배경에 파스텔 무지개 색이 물결치는 몽환적인 행성을 둔다. 땅과 지형물은 가장자리가 은은하게 빛나고 밤 쪽에서도 스스로 조금 빛난다. 처음에는 흰색 무채색이었고 2026-11-22에 사용자 요청으로 바꿨다. 캐릭터는 노랑(#FCC812)으로 고정이다.
 - 플레이어와 같은 다리에 색과 몸 모양(구, 정육면체, 피라미드)이 다른 NPC 5마리(하늘색, 분홍, 초록, 보라, 주황)가 행성 둘레에서 시작해 아무 곳으로 천천히 걸어갔다가 잠깐 서기를 되풀이한다. 하늘색이 집 자리 옆에서 시작한다. 플레이어와 NPC는 서로 통과하지 못한다 (2026-11-21 사용자 요청, [analysis/npc.md](analysis/npc.md)). 플레이어가 다가가면 NPC가 멈춰 서서 머리 위에 인사말 말풍선(안녕!, 반가워! 등)을 띄우고, 멀어지면 거두고 다시 걷는다 (2026-11-22 사용자 요청).
-
-### 작동 영역과 콘텐츠
-
-지금은 등록된 콘텐츠가 없어 행성 표면에 영역이 없다. 예전의 행성 표면 색 변경 콘텐츠(기본색, 코랄, 앰버, 틸, 블루 영역)는 새 시스템을 넣기 전에 정리하려고 2026-11-21에 사용자 결정으로 지웠다. 참고 구현은 커밋 `1c3831b`의 `content/planetColor.ts`, `game/colorTransition.ts`에 있다. 아래는 콘텐츠를 등록하면 따라오는 영역 동작이다.
-
-- 위치는 도 단위다. 위도 90이 시작 지점이고, 경도 180이 시작할 때 바라보는 방향이다.
-- 영역은 시작할 때 해가 드는 쪽에 둔다. 해가 궤도를 돌므로 플레이 중에는 영역이 밤 쪽에 놓일 수 있다.
-- 영역은 모델 없이 행성 표면에 칠한 원(표면 반지름 1.5)이다. 안쪽은 영역 색으로 물들고 경계에 어두운 선이 있다.
-- 캐릭터 몸의 중심이 원 안으로 들어오면 작동한다. 높이는 보지 않는다. 경계에서 충돌 구 반지름만큼 더 벗어나야 다시 작동하므로 경계를 오가도 반복 작동하지 않는다.
-- 켜진 영역은 빛나고, 캐릭터가 올라선 영역은 경계선이 밝아진다.
-- 활성 콘텐츠는 한 번에 하나이며, 처음에는 켜진 콘텐츠가 없다.
-- 왼쪽 아래 HUD에 현재 콘텐츠의 이름과 영역 색을 표시한다. 켜진 콘텐츠가 없으면 HUD를 숨긴다.
 
 ### 렌더링
 
@@ -217,24 +194,11 @@ main.ts ─┬─ game/ ─┬─ content/
 | 포인터 잠금 거부 | 드래그 시점 회전으로 플레이 지속 |
 | 탭 전환이나 긴 프레임 | 일시 정지, 물리 시간 제한 |
 
-## 6. 콘텐츠 확장
-
-규칙은 [rules/content.md](rules/content.md)에, 유형별 수정 파일과 렌더러 구조, 확인 방법은 [analysis/content.md](analysis/content.md)에 정리되어 있다.
-
-[`registry.ts`](../src/content/registry.ts)의 `CONTENT_ENTRIES`에 등록하면 영역 표시, 판정, HUD 표시가 자동으로 따라온다. 지금 `ContentContext`는 비어 있어 다음 작업이 함께 필요하다.
-
-1. `src/content/`에 `GraphicsContent`를 구현한 콘텐츠 파일을 추가한다.
-2. 필요한 기능을 [`ContentContext`](../src/content/types.ts)에 더하고 `World`에서 연결한다.
-3. 셰이더나 후처리를 바꾸는 콘텐츠라면 `src/engine/contentRenderers/`에 `ContentRenderer`를 상속한 클래스를 추가하고 그 폴더의 `registry.ts`에 등록한다. `Renderer`는 고치지 않는다.
-4. `registry.ts`에 등록한다.
-
-영역 위치는 위도와 경도로 직접 지정하며, 기존 테스트가 영역 간 간격, 영역 수(최대 8), 시작 지점과의 거리, 해가 드는 쪽인지를 검사한다.
-
-## 7. 테스트와 검증
+## 6. 테스트와 검증
 
 ### 자동 테스트
 
-`npm test` 기준 16개 파일, 173개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 18개 파일, 169개가 모두 통과한다 (2026-11-22). `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
@@ -245,7 +209,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | [`starfield.test.ts`](../src/engine/starfield.test.ts) | 3 | 별 배치와 윤곽 |
 | [`sunRays.test.ts`](../src/engine/sunRays.test.ts) | 4 | 해 햇살 모양 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
-| [`game.test.ts`](../src/game/game.test.ts) | 47 | 구 조작(중력, 한 바퀴 돌기), 카메라, 작동 영역, 콘텐츠 관리, 월드 통합, 집 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
+| [`game.test.ts`](../src/game/game.test.ts) | 38 | 구 조작(중력, 한 바퀴 돌기), 카메라, 월드 통합, 집 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
 | [`bubbleBelt.test.ts`](../src/game/bubbleBelt.test.ts) | 5 | 비눗방울 띠의 기저, 씨앗 재현, 크기 분포, 카메라·위성·해 궤도와의 간격, 떠다니기 |
 | [`npc.test.ts`](../src/game/npc.test.ts) | 12 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기, 인사 말풍선 |
 | [`bodyShape.test.ts`](../src/game/bodyShape.test.ts) | 10 | NPC 몸 모양의 엉덩이 자리, 땅과의 간격, 방향과 기저 |
@@ -267,6 +231,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | 행성 표면 작동 영역 (2026-11-17) | 코드로 구 이동, 카메라 회전 | 비활성 영역의 색과 경계선, 켜진 영역의 빛남, 구가 올라선 영역의 밝은 경계선. 앰버, 블루 영역에서 행성 표면 색 전환 중간과 완료, 기본색으로 복귀. 플레이어 구 색 유지. WebGL·콘솔 오류 없음 |
 | 몽환적인 땅과 지형물 (2026-11-22) | 시작하기 클릭, 코드로 캐릭터를 위도 15·경도 150, 위도 -30·경도 300에 이동, W 키 3초 | 언덕과 지형물이 파스텔 색으로 보이고 밤 쪽이 은은하게 빛남. 걸어서 언덕을 넘고 땅에 붙어 있음. WebGL·콘솔 오류 없음 |
 | 행성 표면 색 변경 시스템 제거 (2026-11-21) | 시작하기 클릭, 스크린샷 | 흰색 행성에 영역 없음, 활성 콘텐츠 없음, HUD 숨김. WebGL·콘솔 오류 없음 |
+| 작동 영역·콘텐츠 시스템 제거 (2026-11-22) | 시작하기 클릭, 스크린샷 | 시작 안내가 "행성을 자유롭게 탐험해 보세요.", HUD 요소 없음, 플레이 상태로 전환. WebGL·콘솔 오류 없음 |
 | 집 자리 상자 (2026-11-21) | 시작 화면, 코드로 구를 상자 앞에 이동 | 시작할 때 정면에 상자가 보임. 표면에 붙어 서고 그림자가 짐. WebGL·콘솔 오류 없음 |
 | 집 자리 상자 충돌 (2026-11-21) | 시작 후 W 키 3.5초 | 상자 정면(위도 약 74.7)에서 멈추고 통과하지 않음. 표면 높이 유지. WebGL 오류 없음 |
 | 로켓 자리 정육면체 (2026-11-21) | 시작하기 클릭, 코드로 구를 위도 44·경도 207.5에 이동 | 붉은 정육면체가 표면에 붙어 섬. WebGL·콘솔 오류 없음. 충돌은 테스트로만 확인 |
@@ -283,17 +248,16 @@ main.ts ─┬─ game/ ─┬─ content/
 - 공개 URL에서의 실제 플레이
 - 내장 그래픽 60fps 목표
 
-## 8. 알려진 한계
+## 7. 알려진 한계
 
 | 항목 | 내용 |
 |---|---|
-| 콘텐츠 폭 | 등록된 콘텐츠가 없다. 콘텐츠 렌더러 구조는 남아 있지만 등록된 렌더러가 없고, 그림자 패스에 참여하지 못한다 |
 | 안 쓰는 코드 | `math.ts`의 `mat4Perspective`, `mat4LookAt`, `mat4Ortho`, `mat4TransformPoint`, `quatMultiply`, `quatNormalize`, `quatNlerp`, `quatFromUnitVectors`는 다른 런타임 코드에서 쓰지 않고 테스트만 남아 있다 |
 | 빌드 크기 | three.js로 옮기면서 JS가 크게 늘었고, 지금은 729.30KB(gzip 194.97KB)라 Vite가 500KB 청크 경고를 낸다 |
 | 그림자 메모리 | 그림자 렌더 타깃에 쓰지 않는 색 첨부(약 16MB)가 함께 잡힌다 |
 | 재질 | 툰 셰이더가 `metallic`(하이라이트·앰비언트를 바탕색으로 물들임)을 지원하지만 모든 재질이 0을 쓴다 |
 | 프레임 비용 | 그림자 패스를 매 프레임 전부 다시 그린다. 실제 부담은 측정하지 않았다 |
-| 시야 | 행성이 작아 지평선이 가깝다. 구 앞쪽으로 약 7 거리까지만 보이고, 작동 영역은 표면에 칠한 원이라 지평선 너머에서는 전혀 보이지 않는다 |
-| 낮과 밤 | 해가 48초에 한 바퀴 돌아 어느 곳이든 한동안 밤이 된다. 밤에는 간접광만 남는다. 작동 영역의 위치 검사는 시작할 때의 해 방향만 본다 |
+| 시야 | 행성이 작아 지평선이 가깝다. 구 앞쪽으로 약 7 거리까지만 보인다 |
+| 낮과 밤 | 해가 48초에 한 바퀴 돌아 어느 곳이든 한동안 밤이 된다. 밤에는 간접광만 남는다 |
 | 모바일 | 터치로 플레이할 수 있지만 그림자 해상도와 픽셀 비율은 PC와 같다. 성능을 측정하지 않았다 |
 | 문서 | 저장소 루트 `README.md`는 소개, 조작, 시작 방법을 담고, 문서 색인은 `docs/README.md`다. 개발 계획서는 첫 버전 계획이며, 이후 바뀐 결정은 규칙 문서와 이 문서에 있다 |

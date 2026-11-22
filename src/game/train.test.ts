@@ -126,7 +126,7 @@ describe('기차', () => {
   });
 
   it('선로 위에 선 캐릭터를 밀어낸다', () => {
-    const world = new World([]);
+    const world = new World();
     const ahead = world.train.position() + 6;
     const spot = TRACK_PATH.point(ahead);
     const standing = scale(spot, (PLANET.radius + PLAYER_RADIUS) / PLANET.radius);

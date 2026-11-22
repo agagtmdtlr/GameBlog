@@ -89,7 +89,7 @@ describe('캐릭터끼리 밀어내기', () => {
   });
 
   it('월드에서 플레이어가 NPC를 통과하지 못한다', () => {
-    const world = new World(undefined, undefined, seededRandom(1));
+    const world = new World(seededRandom(1));
     const npc = world.npcs[0];
     let closest = Infinity;
     for (let i = 0; i < 120 * 6; i++) {
@@ -101,7 +101,7 @@ describe('캐릭터끼리 밀어내기', () => {
   });
 
   it('NPC끼리도 오래 돌아다니는 동안 서로 통과하지 못한다', () => {
-    const world = new World(undefined, undefined, seededRandom(5));
+    const world = new World(seededRandom(5));
     // 모두 1분 동안 돌아다니게 두고 매 순간 간격을 본다.
     const [a, b] = world.npcs;
     for (let i = 0; i < 120 * 60; i++) {
@@ -120,7 +120,7 @@ describe('캐릭터끼리 밀어내기', () => {
 
 describe('NPC 그리기', () => {
   it('NPC마다 제 모양의 몸과 플레이어와 같은 다리를 제 색으로 그린다', () => {
-    const items = new World(undefined, undefined, seededRandom(1)).buildDrawList(1);
+    const items = new World(seededRandom(1)).buildDrawList(1);
     const legs = items.filter((item) => item.mesh === 'leg');
     expect(legs).toHaveLength(2 * (1 + NPCS.length));
     NPCS.forEach((npc, i) => {
@@ -181,7 +181,7 @@ describe('NPC 인사', () => {
   });
 
   it('월드에서 가까이 간 NPC 머리 위에만 제 인사말 말풍선이 뜬다', () => {
-    const world = new World(undefined, undefined, seededRandom(4));
+    const world = new World(seededRandom(4));
     const bubbles = () => world.buildBillboards(1).filter((b) => b.image === 'speechBubble');
     expect(bubbles()).toHaveLength(0);
 
