@@ -8,7 +8,7 @@
 ## 범위
 
 - 렌더링은 three.js로 한다 (2026-11-15 사용자 결정).
-- three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/bubbleRenderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 가져온다. `game/`, `physics/`, `content/`, `engine/frame.ts`, `engine/math.ts`는 three.js에 의존하지 않는다.
+- three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/bubbleRenderer.ts`, `main.ts`에서만 가져온다. `game/`, `physics/`, `engine/frame.ts`, `engine/math.ts`는 three.js에 의존하지 않는다.
 - WebGL 함수를 직접 호출하지 않는다. `renderer.context`는 개발용 오류 확인에만 쓴다.
 
 ## 셰이더

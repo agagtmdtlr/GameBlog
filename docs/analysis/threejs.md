@@ -18,7 +18,7 @@ git log --oneline cc0d160..HEAD -- src/engine src/shaders src/main.ts package.js
 
 - 화면 결과와 플레이는 포팅 전과 같게 유지한다. 그래서 PBR과 물 셰이더는 내용을 그대로 두고 three.js의 `RawShaderMaterial`로 옮겼다.
 - WebGL 호출을 직접 하던 부분(컨텍스트, 프로그램, 버퍼, 프레임버퍼, 상태 전환)은 모두 three.js에 맡겼다. `src/`에 `gl.*` 호출은 남아 있지 않다.
-- three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 가져온다. `World`, 물리, 콘텐츠는 three.js를 모른다.
+- three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/bubbleRenderer.ts`, `main.ts`에서만 가져온다. `World`와 물리는 three.js를 모른다.
 
 ## 바뀐 파일
 
@@ -58,10 +58,9 @@ git log --oneline cc0d160..HEAD -- src/engine src/shaders src/main.ts package.js
 
 ## 렌더러 구조
 
-`Renderer`는 장면 하나와 카메라 두 개를 가지고, 콘텐츠 전용 그리기는 `engine/contentRenderers/`의 `ContentRenderer`들에 맡긴다 (포팅 직후에는 물이 든 구도 `Renderer` 안에 있었고, 물이 든 구와 달아오른 구는 2026-11-17에 지웠다). 인터페이스는 [analysis/content.md](content.md)의 "콘텐츠 렌더러"에 있다.
+`Renderer`는 그리기 장면 몇 개와 카메라 두 개를 가진다. 2026-11-22까지는 콘텐츠 전용 그리기를 맡기는 `engine/contentRenderers/`(`ContentRenderer`, `RenderContext`, 장면 복사 `copySceneColor`)가 있었으나, 등록된 렌더러가 없어 작동 영역·콘텐츠 시스템과 함께 지웠다. 참고 구현은 커밋 `ad4cee7`에 있다.
 
 - `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
-- 콘텐츠 렌더러는 필요하면 자기 장면을 가진다. 지금은 등록된 렌더러가 없다.
 - `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
 - `skyScene`: 먼 우주 `CubeTexture`를 `background`로만 가진 장면. 메인 패스에서 가장 먼저 그린다 ([analysis/skybox.md](skybox.md), 2026-11-21)
 - `billboardScene`: 별, 햇살, 해 눈을 한 번에 그리는 `BillboardBatch`의 메시 하나만 가진 장면. 그림자 패스에 넣지 않으려고 분리했다. 구조는 [analysis/billboard.md](billboard.md)에 있다 (2026-11-21, 그 전에는 별 `Sprite`만 가진 `skyScene`이었다)
@@ -72,7 +71,6 @@ git log --oneline cc0d160..HEAD -- src/engine src/shaders src/main.ts package.js
 
 1. `setRenderTarget(shadowTarget)` → `clear()` → `overrideMaterial`을 걸고 `render(scene, lightCamera)`
 2. `setRenderTarget(null)` → `setClearColor` → `clear()` → `render(skyScene, camera)`(먼 우주) → `render(scene, camera)` → `render(billboardScene, camera)`(빌보드, [analysis/billboard.md](billboard.md)) → `render(bubbleScene, camera)`(비눗방울)
-3. `frame.contents`에 값이 있는 콘텐츠 렌더러마다 `render()`. 뒤 장면이 필요한 렌더러는 `copySceneColor()`(`copyFramebufferToTexture`) → `render(자기 장면, camera)` 순서로 그린다
 
 ### 행렬
 
@@ -128,6 +126,44 @@ three.js의 톤 매핑과 출력 색공간 변환은 내장 재질과 셰이더 
 | 빌드 JS | 37.49KB (gzip 13.86KB) | 562.65KB (gzip 143.92KB). 기능이 늘어 `cc0d160` 기준 674.54KB (gzip 176.19KB) |
 
 빌드 크기가 약 15배 늘었다. 0.187의 `WebGLRenderer`는 내장 재질과 셰이더 청크를 함께 포함하므로 이름으로 가져와도 크게 줄지 않는다.
+
+## 새 재질을 만들 때 알아 둘 점
+
+예전 `analysis/content.md`에서 옮겼다 (2026-11-22).
+
+- **정점 셰이더:** `mesh.vert`를 재사용할 수 있다. three.js가 채우는 `modelMatrix`, `viewMatrix`, `projectionMatrix` 외에 `uNormalMatrix`, `uLightViewProj`를 uniform으로 넘겨야 한다. 출력은 `vWorldPos`, `vNormal`, `vObjectPos`, `vShadowCoord`다.
+- **재질:** `RawShaderMaterial`에 `glslVersion: GLSL3`를 준다. 셰이더 파일에 `#version`은 쓰지 않는다.
+- **겹쳐 그리기:** 같은 메시를 `mesh.vert`로 그리면 깊이가 같다. 재질의 깊이 함수 기본값이 `LessEqualDepth`이므로 `transparent: true`, `depthWrite: false`만 주면 된다.
+- **색공간:** 프레임 버퍼에는 ACES와 sRGB 변환을 마친 값이 들어 있다. ACES는 새로 더하는 빛에만 적용한다.
+- **uniform:** 프레임 단위 값은 `Renderer.shared`의 객체를 모든 재질이 함께 참조한다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
+- **시간:** 전역 시계는 없다. 시간이 필요한 셰이더는 상태 클래스가 진행한 시간을 프레임 값으로 받는다.
+- **위쪽:** 셰이더에서도 위쪽을 +Y로 가정하지 않는다. 행성 위에서 위쪽은 `normalize(위치 - PLANET.center)`다.
+- **격자:** `SurfacePattern.Grid`는 구 메시 전용이다. 오브젝트 공간 방향을 정육면체 면에 투영해 격자를 그린다. 지금은 쓰는 곳이 없다.
+
+## 브라우저 확인 방법
+
+서버는 `.claude/launch.json`의 `gameblog`다. 개발 서버에서만 `window.__game`(`world`, `camera`, `input`, `gl`, `getState`)을 쓸 수 있다.
+
+1. "시작하기" 버튼을 클릭한다. 상태가 `playing`이어야 물리가 돈다.
+2. 캐릭터를 옮기려면 물리 몸체의 위치를 바꾼다. 다리(`Walker`)는 발이 멀어지면 회복 걸음으로 따라온다.
+
+   ```js
+   const g = window.__game;
+   const [lat, lon] = [35, 60].map((d) => (d * Math.PI) / 180); // 위도, 경도
+   const r = 18 + 1.32; // 행성 반지름 + 충돌 구 반지름(PLAYER_RADIUS). 땅이 높은 곳이면 더한다
+   const p = [r * Math.cos(lat) * Math.sin(lon), r * Math.sin(lat), r * Math.cos(lat) * Math.cos(lon)];
+   g.world.player.position = p;
+   g.world.player.previousPosition = p;
+   g.world.player.velocity = [0, 0, 0];
+   ```
+
+3. 이동은 키 이벤트를 보내 시험한다. `Input`은 `window`에서 받으므로 캔버스에 보내도 버블링으로 전달된다.
+
+   ```js
+   document.getElementById('game').dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA', bubbles: true }));
+   ```
+
+4. `g.gl.getError()`와 콘솔 오류, 스크린샷을 확인한다.
 
 ## 브라우저 확인 (2026-11-15, 개발 서버)
 

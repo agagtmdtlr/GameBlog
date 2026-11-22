@@ -1,6 +1,4 @@
 import WebGL from 'three/addons/capabilities/WebGL.js';
-import { CONTENT_ENTRIES } from './content/registry';
-import { createContentRenderers } from './engine/contentRenderers/registry';
 import characterModelUrl from './assets/character.glb?url';
 import astronautStickerUrl from './assets/astronaut-sticker.png?url';
 import { Input } from './engine/input';
@@ -56,7 +54,7 @@ function main(): void {
   // 컨텍스트 손실과 복구는 three.js의 WebGLRenderer가 처리하므로 한 번만 만든다.
   let renderer: Renderer;
   try {
-    renderer = new Renderer(canvas, createContentRenderers(), showGraphicsFailure);
+    renderer = new Renderer(canvas, showGraphicsFailure);
   } catch (error) {
     console.error(error);
     showGraphicsFailure();
@@ -77,10 +75,7 @@ function main(): void {
 
   const input = new Input(canvas);
   const stepper = new FixedStepper(PHYSICS_STEP_SECONDS, MAX_FRAME_SECONDS);
-  const accentById = new Map(CONTENT_ENTRIES.map((entry) => [entry.content.id, entry.zone.color]));
-  const world = new World(CONTENT_ENTRIES, (content) => {
-    overlay.setActiveContent(content.label, accentById.get(content.id) ?? [1, 1, 1]);
-  });
+  const world = new World();
   const camera = new CameraRig(world.player.position, PLANET.center, TERRAIN);
 
   let hadPointerLock = false;
@@ -158,8 +153,6 @@ function main(): void {
         camera: camera.view,
         environment: world.environment(alpha),
         occluder: world.occluder(alpha),
-        surfaceZones: world.buildSurfaceZones(),
-        contents: world.buildContentFrames(alpha),
       },
       aspect,
     );

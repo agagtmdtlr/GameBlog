@@ -67,7 +67,7 @@ describe('외계인', () => {
   });
 
   it('머리, 눈가리개, 더듬이, 촉수 여섯, 광선총이 그리기 목록에 들어간다', () => {
-    const world = new World(undefined, undefined, seededRandom(2));
+    const world = new World(seededRandom(2));
     const items = world.buildDrawList(1);
     const count = (mesh: string) => items.filter((item) => item.mesh === mesh).length;
     expect(count('alienHead')).toBe(ALIEN_SPAWNS.length);
@@ -79,7 +79,7 @@ describe('외계인', () => {
   });
 
   it('떠서 돌아다니고, 다리 끝은 머리 아래 땅 가까이에 늘어진다', () => {
-    const world = new World(undefined, undefined, seededRandom(4));
+    const world = new World(seededRandom(4));
     const alien = world.aliens[0];
     const start = alien.body.position;
     let travelled = 0;
@@ -111,7 +111,7 @@ describe('외계인', () => {
   });
 
   it('광선총은 앞쪽을 겨누고 손끝 가까이에 있다', () => {
-    const world = new World(undefined, undefined, seededRandom(1));
+    const world = new World(seededRandom(1));
     const alien = world.aliens[0];
     const parts = alien.parts(1);
     const frame = alien.frame(1);

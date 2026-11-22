@@ -9,8 +9,8 @@ import {
   CubeTexture,
   DynamicDrawUsage,
   DepthTexture,
-  FramebufferTexture,
   GLSL3,
+  type IUniform,
   IcosahedronGeometry,
   LatheGeometry,
   LessEqualCompare,
@@ -23,7 +23,6 @@ import {
   PerspectiveCamera,
   Quaternion,
   RawShaderMaterial,
-  RGBFormat,
   Scene,
   SkinnedMesh,
   SphereGeometry,
@@ -34,13 +33,11 @@ import {
   Vector4,
   WebGLRenderer,
   WebGLRenderTarget,
-  type Texture,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import meshVert from '../shaders/mesh.vert?raw';
 import toonFrag from '../shaders/toon.frag?raw';
-import type { ContentRenderer, ToonMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
 import type { Mat4, Vec3 } from './math';
 import { headProfile, slitPatch, tentacleSkin, visorPatch, type MeshArrays } from './alienShape';
 import { skinVertices, type SkinSource } from './skinning';
@@ -53,7 +50,10 @@ import type { BillboardImage } from './billboard';
 import { BubbleBatch } from './bubbleRenderer';
 import { drawSkyboxFaces } from './skybox';
 import type { TriangleMesh } from './trackPath';
-import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
+import { LEG_BONE_COUNT, RING_TUBE_RATIO, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
+
+type Uniforms = Record<string, IUniform>;
+type ToonMesh = Mesh<BufferGeometry, RawShaderMaterial>;
 
 const SHADOW_MAP_SIZE = 2048;
 const MAX_DEVICE_PIXEL_RATIO = 2;
@@ -209,9 +209,6 @@ function createRocketGlassGeometry(): BufferGeometry {
 /**
  * three.js로 장면을 그린다. 게임 상태는 들고 있지 않고, 매 프레임 `FrameData`를 받아
  * 메시 풀과 uniform에 옮겨 적는다. 컨텍스트 손실과 복구는 `WebGLRenderer`가 처리한다.
- *
- * 콘텐츠 전용 그리기는 여기에 두지 않는다. `ContentRenderer`를 상속한 클래스가 맡고,
- * 이 클래스는 `init`, `prepare`, `render`만 호출한다.
  */
 export class Renderer {
   private readonly renderer: WebGLRenderer;
@@ -233,11 +230,6 @@ export class Renderer {
   private readonly depthMaterial: MeshBasicMaterial;
   private readonly shadowTarget: WebGLRenderTarget;
   private readonly pool: ToonMesh[] = [];
-  private readonly contentRenderers: ReadonlyMap<string, ContentRenderer>;
-  private readonly renderContext: RenderContext;
-  /** 이번 프레임의 콘텐츠 값을 `kind`로 찾는 표. 매 프레임 다시 채운다. */
-  private readonly contentFrames = new Map<string, ContentFrame>();
-  private sceneColor: FramebufferTexture | null = null;
   /** 다리 스킨 메시의 기본 자세와 가중치. loadCharacter 전에는 없다. */
   private legSkin: SkinSource | null = null;
   /** 풀의 메시마다 스키닝 결과를 쓰는 지오메트리. 메시가 그리는 스킨 메시 종류가 바뀌면 새로 만든다. */
@@ -259,22 +251,15 @@ export class Renderer {
   };
   private readonly toonShared: Uniforms;
 
-  /**
-   * `contentRenderers`는 전용 그리기가 있는 콘텐츠의 렌더러다. 목록 순서대로 그린다.
-   * `onShaderError`는 셰이더 컴파일이나 링크가 실패했을 때 한 번 이상 호출된다.
-   */
-  constructor(
-    canvas: HTMLCanvasElement,
-    contentRenderers: readonly ContentRenderer[],
-    onShaderError: () => void,
-  ) {
+  /** `onShaderError`는 셰이더 컴파일이나 링크가 실패했을 때 한 번 이상 호출된다. */
+  constructor(canvas: HTMLCanvasElement, onShaderError: () => void) {
     this.renderer = new WebGLRenderer({
       canvas,
       alpha: false,
       antialias: true,
       powerPreference: 'high-performance',
     });
-    // 지우기와 그리기 순서를 직접 제어한다 (그림자 → 장면 → 콘텐츠 렌더러).
+    // 지우기와 그리기 순서를 직접 제어한다 (그림자 → 장면 → 빌보드 → 비눗방울).
     this.renderer.autoClear = false;
     this.renderer.debug.onShaderError = (gl, program) => {
       console.error(`셰이더 오류:\n${gl.getProgramInfoLog(program)}`);
@@ -340,36 +325,12 @@ export class Renderer {
     sky.needsUpdate = true;
     this.skyScene.background = sky;
 
-    const byKind = new Map<string, ContentRenderer>();
-    for (const content of contentRenderers) {
-      if (byKind.has(content.kind)) throw new Error(`콘텐츠 렌더러 kind 중복: ${content.kind}`);
-      byKind.set(content.kind, content);
-    }
-    this.contentRenderers = byKind;
-
-    // 콘텐츠 렌더러가 더한 uniform까지 모은 뒤에 툰 재질을 만들어야 모든 재질이 함께 참조한다.
     this.toonShared = {
       ...this.shared,
       uShadowMap: { value: shadowMap },
       uShadowTexel: { value: 1 / SHADOW_MAP_SIZE },
       uOccluder: { value: new Vector4() },
-      uZoneCount: { value: 0 },
-      uZoneDir: { value: Array.from({ length: MAX_SURFACE_ZONES }, () => new Vector3()) },
-      uZoneColor: { value: Array.from({ length: MAX_SURFACE_ZONES }, () => new Vector3()) },
-      uZoneParams: { value: Array.from({ length: MAX_SURFACE_ZONES }, () => new Vector4()) },
     };
-    for (const content of contentRenderers) Object.assign(this.toonShared, content.toonUniforms);
-
-    this.renderContext = {
-      renderer: this.renderer,
-      camera: this.camera,
-      geometries: this.geometries,
-      shared: this.shared,
-      createToonMesh: () => this.createToonMesh(),
-      applyItem: (mesh, item) => this.applyItem(mesh, item),
-      copySceneColor: () => this.copySceneColor(),
-    };
-    for (const content of contentRenderers) content.init(this.renderContext);
   }
 
   /**
@@ -461,12 +422,6 @@ export class Renderer {
     this.billboards.update(frame.billboards, frame.camera);
     this.bubbles.update(frame.bubbles, frame.camera, frame.environment.lightDirection);
 
-    this.contentFrames.clear();
-    for (const content of frame.contents) this.contentFrames.set(content.kind, content);
-    for (const [kind, content] of this.contentRenderers) {
-      content.prepare(this.contentFrames.get(kind) ?? null);
-    }
-
     // 1. 그림자 패스: 그림자 레이어의 메시를 깊이만 그린다.
     r.setRenderTarget(this.shadowTarget);
     r.clear();
@@ -486,12 +441,6 @@ export class Renderer {
     r.render(this.billboardScene, this.camera);
     // 비눗방울은 깊이를 쓰지 않으므로 빌보드보다 먼저 그리면 뒤의 별이 방울을 덮는다.
     r.render(this.bubbleScene, this.camera);
-
-    // 3. 콘텐츠 렌더러: 이번 프레임에 값이 있는 것만 등록한 순서대로 그린다.
-    for (const [kind, content] of this.contentRenderers) {
-      const data = this.contentFrames.get(kind);
-      if (data) content.render(data, this.renderContext);
-    }
   }
 
   private updateCameras(frame: FrameData, aspect: number): void {
@@ -539,19 +488,6 @@ export class Renderer {
 
     const { center, radius } = frame.occluder;
     this.toonShared.uOccluder.value.set(center[0], center[1], center[2], radius);
-
-    const zones = frame.surfaceZones;
-    const count = Math.min(zones.length, MAX_SURFACE_ZONES);
-    const dirs = this.toonShared.uZoneDir.value as Vector3[];
-    const colors = this.toonShared.uZoneColor.value as Vector3[];
-    const params = this.toonShared.uZoneParams.value as Vector4[];
-    for (let i = 0; i < count; i++) {
-      const zone = zones[i];
-      dirs[i].fromArray(zone.direction);
-      colors[i].fromArray(zone.color);
-      params[i].set(zone.angularRadius, zone.edgeWidth, zone.glow, zone.presence);
-    }
-    this.toonShared.uZoneCount.value = count;
   }
 
   /** 그리기 목록을 메시 풀에 옮긴다. 목록보다 남는 메시는 숨긴다. */
@@ -582,7 +518,6 @@ export class Renderer {
         uMetallic: { value: 0 },
         uRoughness: { value: 1 },
         uPattern: { value: 0 },
-        uShowZones: { value: false },
         uReceiveOccluder: { value: false },
       },
     });
@@ -609,7 +544,6 @@ export class Renderer {
     u.uMetallic.value = m.metallic;
     u.uRoughness.value = m.roughness;
     u.uPattern.value = m.pattern;
-    u.uShowZones.value = m.showsZones;
     u.uReceiveOccluder.value = m.receivesOccluder;
   }
 
@@ -637,23 +571,5 @@ export class Renderer {
     position.needsUpdate = true;
     normal.needsUpdate = true;
     return geometry;
-  }
-
-  /** 지금까지 그린 화면을 텍스처로 복사한다. 굴절처럼 뒤 장면을 읽는 콘텐츠가 쓴다. */
-  private copySceneColor(): Texture {
-    const r = this.renderer;
-    const size = r.getDrawingBufferSize(this.bufferSize);
-    if (!this.sceneColor || this.sceneColor.image.width !== size.x || this.sceneColor.image.height !== size.y) {
-      this.sceneColor?.dispose();
-      this.sceneColor = new FramebufferTexture(size.x, size.y);
-      // 캔버스가 alpha: false이므로 RGB로만 복사할 수 있다.
-      // three.js는 RGB + UNSIGNED_BYTE의 크기 있는 내부 형식을 고르지 않으므로 직접 지정한다.
-      this.sceneColor.format = RGBFormat;
-      this.sceneColor.internalFormat = 'RGB8';
-      this.sceneColor.minFilter = LinearFilter;
-      this.sceneColor.magFilter = LinearFilter;
-    }
-    r.copyFramebufferToTexture(this.sceneColor);
-    return this.sceneColor;
   }
 }

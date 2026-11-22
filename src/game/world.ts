@@ -1,6 +1,3 @@
-import { ContentManager } from '../content/manager';
-import { CONTENT_ENTRIES } from '../content/registry';
-import type { ContentEntry, GraphicsContent } from '../content/types';
 import {
   add,
   cross,
@@ -27,12 +24,10 @@ import {
   LEG_BONE_COUNT,
   SurfacePattern,
   type BubbleFrame,
-  type ContentFrame,
   type DrawItem,
   type Environment,
   type Material,
   type MeshKind,
-  type SurfaceZoneFrame,
 } from '../engine/frame';
 import { Alien, ALIEN_ROUGHNESS, alienSpawn, type AlienPart } from './alien';
 import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
@@ -46,7 +41,6 @@ import { separateBodies, Wanderer, type Random } from './npc';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
 import { ROCKET_SHAPE } from '../engine/rocketShape';
-import { SurfaceZone } from './surfaceZone';
 import { Train, type TrainPartModel } from './train';
 import { SMOKE } from './smoke';
 import { TRACK_SHAPE } from '../engine/trackPath';
@@ -65,13 +59,6 @@ import { BODY_RADIUS, CHARACTER_SCALE, restBones, Walker, type BoneTransform } f
 /** 행성의 꼭대기에서 시작한다. */
 const SPAWN: Vec3 = [0, PLANET.radius + PLAYER_RADIUS, 0];
 
-/** 작동 영역의 표면 반지름 */
-const ZONE_RADIUS = 1.5;
-/** 영역 경계에서 이만큼(표면 거리) 더 벗어나야 다시 작동한다. */
-const ZONE_REARM_MARGIN = PLAYER_RADIUS;
-/** 영역 경계선의 표면 폭 */
-const ZONE_EDGE_WIDTH = 0.12;
-const ZONE_FADE_RATE = 7;
 /** 행성 땅의 바탕 색 (선형 RGB). 셰이더(`SurfacePattern.Dreamy`)가 여기에 파스텔 물결을 곱한다. */
 const PLANET_COLOR: Vec3 = [0.95, 0.95, 0.95];
 /** 지형물의 거칠기. 은은한 하이라이트가 남는다. */
@@ -151,7 +138,6 @@ function material(baseColor: Vec3, roughness: number, overrides: Partial<Materia
     metallic: 0,
     emissive: [0, 0, 0],
     pattern: SurfacePattern.None,
-    showsZones: false,
     receivesOccluder: false,
     ...overrides,
   };
@@ -230,20 +216,10 @@ const STAR_BILLBOARDS: readonly Billboard[] = placeStars().map((star) => ({
 /** 햇살 그림 한 변의 길이 (해 반지름 단위) */
 const SUN_RAYS_SIZE = sunRaysExtent() * 2;
 
-interface ZoneInstance {
-  entry: ContentEntry;
-  zone: SurfaceZone;
-  /** 활성 콘텐츠의 영역이면 1로 다가간다. */
-  glow: number;
-  /** 구가 영역 위에 있으면 1로 다가간다. */
-  presence: number;
-}
-
 /** 월드를 구성하고 게임 규칙을 진행한다. GPU와 DOM에 의존하지 않는다. */
 export class World {
   readonly player = new Player(SPAWN);
   readonly walker = new Walker(SPAWN, TERRAIN);
-  readonly content: ContentManager;
   readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
   readonly moon = new Moon();
   readonly astronaut = new FloatingAstronaut();
@@ -255,32 +231,10 @@ export class World {
   /** 서로 통과하지 못하는 캐릭터 몸체들. 플레이어가 먼저다. */
   private readonly bodies: readonly Player[];
 
-  private readonly zones: readonly ZoneInstance[];
-
-  constructor(
-    entries: readonly ContentEntry[] = CONTENT_ENTRIES,
-    onContentChange?: (content: GraphicsContent) => void,
-    random?: Random,
-  ) {
+  constructor(random?: Random) {
     this.npcs = NPCS.map((npc) => new Wanderer(npc.spawn, TERRAIN, random, BODY_FORMS[npc.shape].hip));
     this.aliens = ALIEN_SPAWNS.map((spawn, i) => new Alien(spawn, TERRAIN, random, i * 1.9));
     this.bodies = [this.player, ...this.npcs.map((npc) => npc.body), ...this.aliens.map((alien) => alien.body)];
-    this.zones = entries.map((entry) => ({
-      entry,
-      zone: new SurfaceZone(
-        surfaceDirection(entry.zone.latitude, entry.zone.longitude),
-        ZONE_RADIUS / PLANET.radius,
-        ZONE_REARM_MARGIN / PLANET.radius,
-      ),
-      glow: 0,
-      presence: 0,
-    }));
-
-    this.content = new ContentManager(
-      {},
-      entries.map((entry) => entry.content),
-      onContentChange,
-    );
   }
 
   fixedStep(dt: number, command: MoveCommand): void {
@@ -304,17 +258,6 @@ export class World {
     this.walker.step(dt, this.player);
     for (const npc of this.npcs) npc.animate(dt);
     for (const alien of this.aliens) alien.animate(dt);
-
-    const fade = 1 - Math.exp(-ZONE_FADE_RATE * dt);
-    for (const instance of this.zones) {
-      const { zone, entry } = instance;
-      if (zone.update(this.player.position, PLANET.center)) this.content.activate(entry.content.id);
-      const targetGlow = this.content.activeId === entry.content.id ? 1 : 0;
-      const targetPresence = zone.contains(this.player.position, PLANET.center) ? 1 : 0;
-      instance.glow += (targetGlow - instance.glow) * fade;
-      instance.presence += (targetPresence - instance.presence) * fade;
-    }
-    this.content.update(dt);
   }
 
   /** 렌더링 보간이 적용된 물리 몸체의 위치 */
@@ -330,7 +273,6 @@ export class World {
         mat4Identity(),
         material(PLANET_COLOR, 0.8, {
           pattern: SurfacePattern.Dreamy,
-          showsZones: true,
           receivesOccluder: true,
         }),
       ),
@@ -415,23 +357,6 @@ export class World {
   /** 앰비언트 오클루전을 만드는 캐릭터 몸 */
   occluder(alpha: number): { center: Vec3; radius: number } {
     return { center: this.walker.pose(alpha).body, radius: BODY_RADIUS };
-  }
-
-  /** 행성 표면에 그릴 작동 영역 */
-  buildSurfaceZones(): SurfaceZoneFrame[] {
-    return this.zones.map(({ entry, zone, glow, presence }) => ({
-      direction: zone.direction,
-      angularRadius: zone.angularRadius,
-      edgeWidth: ZONE_EDGE_WIDTH / PLANET.radius,
-      color: entry.zone.color,
-      glow,
-      presence,
-    }));
-  }
-
-  /** 전용 렌더러가 그릴 콘텐츠의 값. 이번 프레임에 보이는 것만 담는다. 지금은 없다. */
-  buildContentFrames(_alpha: number): ContentFrame[] {
-    return [];
   }
 }
 

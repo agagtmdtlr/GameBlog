@@ -12,7 +12,7 @@
 |---|---|
 | [`src/engine/input.ts`](../../src/engine/input.ts) | 키보드, 마우스, 터치 입력을 모은다. 게임 규칙은 모른다 |
 | [`src/main.ts`](../../src/main.ts) | 입력을 이동 방향과 시점 회전으로 바꾸고, 시작·일시 정지 상태를 관리한다 |
-| [`src/ui/overlay.ts`](../../src/ui/overlay.ts) | 시작·일시 정지 화면, HUD, 일시 정지 버튼, 조이스틱 표시 |
+| [`src/ui/overlay.ts`](../../src/ui/overlay.ts) | 시작·일시 정지 화면, 일시 정지 버튼, 조이스틱 표시 |
 | [`index.html`](../../index.html), [`src/style.css`](../../src/style.css) | 조작 안내, 버튼과 조이스틱 요소, 터치 관련 CSS |
 
 ## 입력별 동작
@@ -38,7 +38,7 @@
 
 - 조작 안내는 `.controls-pointer`와 `.controls-touch` 두 묶음이 있고, `(pointer: coarse)` 미디어 쿼리로 하나만 보인다.
 - 캔버스는 `touch-action: none`이라 드래그가 스크롤·확대로 처리되지 않는다. `body`는 `overscroll-behavior: none`이다.
-- HUD와 일시 정지 버튼은 `env(safe-area-inset-*)`만큼 안쪽에 둔다. 뷰포트 메타에 `viewport-fit=cover`가 있다.
+- 일시 정지 버튼은 `env(safe-area-inset-*)`만큼 안쪽에 둔다. 뷰포트 메타에 `viewport-fit=cover`가 있다.
 
 ## 확인 방법
 
