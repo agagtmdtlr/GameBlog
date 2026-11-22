@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { dot, length, normalize, sub } from '../engine/math';
+import { add, cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
+import { GREETINGS } from '../engine/speechBubble';
 import { sphereVsBox } from '../physics/collision';
-import { separateBodies, seededRandom, Wanderer } from './npc';
+import { GREET_DISTANCE, GREET_LEAVE_DISTANCE, separateBodies, seededRandom, Wanderer } from './npc';
 import { PLANET } from './planet';
 import { PLAYER_RADIUS, Player } from './player';
 import { SURFACE_OBJECTS } from './surfaceScene';
@@ -137,4 +138,65 @@ it('기본 난수의 월드도 NPC를 함께 진행한다', () => {
   const world = new World();
   for (let i = 0; i < 240; i++) world.fixedStep(DT, IDLE);
   for (const npc of world.npcs) expect(Number.isFinite(npc.body.position[0])).toBe(true);
+});
+
+describe('NPC 인사', () => {
+  /** NPC 몸에서 표면을 따라 `distance`만큼 옆에 있는 점 */
+  const beside = (npc: Wanderer, distance: number): Vec3 => {
+    const up = normalize(npc.body.position);
+    const side = normalize(cross(up, [1, 0, 0]));
+    return add(npc.body.position, scale(side, distance));
+  };
+  const run = (npc: Wanderer, seconds: number, player: () => Vec3) => {
+    for (let i = 0; i < Math.round(seconds / DT); i++) {
+      npc.notice(DT, player());
+      npc.move(DT, OBSTACLES);
+      npc.animate(DT);
+    }
+  };
+
+  it('플레이어가 멀면 인사하지 않고, 가까이 오면 말풍선을 띄우고 멈춰 선다', () => {
+    const npc = new Wanderer(NPCS[0].spawn, PLANET, seededRandom(2));
+    run(npc, 5, () => beside(npc, GREET_LEAVE_DISTANCE * 3));
+    expect(npc.greeting).toBe(false);
+    expect(npc.greetAmount).toBe(0);
+
+    run(npc, 2, () => beside(npc, GREET_DISTANCE * 0.8));
+    expect(npc.greeting).toBe(true);
+    expect(npc.greetAmount).toBe(1);
+    // 지면 감쇠로 서서히 멈춘다.
+    expect(length(npc.body.velocity)).toBeLessThan(0.1);
+  });
+
+  it('경계 사이에서는 인사를 이어가고, 충분히 멀어지면 말풍선을 거둔다', () => {
+    const npc = new Wanderer(NPCS[0].spawn, PLANET, seededRandom(2));
+    run(npc, 0.5, () => beside(npc, GREET_DISTANCE * 0.8));
+    run(npc, 0.5, () => beside(npc, (GREET_DISTANCE + GREET_LEAVE_DISTANCE) / 2));
+    expect(npc.greeting).toBe(true);
+    run(npc, 0.1, () => beside(npc, GREET_LEAVE_DISTANCE * 1.5));
+    expect(npc.greeting).toBe(false);
+    expect(npc.greetAmount).toBeGreaterThan(0);
+    run(npc, 0.2, () => beside(npc, GREET_LEAVE_DISTANCE * 1.5));
+    expect(npc.greetAmount).toBe(0);
+  });
+
+  it('월드에서 가까이 간 NPC 머리 위에만 제 인사말 말풍선이 뜬다', () => {
+    const world = new World(undefined, undefined, seededRandom(4));
+    const bubbles = () => world.buildBillboards(1).filter((b) => b.image === 'speechBubble');
+    expect(bubbles()).toHaveLength(0);
+
+    const npc = world.npcs[1];
+    for (let i = 0; i < 60; i++) {
+      world.player.position = beside(npc, GREET_DISTANCE * 0.95);
+      world.player.previousPosition = world.player.position;
+      world.player.velocity = [0, 0, 0];
+      world.fixedStep(DT, IDLE);
+    }
+    const shown = bubbles();
+    expect(shown).toHaveLength(1);
+    expect(shown[0].frame).toBe(1 % GREETINGS.length);
+    const body = npc.walker.pose(1).body;
+    const height = dot(sub(shown[0].position, body), normalize(body));
+    expect(height).toBeGreaterThan(BODY_FORMS[NPCS[1].shape].size[1]);
+  });
 });

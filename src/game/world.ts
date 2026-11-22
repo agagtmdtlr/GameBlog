@@ -13,12 +13,14 @@ import {
   normalize,
   normalMatrix,
   scale,
+  sub,
   QUAT_IDENTITY,
   type Mat4,
   type Quat,
   type Vec3,
 } from '../engine/math';
 import type { Billboard } from '../engine/billboard';
+import { GREETINGS, SPEECH_BUBBLE_TAIL } from '../engine/speechBubble';
 import { placeStars } from '../engine/starfield';
 import { sunRaysExtent } from '../engine/sunRays';
 import {
@@ -291,7 +293,10 @@ export class World {
     // 기차는 움직이는 벽이다. 이번 걸음의 자리로 캐릭터를 밀어낸다.
     const obstacles: Obstacle[] = [...SURFACE_OBSTACLES, ...this.train.obstacles()];
     this.player.step(dt, command, TERRAIN, obstacles);
-    for (const npc of this.npcs) npc.move(dt, obstacles);
+    for (const npc of this.npcs) {
+      npc.notice(dt, this.player.position);
+      npc.move(dt, obstacles);
+    }
     for (const alien of this.aliens) alien.move(dt, obstacles);
     for (let i = 0; i < this.bodies.length; i++) {
       for (let j = i + 1; j < this.bodies.length; j++) separateBodies(this.bodies[i], this.bodies[j]);
@@ -381,6 +386,7 @@ export class World {
       ...STAR_BILLBOARDS,
       this.astronaut.billboard(alpha),
       ...this.satellite.signalBillboards(alpha, view),
+      ...this.npcs.flatMap((npc, i) => greetingBillboards(npc, i, alpha)),
       { image: 'sunRays', position: sunPosition, size: [SUN_RAYS_SIZE * r, SUN_RAYS_SIZE * r], color: SUN_EMISSIVE, toneMapped: true },
       ...eyes.flatMap((eye): Billboard[] => [
         { image: 'disk', position: eye.white, size: [rx * 2 * r, ry * 2 * r], color: SUN_EYE_WHITE_EMISSIVE, toneMapped: true },
@@ -452,4 +458,40 @@ function characterDrawItems(walker: Walker, alpha: number, color: Vec3, shape: B
     mat,
   );
   return [body, leg(0), leg(LEG_BONE_COUNT)];
+}
+
+/** 말풍선 빌보드의 한 변 (정사각 그림. 풍선은 그 가운데 줄에 그려져 있다) */
+const GREETING_SIZE = 1.7 * CHARACTER_SCALE;
+/** 몸 중심에서 말풍선 꼬리 끝까지의 높이. 솟은 무릎(0.55)과 피라미드 꼭짓점(0.75)보다 위다. */
+const GREETING_TIP_HEIGHT = 0.95 * CHARACTER_SCALE;
+
+/** 튀어나오듯 조금 넘쳤다가 돌아오는 곡선 (0→0, 1→1) */
+function popOut(t: number): number {
+  const c = 1.7;
+  const u = t - 1;
+  return 1 + (c + 1) * u * u * u + c * u * u;
+}
+
+/**
+ * NPC가 인사하는 동안 머리 위에 띄우는 말풍선. 꼬리 끝을 머리 위에 고정하고, 나타날 때 튀어나오듯 커진다.
+ * 인사말은 NPC 순서대로 `GREETINGS`를 돌려 쓴다.
+ */
+function greetingBillboards(npc: Wanderer, index: number, alpha: number): Billboard[] {
+  const amount = npc.greetAmountAt(alpha);
+  if (amount <= 0) return [];
+  const scaleNow = popOut(amount);
+  const size = GREETING_SIZE * scaleNow;
+  const body = npc.walker.pose(alpha).body;
+  const up = normalize(sub(body, PLANET.center));
+  const tip = add(body, scale(up, GREETING_TIP_HEIGHT));
+  return [
+    {
+      image: 'speechBubble',
+      frame: index % GREETINGS.length,
+      position: add(tip, scale(up, size * (SPEECH_BUBBLE_TAIL - 0.5))),
+      size: [size, size],
+      color: [1, 1, 1],
+      toneMapped: false,
+    },
+  ];
 }

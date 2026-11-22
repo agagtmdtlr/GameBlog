@@ -1,5 +1,6 @@
 import type { Vec3 } from './math';
 import { SIGNAL_ARC } from './signalArc';
+import { GREETINGS } from './speechBubble';
 import { STAR_FACES } from './starfield';
 
 /**
@@ -14,8 +15,9 @@ import { STAR_FACES } from './starfield';
  * `astronaut`는 `assets/astronaut-sticker.png`(잡지에서 오린 스티커 꼴의 우주인 사진)다. 파일을 비동기로 불러와
  * 칸에 그리므로, 불러오기 전에는 투명해 보이지 않는다.
  * `signalArc`는 인공위성 신호 물결 하나(흰 초승달 호)이고, 퍼질수록 가늘어지는 프레임이 있다 (`signalArc.ts`).
+ * `speechBubble`은 NPC 말풍선이고 `GREETINGS`의 인사말마다 프레임이 있다.
  */
-export type BillboardImage = 'starFace' | 'disk' | 'sunRays' | 'astronaut' | 'signalArc';
+export type BillboardImage = 'starFace' | 'disk' | 'sunRays' | 'astronaut' | 'signalArc' | 'speechBubble';
 
 /** 파일에서 불러와 칸에 그리는 그림 */
 export const FILE_BILLBOARD_IMAGES: readonly BillboardImage[] = ['astronaut'];
@@ -32,6 +34,7 @@ export const BILLBOARD_IMAGES: Readonly<Record<BillboardImage, BillboardImageSpe
   // 원본 사진이 466×580이라 512칸이면 충분하다.
   astronaut: { size: 512, frames: 1 },
   starFace: { size: 256, frames: STAR_FACES.length },
+  speechBubble: { size: 256, frames: GREETINGS.length },
   disk: { size: 128, frames: 1 },
   signalArc: { size: 256, frames: SIGNAL_ARC.frames },
 };
