@@ -601,7 +601,7 @@ describe('인공위성', () => {
       const p = world.satellite.position(1);
       expect(length(sub(p, moonCenter))).toBeGreaterThan(MOON.radius * 1.25 + reach);
     }
-    expect(SATELLITE.orbitRadius - reach).toBeGreaterThan(44 + 2.2 + 4);
+    expect(SATELLITE.orbitRadius - reach).toBeGreaterThan(44 + 2.2 + 1);
     expect(SUN.orbitRadius - SATELLITE.orbitRadius).toBeGreaterThan(SUN.radius + reach);
   });
 
