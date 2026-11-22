@@ -31,6 +31,7 @@ import {
   type MeshKind,
   type SurfaceZoneFrame,
 } from '../engine/frame';
+import { Alien, ALIEN_ROUGHNESS, alienSpawn, type AlienPart } from './alien';
 import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
 import { PLANET, surfaceDirection } from './planet';
 import { DREAM_PROPS, PROP_COLLIDERS, TERRAIN, type DreamProp } from './terrain';
@@ -100,6 +101,15 @@ export const NPCS: readonly NpcSpec[] = [
   npcAt(-25, 10, [0.376, 0.202, 0.807], 'cube'), // 보라 #A57CE8
   npcAt(-60, 200, [0.871, 0.254, 0.045], 'pyramid'), // 주황 #F08A3C
 ];
+/**
+ * 둥둥 떠다니는 문어 꼴 외계인의 시작 자리 (위도, 경도). 줄을 더하면 수가 는다.
+ * 첫째는 시작할 때 보이는 집 자리 왼쪽 앞이다.
+ */
+export const ALIEN_SPAWNS: readonly Vec3[] = [[70, 212]].map(([lat, lon]) => {
+  const dir = surfaceDirection(lat, lon);
+  return alienSpawn(dir, groundRadius(TERRAIN, dir));
+});
+
 /** 장면 파일(`scenes/surface.json`)의 표면 객체 중 캐릭터가 통과할 수 없는 상자 */
 const SURFACE_OBSTACLES: readonly Obstacle[] = [
   ...SURFACE_OBJECTS.filter((o) => o.collides).map((o) => o.box),
@@ -183,6 +193,12 @@ function propDrawItems(prop: DreamProp): DrawItem[] {
   );
 }
 
+/** 외계인 덩이의 그리기 항목. 촉수는 다리처럼 스킨 행렬로 그린다. */
+function alienPartDrawItem(part: AlienPart): DrawItem {
+  const item = drawItemFromModel(part.mesh, part.model, material(part.color, ALIEN_ROUGHNESS));
+  return part.skin ? { ...item, skin: part.skin } : item;
+}
+
 /** 움직이지 않는 지형물이므로 한 번만 만든다. */
 const PROP_DRAW_ITEMS: readonly DrawItem[] = DREAM_PROPS.flatMap(propDrawItems);
 
@@ -220,6 +236,7 @@ export class World {
   readonly moon = new Moon();
   readonly train = new Train();
   readonly npcs: readonly Wanderer[];
+  readonly aliens: readonly Alien[];
   /** 서로 통과하지 못하는 캐릭터 몸체들. 플레이어가 먼저다. */
   private readonly bodies: readonly Player[];
 
@@ -231,7 +248,8 @@ export class World {
     random?: Random,
   ) {
     this.npcs = NPCS.map((npc) => new Wanderer(npc.spawn, TERRAIN, random, BODY_FORMS[npc.shape].hip));
-    this.bodies = [this.player, ...this.npcs.map((npc) => npc.body)];
+    this.aliens = ALIEN_SPAWNS.map((spawn, i) => new Alien(spawn, TERRAIN, random, i * 1.9));
+    this.bodies = [this.player, ...this.npcs.map((npc) => npc.body), ...this.aliens.map((alien) => alien.body)];
     this.zones = entries.map((entry) => ({
       entry,
       zone: new SurfaceZone(
@@ -258,11 +276,13 @@ export class World {
     const obstacles: Obstacle[] = [...SURFACE_OBSTACLES, ...this.train.obstacles()];
     this.player.step(dt, command, TERRAIN, obstacles);
     for (const npc of this.npcs) npc.move(dt, obstacles);
+    for (const alien of this.aliens) alien.move(dt, obstacles);
     for (let i = 0; i < this.bodies.length; i++) {
       for (let j = i + 1; j < this.bodies.length; j++) separateBodies(this.bodies[i], this.bodies[j]);
     }
     this.walker.step(dt, this.player);
     for (const npc of this.npcs) npc.animate(dt);
+    for (const alien of this.aliens) alien.animate(dt);
 
     const fade = 1 - Math.exp(-ZONE_FADE_RATE * dt);
     for (const instance of this.zones) {
@@ -304,6 +324,7 @@ export class World {
       ...this.train.parts(alpha).map(trainPartDrawItem),
       ...characterDrawItems(this.walker, alpha, PLAYER_COLOR, 'sphere'),
       ...this.npcs.flatMap((npc, i) => characterDrawItems(npc.walker, alpha, NPCS[i].color, NPCS[i].shape)),
+      ...this.aliens.flatMap((alien) => alien.parts(alpha).map(alienPartDrawItem)),
       // 위성은 그림자 맵 범위 밖에 있으므로 그림자를 드리우지 않는다.
       drawItemFromModel('moon', this.moon.model(alpha), material(MOON_COLOR, MOON_ROUGHNESS), false),
       // 해는 빛을 내기만 하고 그림자를 드리우지 않는다.

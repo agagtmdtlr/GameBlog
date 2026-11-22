@@ -46,6 +46,7 @@ GameBlog/
 │  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
 │  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
+│  │  ├─ alienShape.ts         문어 외계인의 머리 단면, 눈가리개 구면 조각, 촉수 스킨 메시 ([analysis/alien.md](analysis/alien.md))
 │  │  ├─ dreamShape.ts         지형물(종 모양 언덕, 둥근 기둥)의 회전체 단면
 │  │  ├─ rocketShape.ts        로켓 모형의 달걀 몸통·다리·창·옆문·리벳 자리 ([analysis/surfaceScene.md](analysis/surfaceScene.md))
 │  │  ├─ trackPath.ts          구 표면 닫힌 스플라인 경로와 레일·침목 모양 ([analysis/train.md](analysis/train.md))
@@ -69,6 +70,7 @@ GameBlog/
 │  │  ├─ train.ts              선로 노선과 그 위를 도는 기차 ([analysis/train.md](analysis/train.md))
 │  │  ├─ player.ts             캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
 │  │  ├─ npc.ts                혼자 돌아다니는 NPC, 캐릭터끼리 밀어내기 ([analysis/npc.md](analysis/npc.md))
+│  │  ├─ alien.ts              떠다니는 문어 외계인의 자세, 촉수 흔들림, 광선총 ([analysis/alien.md](analysis/alien.md))
 │  │  ├─ bodyShape.ts          NPC 몸 모양(구, 정육면체, 피라미드)의 크기와 엉덩이 자리
 │  │  ├─ walker.ts             서기·걷기 애니메이션 재생, 발 고정, 다리 IK ([analysis/character.md](analysis/character.md))
 │  │  ├─ characterClips.ts     캐릭터 키프레임 클립 (서기, 걷기, 내딛기)

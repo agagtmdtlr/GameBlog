@@ -23,6 +23,8 @@ git log --oneline 649f5c7..HEAD -- src/game/npc.ts src/game/npc.test.ts src/game
 | 월드 | `game/world.ts` | 목록 `NPCS`(시작 위치, 색, 몸 모양)로 `World.npcs`를 만든다. `fixedStep`에서 플레이어 이동 → NPC마다 `move` → 모든 쌍 `separateBodies` → 플레이어 `walker.step` → NPC마다 `animate` 순서다. 그리기 목록에서 플레이어 몸·다리 다음에 NPC마다 몸·다리를 제 색으로 넣는다. 모난 몸은 `Walker.hipAxes`(엉덩이 기울기를 넣은 오른쪽·위 축)로 진행 방향을 보고 엉덩이와 함께 기운다. 기저는 [오른쪽, 위, 뒤]로 오른손 기저라 면의 감김이 뒤집히지 않는다 |
 | 메시 | `engine/renderer.ts`의 `createPyramidGeometry` | 상자처럼 한 변 1인 사각뿔(밑면 y = -0.5, 꼭짓점 y = 0.5). 면마다 정점을 따로 두어 모서리가 각지다. 정육면체는 기존 `box` 메시를 쓴다 |
 
+- 문어 외계인([analysis/alien.md](alien.md))도 `Wanderer`로 돌아다니고, `World.bodies`에 들어가 밀어내기 대상이 된다. `fixedStep`에서 NPC 다음에 `move`, `animate`를 부른다.
+
 ## 값
 
 | 항목 | 값 |

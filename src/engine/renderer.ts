@@ -42,6 +42,7 @@ import meshVert from '../shaders/mesh.vert?raw';
 import toonFrag from '../shaders/toon.frag?raw';
 import type { ContentRenderer, ToonMesh, RenderContext, Uniforms } from './contentRenderers/contentRenderer';
 import type { Mat4, Vec3 } from './math';
+import { headProfile, slitPatch, tentacleSkin, visorPatch, type MeshArrays } from './alienShape';
 import { skinVertices, type SkinSource } from './skinning';
 import { displaceToMoon } from './moonShape';
 import { DREAM_SHAPE, moundProfile, pillarProfile, type Profile } from './dreamShape';
@@ -105,6 +106,19 @@ function createTerrainGeometry(field: HeightField): BufferGeometry {
   geometry.computeBoundingSphere();
   return geometry;
 }
+
+/** 위치·법선·색인 배열로 만든 지오메트리 */
+function createArrayGeometry({ positions, normals, indices }: MeshArrays): BufferGeometry {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new BufferAttribute(normals, 3));
+  geometry.setIndex(new BufferAttribute(indices, 1));
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+/** 외계인 촉수의 기본 자세와 뼈 가중치. 그릴 때는 메시마다 스키닝한 복사본을 쓴다. */
+const TENTACLE_SKIN = tentacleSkin();
 
 /** 단면을 돌린 회전체. 이음매 법선이 부드럽게 이어지도록 정점을 합친다. */
 function createLatheGeometry(profile: Profile): BufferGeometry {
@@ -220,7 +234,8 @@ export class Renderer {
   private sceneColor: FramebufferTexture | null = null;
   /** 다리 스킨 메시의 기본 자세와 가중치. loadCharacter 전에는 없다. */
   private legSkin: SkinSource | null = null;
-  private readonly skinned = new Map<ToonMesh, BufferGeometry>();
+  /** 풀의 메시마다 스키닝 결과를 쓰는 지오메트리. 메시가 그리는 스킨 메시 종류가 바뀌면 새로 만든다. */
+  private readonly skinned = new Map<ToonMesh, { kind: MeshKind; geometry: BufferGeometry }>();
 
   private readonly clearColor = new Color();
   private readonly bufferSize = new Vector2();
@@ -285,6 +300,11 @@ export class Renderer {
       // 몽환적인 지형물 (`dreamShape.ts`)
       mound: createLatheGeometry(moundProfile()),
       pillar: createLatheGeometry(pillarProfile()),
+      // 문어 꼴 외계인 (`alienShape.ts`)
+      alienHead: createLatheGeometry(headProfile()),
+      alienVisor: createArrayGeometry(visorPatch()),
+      alienSlit: createArrayGeometry(slitPatch()),
+      tentacle: createArrayGeometry(TENTACLE_SKIN),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -556,7 +576,7 @@ export class Renderer {
   }
 
   private applyItem(mesh: ToonMesh, item: DrawItem): void {
-    mesh.geometry = item.skin ? this.skinnedGeometry(mesh, item.skin) : this.geometries[item.mesh];
+    mesh.geometry = item.skin ? this.skinnedGeometry(mesh, item.mesh, item.skin) : this.geometries[item.mesh];
     // 스키닝한 정점은 이미 월드 좌표라 경계 구를 따로 계산하지 않고 화면 밖 제외를 끈다.
     mesh.frustumCulled = !item.skin;
     mesh.matrix.fromArray(item.model);
@@ -577,20 +597,23 @@ export class Renderer {
   }
 
   /**
-   * 풀의 메시마다 따로 가진 다리 지오메트리에 스키닝 결과를 쓴다.
-   * 같은 메시는 매 프레임 같은 다리를 그리므로 지오메트리를 다시 만들지 않는다.
+   * 풀의 메시마다 따로 가진 스킨 지오메트리(다리, 촉수)에 스키닝 결과를 쓴다.
+   * 같은 메시는 보통 매 프레임 같은 스킨 메시를 그리므로 종류가 같으면 지오메트리를 다시 만들지 않는다.
    */
-  private skinnedGeometry(mesh: ToonMesh, bones: readonly Mat4[]): BufferGeometry {
-    const source = this.legSkin;
-    if (!source) return this.geometries.leg;
-    let geometry = this.skinned.get(mesh);
-    if (!geometry) {
-      geometry = new BufferGeometry();
-      geometry.setIndex(this.geometries.leg.index);
+  private skinnedGeometry(mesh: ToonMesh, kind: MeshKind, bones: readonly Mat4[]): BufferGeometry {
+    const source = kind === 'tentacle' ? TENTACLE_SKIN : kind === 'leg' ? this.legSkin : null;
+    if (!source) return this.geometries[kind];
+    let entry = this.skinned.get(mesh);
+    if (!entry || entry.kind !== kind) {
+      entry?.geometry.dispose();
+      const geometry = new BufferGeometry();
+      geometry.setIndex(this.geometries[kind].index);
       geometry.setAttribute('position', new BufferAttribute(source.positions.slice(), 3).setUsage(DynamicDrawUsage));
       geometry.setAttribute('normal', new BufferAttribute(source.normals.slice(), 3).setUsage(DynamicDrawUsage));
-      this.skinned.set(mesh, geometry);
+      entry = { kind, geometry };
+      this.skinned.set(mesh, entry);
     }
+    const { geometry } = entry;
     const position = geometry.getAttribute('position') as BufferAttribute;
     const normal = geometry.getAttribute('normal') as BufferAttribute;
     skinVertices(source, bones, position.array as Float32Array, normal.array as Float32Array);

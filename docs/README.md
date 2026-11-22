@@ -9,6 +9,7 @@
 | 콘텐츠와 셰이더 | 행성 표면의 작동 영역(예전 발판), 콘텐츠, 셰이더, 행성·구의 재질이나 연출 | [rules/content.md](rules/content.md) | [analysis/content.md](analysis/content.md) |
 | 입력과 조작 | 키보드·마우스·터치 입력, 가상 조이스틱, 일시 정지, 조작 안내 | 없음 | [analysis/input.md](analysis/input.md) |
 | 플레이어 캐릭터 | 구체 몸과 다리의 모양, Blender 모델, 서기·걷기 키프레임 애니메이션, 물리 몸체 | [rules/character.md](rules/character.md) | [analysis/character.md](analysis/character.md) |
+| 문어 외계인 | 행성 위를 떠다니는 문어 꼴 외계인, 챙 머리·눈가리개·더듬이·촉수·광선총 모양, 촉수 스킨 메시, 시작 자리 | 없음 | [analysis/alien.md](analysis/alien.md) |
 | NPC | 행성 위를 혼자 돌아다니는 플레이어 모양의 NPC, 색·몸 모양(구·정육면체·피라미드)·시작 위치·걷는 빠르기, 캐릭터끼리 밀어내기 | 없음 | [analysis/npc.md](analysis/npc.md) |
 | 먼 우주 스카이박스 | 큐브맵 텍스처로 그린 아주 먼 배경 우주, 알록달록한 점·반짝이·별·초승달의 개수·크기·색 | 없음 | [analysis/skybox.md](analysis/skybox.md) |
 | 별 빌보드 | 행성 둘레의 의인화된 코믹한 별, 별 얼굴 텍스처·개수·배치 | 없음 | [analysis/starfield.md](analysis/starfield.md) |
