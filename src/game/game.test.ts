@@ -5,7 +5,7 @@ import { MAX_SURFACE_ZONES } from '../engine/frame';
 import { STARFIELD } from '../engine/starfield';
 import { SUN_RAYS } from '../engine/sunRays';
 import type { ContentEntry, GraphicsContent } from '../content/types';
-import { cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
+import { add, cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
 import { loadSurfaceScene, SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
 import { PLANET, surfaceDirection } from './planet';
@@ -610,6 +610,36 @@ describe('인공위성', () => {
     }
     expect(SATELLITE.orbitRadius - reach).toBeGreaterThan(44 + 2.2 + 1);
     expect(SUN.orbitRadius - SATELLITE.orbitRadius).toBeGreaterThan(SUN.radius + reach);
+  });
+
+  it('접시에서 행성 쪽으로 신호 물결이 퍼져 나간다', () => {
+    const world = new World();
+    stepWorld(world, SATELLITE.signal.lifetime * 2);
+    const sat = world.satellite;
+    const source = sat.signalSource(1);
+    const down = scale(sat.direction(1), -1);
+    // 궤도면 법선 쪽 옆에서 보면 신호 방향이 화면에 온전히 보인다.
+    const view = { position: add(source, scale(sat.axis, 30)), up: sat.direction(1) };
+    const waves = world.buildBillboards(1, view).filter((b) => b.image === 'signalArc');
+    const { interval, lifetime } = SATELLITE.signal;
+    expect(waves.length).toBeGreaterThanOrEqual(Math.floor(lifetime / interval) - 1);
+    expect(waves.length).toBeLessThanOrEqual(Math.ceil(lifetime / interval) + 1);
+    for (const wave of waves) {
+      expect(length(sub(wave.position, source))).toBeCloseTo(0, 6);
+      expect(wave.opacity!).toBeGreaterThanOrEqual(0);
+      expect(wave.opacity!).toBeLessThanOrEqual(1);
+      // 회전한 빌보드의 +Y가 화면에서 행성 쪽(카메라 기준 아래)을 본다.
+      const basis = sunBillboardBasis(source, view);
+      const r = wave.rotation!;
+      const up = add(scale(basis.x, -Math.sin(r)), scale(basis.y, Math.cos(r)));
+      expect(dot(up, down)).toBeCloseTo(1, 4);
+    }
+    // 먼저 생긴 물결일수록 크고 가는 프레임이다.
+    const sorted = [...waves].sort((a, b) => a.size[0] - b.size[0]);
+    for (let i = 1; i < sorted.length; i++) expect(sorted[i].frame!).toBeGreaterThanOrEqual(sorted[i - 1].frame!);
+    // 신호를 정면(행성 쪽 아래)에서 보면 감춘다.
+    const below = { position: add(source, scale(down, 20)), up: sat.axis };
+    expect(world.buildBillboards(1, below).filter((b) => b.image === 'signalArc')).toHaveLength(0);
   });
 
   it('전지판이 해를 보고, 접시가 행성을 보며, 그림자를 드리우지 않는다', () => {

@@ -7,7 +7,7 @@ in vec3 iCenter;
 in vec2 iSize;
 in float iRotation;
 in vec4 iUvRect;
-in vec3 iColor;
+in vec4 iColor;
 in float iToneMap;
 
 uniform mat4 viewMatrix;
@@ -16,7 +16,7 @@ uniform vec3 uCameraPos;
 uniform vec3 uCameraUp;
 
 out vec2 vUv;
-out vec3 vColor;
+out vec4 vColor;
 out float vToneMap;
 
 void main() {

@@ -48,6 +48,7 @@ GameBlog/
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
 │  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
 │  │  ├─ satelliteShape.ts     인공위성 접시 안테나 단면 ([analysis/satellite.md](analysis/satellite.md))
+│  │  ├─ signalArc.ts          인공위성 신호 물결 호의 모양과 굵기 프레임 ([analysis/satellite.md](analysis/satellite.md))
 │  │  ├─ alienShape.ts         문어 외계인의 머리 단면, 눈가리개 구면 조각, 촉수 스킨 메시 ([analysis/alien.md](analysis/alien.md))
 │  │  ├─ dreamShape.ts         지형물(종 모양 언덕, 둥근 기둥)의 회전체 단면
 │  │  ├─ rocketShape.ts        로켓 모형의 달걀 몸통·다리·창·옆문·리벳 자리 ([analysis/surfaceScene.md](analysis/surfaceScene.md))
@@ -172,7 +173,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - 시작 지점을 둘러싸고 위도 46~54 사이를 물결치는 닫힌 스플라인 선로에 기관차와 객차 셋이 끝없이 돈다. 차량은 움직이는 충돌 상자라 선로 위의 캐릭터를 밀어낸다 (2026-11-21 사용자 요청, [analysis/train.md](analysis/train.md)).
 - 행성 주변 하늘(시작 시점 왼쪽 위, 거리 40)에 충돌구가 패인 회색 위성이 떠서 제자리에서 자전한다 (2026-11-21 사용자 요청).
 - 사용자가 준 우주인 사진을 3D로 만들지 않고 잡지에서 오린 스티커처럼 다듬어, 위성 오른쪽 가장자리 앞에 둥실거리는 빌보드로 붙였다 (2026-11-22 사용자 요청, [analysis/astronaut.md](analysis/astronaut.md)).
-- 인공위성(은색 몸통, 행성을 보는 접시 안테나, 해를 따라 도는 파란 태양 전지판 두 장)이 거리 57의 비스듬한 궤도를 36초에 한 바퀴 돌고, 궤도는 옅은 하늘색 고리로 그린다 (2026-11-22 사용자 요청, [analysis/satellite.md](analysis/satellite.md)).
+- 인공위성(은색 몸통, 행성을 보는 접시 안테나, 해를 따라 도는 파란 태양 전지판 두 장)이 거리 57의 비스듬한 궤도를 36초에 한 바퀴 돌고, 궤도는 옅은 하늘색 고리로 그린다. 접시 안테나에서는 행성 쪽으로 신호 물결(퍼질수록 가늘어지는 초승달 호 여러 겹)이 계속 퍼져 나간다 (2026-11-22 사용자 요청, [analysis/satellite.md](analysis/satellite.md)).
 - 비눗방울 240개가 소행성대처럼 행성을 감싼 띠(행성 중심에서 32~44, 적도에서 조금 기운 평면)를 이루어 천천히 공전하며 둥실거린다. 가장자리가 무지개빛이고 가운데는 비친 창과 반짝임만 보인다 (2026-11-22 사용자 요청, [analysis/bubbles.md](analysis/bubbles.md)).
 - 주황색 해가 행성 중심에서 70 떨어진 궤도를 48초에 한 바퀴 돈다. 직사광이 해를 따라 움직여 낮과 밤이 바뀌고, 밤 쪽은 간접광으로만 보인다. 해는 둘레의 햇살과 캐릭터를 바라보는 눈을 가지며, 궤적이 가는 고리로 보인다 ([analysis/sun.md](analysis/sun.md)).
 - 행성 중심에서 110~200 떨어진 곳에 얼굴이 있는 별 48개가 카메라를 보며 떠 있다 ([analysis/starfield.md](analysis/starfield.md)).

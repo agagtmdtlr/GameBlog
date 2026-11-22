@@ -3,7 +3,7 @@ precision highp float;
 uniform sampler2D uAtlas;
 
 in vec2 vUv;
-in vec3 vColor;
+in vec4 vColor;
 in float vToneMap;
 
 out vec4 fragColor;
@@ -18,10 +18,13 @@ vec3 linearToSrgb(vec3 c) {
 }
 
 void main() {
+  // 아틀라스는 알파를 곱해 올린다(premultiplied). 거른 가장자리에 검은 테가 생기지 않는다.
   vec4 texel = texture(uAtlas, vUv);
+  float alpha = texel.a * vColor.a;
   // 투명한 칸 가장자리가 깊이를 써서 뒤에 그릴 빌보드를 가리지 않게 버린다.
-  if (texel.a < 0.01) discard;
-  vec3 color = texel.rgb * vColor;
+  if (alpha < 0.01) discard;
+  // 색과 톤 매핑은 알파를 나눈 원래 색으로 계산한다.
+  vec3 color = texel.rgb / texel.a * vColor.rgb;
   if (vToneMap > 0.5) color = acesFilm(color);
-  fragColor = vec4(linearToSrgb(clamp(color, 0.0, 1.0)), texel.a);
+  fragColor = vec4(linearToSrgb(clamp(color, 0.0, 1.0)) * alpha, alpha);
 }

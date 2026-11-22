@@ -1,5 +1,6 @@
 import { atlasKey, BILLBOARD_IMAGES, type AtlasLayout, type AtlasRect, type BillboardImage } from './billboard';
 import { drawStarFace, STAR_FACES } from './starfield';
+import { signalArcOutline } from './signalArc';
 import { sunRayPositions, sunRaysExtent } from './sunRays';
 
 /**
@@ -44,6 +45,21 @@ export function drawImageIntoCell(canvas: HTMLCanvasElement, layout: AtlasLayout
 const DRAW: Record<BillboardImage, Draw> = {
   // 파일에서 불러와 `drawImageIntoCell`로 채운다. 그 전에는 비워 둔다.
   astronaut() {},
+
+  signalArc(ctx, { x, y, width, height }, frame) {
+    // 칸 절반을 1로 둔 좌표를 칸에 옮긴다. 캔버스는 y가 아래로 커지므로 뒤집는다.
+    const outline = signalArcOutline(frame);
+    ctx.beginPath();
+    outline.forEach(([u, v], i) => {
+      const px = x + ((u + 1) / 2) * width;
+      const py = y + ((1 - v) / 2) * height;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  },
 
   starFace(ctx, rect, frame) {
     ctx.drawImage(drawStarFace(STAR_FACES[frame], rect.width), rect.x, rect.y, rect.width, rect.height);

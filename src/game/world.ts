@@ -367,7 +367,7 @@ export class World {
   }
 
   /**
-   * 카메라를 보는 빌보드: 별, 햇살, 해 눈(흰자·검은자), 위성 곁의 우주인 스티커. 해 빌보드는 해 구체와 같은 색으로 보이도록
+   * 카메라를 보는 빌보드: 별, 햇살, 해 눈(흰자·검은자), 위성 곁의 우주인 스티커, 인공위성 신호 물결. 해 빌보드는 해 구체와 같은 색으로 보이도록
    * 툰 셰이더와 같은 톤 매핑을 건다. 렌더러가 모두 모아 한 번에 그린다.
    * `view`는 이번 프레임의 카메라이고, 해 눈을 해 얼굴 위에 놓는 데 쓴다. 없으면 행성 중심에서 보는 것으로 친다.
    */
@@ -380,6 +380,7 @@ export class World {
     return [
       ...STAR_BILLBOARDS,
       this.astronaut.billboard(alpha),
+      ...this.satellite.signalBillboards(alpha, view),
       { image: 'sunRays', position: sunPosition, size: [SUN_RAYS_SIZE * r, SUN_RAYS_SIZE * r], color: SUN_EMISSIVE, toneMapped: true },
       ...eyes.flatMap((eye): Billboard[] => [
         { image: 'disk', position: eye.white, size: [rx * 2 * r, ry * 2 * r], color: SUN_EYE_WHITE_EMISSIVE, toneMapped: true },
