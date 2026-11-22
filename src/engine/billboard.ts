@@ -1,4 +1,5 @@
 import type { Vec3 } from './math';
+import { SIGNAL_ARC } from './signalArc';
 import { STAR_FACES } from './starfield';
 
 /**
@@ -12,8 +13,9 @@ import { STAR_FACES } from './starfield';
  * `disk`는 칸을 꽉 채운 흰 원, `sunRays`는 `sunRays.ts`의 햇살을 흰색으로 칠한 것이다.
  * `astronaut`는 `assets/astronaut-sticker.png`(잡지에서 오린 스티커 꼴의 우주인 사진)다. 파일을 비동기로 불러와
  * 칸에 그리므로, 불러오기 전에는 투명해 보이지 않는다.
+ * `signalArc`는 인공위성 신호 물결 하나(흰 초승달 호)이고, 퍼질수록 가늘어지는 프레임이 있다 (`signalArc.ts`).
  */
-export type BillboardImage = 'starFace' | 'disk' | 'sunRays' | 'astronaut';
+export type BillboardImage = 'starFace' | 'disk' | 'sunRays' | 'astronaut' | 'signalArc';
 
 /** 파일에서 불러와 칸에 그리는 그림 */
 export const FILE_BILLBOARD_IMAGES: readonly BillboardImage[] = ['astronaut'];
@@ -31,6 +33,7 @@ export const BILLBOARD_IMAGES: Readonly<Record<BillboardImage, BillboardImageSpe
   astronaut: { size: 512, frames: 1 },
   starFace: { size: 256, frames: STAR_FACES.length },
   disk: { size: 128, frames: 1 },
+  signalArc: { size: 256, frames: SIGNAL_ARC.frames },
 };
 
 export interface Billboard {
@@ -50,6 +53,8 @@ export interface Billboard {
    * 끄면 텍스처 색이 그대로 나온다 (별 얼굴).
    */
   toneMapped: boolean;
+  /** 불투명도 (0~1). 그림의 알파에 곱한다. 없으면 1 */
+  opacity?: number;
 }
 
 /** 아틀라스 안의 칸. 픽셀 단위이고 원점은 왼쪽 위다. */

@@ -1,4 +1,7 @@
 import { add, cross, dot, mat4FromBasis, normalize, scale, type Mat4, type Vec3 } from '../engine/math';
+import type { Billboard } from '../engine/billboard';
+import { SIGNAL_ARC, signalArcFrame } from '../engine/signalArc';
+import { sunBillboardBasis, type BillboardView } from './sunFace';
 import type { MeshKind } from '../engine/frame';
 import { SATELLITE_DISH } from '../engine/satelliteShape';
 
@@ -28,6 +31,20 @@ export const SATELLITE = {
   dishOffset: 1.2,
   /** 안테나 막대의 길이 */
   mastLength: 1.5,
+  /**
+   * 접시 안테나에서 행성 쪽으로 퍼져 나가는 신호 물결. 물결은 접시 초점에서 나와 `interval`초마다 하나씩 생기고,
+   * `lifetime`초 동안 반지름이 `startRadius`에서 `endRadius`(월드)까지 넓어지며 가늘어지고 흐려진다.
+   */
+  signal: {
+    interval: 0.3,
+    lifetime: 3,
+    startRadius: 0.4,
+    endRadius: 10,
+    /** 선형 RGB. 톤 매핑을 거쳐 옅은 하늘색으로 보인다. */
+    color: [0.55, 1.3, 2.2] as Vec3,
+    /** 화면에서 본 신호 방향의 길이(0~1)가 이 범위보다 짧으면, 곧 정면이나 뒤에서 보면 흐리게 감춘다. */
+    fadeProjection: [0.15, 0.45] as [number, number],
+  },
 };
 
 /** 궤적 고리의 색 (선형 RGB). 해 궤적(주황)과 구별되는 옅은 하늘색이다. */
@@ -64,6 +81,9 @@ export class Satellite {
   readonly axis: Vec3;
   private angle = 0;
   private previousAngle = 0;
+  /** 신호 물결에 쓰는 흐른 시간 (초) */
+  private time = 0;
+  private previousTime = 0;
 
   constructor() {
     this.start = SATELLITE.start;
@@ -72,6 +92,8 @@ export class Satellite {
   }
 
   step(dt: number): void {
+    this.previousTime = this.time;
+    this.time += dt;
     this.previousAngle = this.angle;
     this.angle = (this.angle + (2 * Math.PI * dt) / SATELLITE.periodSeconds) % (2 * Math.PI);
     if (this.angle < this.previousAngle) this.previousAngle -= 2 * Math.PI;
@@ -92,6 +114,52 @@ export class Satellite {
   orbitModel(): Mat4 {
     const r = SATELLITE.orbitRadius;
     return mat4FromBasis([0, 0, 0], scale(this.start, r), scale(this.ahead, r), scale(this.axis, r));
+  }
+
+  /** 접시 초점, 곧 신호 물결이 나오는 점 (월드) */
+  signalSource(alpha = 1): Vec3 {
+    const focusY = -SATELLITE.dishOffset - SATELLITE.dishRadius / (4 * SATELLITE_DISH.depth);
+    return scale(this.direction(alpha), SATELLITE.orbitRadius + focusY * SATELLITE.scale);
+  }
+
+  /**
+   * 신호 물결 빌보드. 늘 카메라를 보는 평면이므로, 호가 화면에서 행성 쪽(접시가 보는 쪽)을 향하도록 돌린다.
+   * 빌보드 가운데가 물결이 나오는 점이고, 크기가 커지면 호가 그 점에서 멀어진다 (`signalArc.ts`).
+   */
+  signalBillboards(alpha: number, view: BillboardView): Billboard[] {
+    const { interval, lifetime, startRadius, endRadius, color, fadeProjection } = SATELLITE.signal;
+    const source = this.signalSource(alpha);
+    const toward = scale(this.direction(alpha), -1);
+    const basis = sunBillboardBasis(source, view);
+    const u = dot(toward, basis.x);
+    const v = dot(toward, basis.y);
+    // 빌보드의 +Y(호가 볼록한 쪽)를 화면 위 (u, v)로 돌린다. 반시계 θ만큼 돌리면 +Y가 (-sinθ, cosθ)가 된다.
+    const rotation = Math.atan2(-u, v);
+    const [f0, f1] = fadeProjection;
+    const facing = Math.min(1, Math.max(0, (Math.hypot(u, v) - f0) / (f1 - f0)));
+    if (facing <= 0) return [];
+
+    const t = this.previousTime + (this.time - this.previousTime) * alpha;
+    const waves: Billboard[] = [];
+    // 가장 최근에 생긴 물결부터 수명 안의 것만 그린다.
+    for (let born = Math.floor(t / interval) * interval; born > t - lifetime; born -= interval) {
+      if (born < 0) break;
+      const progress = (t - born) / lifetime;
+      const radius = startRadius + (endRadius - startRadius) * progress;
+      const size = (2 * radius) / SIGNAL_ARC.radius;
+      const opacity = Math.min(1, progress / 0.08) * (1 - progress) ** 0.7 * facing;
+      waves.push({
+        image: 'signalArc',
+        frame: signalArcFrame(progress),
+        position: source,
+        size: [size, size],
+        rotation,
+        color,
+        toneMapped: true,
+        opacity,
+      });
+    }
+    return waves;
   }
 
   /**

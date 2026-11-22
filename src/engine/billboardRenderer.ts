@@ -25,7 +25,8 @@ const ATTRIBUTES = {
   iSize: 2,
   iRotation: 1,
   iUvRect: 4,
-  iColor: 3,
+  // rgb와 불투명도
+  iColor: 4,
   iToneMap: 1,
 } as const;
 type AttributeName = keyof typeof ATTRIBUTES;
@@ -48,6 +49,8 @@ export class BillboardBatch {
     this.canvas = drawBillboardAtlas(this.layout);
     this.texture = new CanvasTexture(this.canvas);
     this.texture.colorSpace = SRGBColorSpace;
+    // 투명한 칸은 rgb가 검정이라, 그대로 거르면 그림 가장자리에 검은 테가 번진다. 알파를 곱해 올리고 그대로 섞는다.
+    this.texture.premultiplyAlpha = true;
 
     const geometry = new InstancedBufferGeometry();
     const quad = new PlaneGeometry(1, 1);
@@ -65,6 +68,7 @@ export class BillboardBatch {
         uCameraUp: { value: new Vector3() },
       },
       transparent: true,
+      premultipliedAlpha: true,
       // 좌우로 뒤집은 빌보드는 감김 방향이 바뀐다.
       side: DoubleSide,
     });
@@ -106,7 +110,8 @@ export class BillboardBatch {
       size.set(b.size, slot * 2);
       rotation[slot] = b.rotation ?? 0;
       uvRect.set(atlasUv(this.layout, b.image, b.frame), slot * 4);
-      color.set(b.color, slot * 3);
+      color.set(b.color, slot * 4);
+      color[slot * 4 + 3] = b.opacity ?? 1;
       toneMap[slot] = b.toneMapped ? 1 : 0;
     }
     for (const attribute of Object.values(a)) {
