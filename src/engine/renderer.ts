@@ -48,6 +48,7 @@ import { displaceToMoon } from './moonShape';
 import { DREAM_SHAPE, moundProfile, pillarProfile, type Profile } from './dreamShape';
 import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from './rocketShape';
 import { BillboardBatch } from './billboardRenderer';
+import { BubbleBatch } from './bubbleRenderer';
 import { drawSkyboxFaces } from './skybox';
 import type { TriangleMesh } from './trackPath';
 import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, type DrawItem, type Environment, type FrameData, type MeshKind } from './frame';
@@ -221,6 +222,9 @@ export class Renderer {
    */
   private readonly billboardScene = new Scene();
   private readonly billboards = new BillboardBatch();
+  /** 행성 둘레의 비눗방울. 깊이를 쓰지 않고 가산 혼합하므로 다른 것을 모두 그린 뒤에 그린다. */
+  private readonly bubbleScene = new Scene();
+  private readonly bubbles = new BubbleBatch();
   private readonly camera = new PerspectiveCamera();
   private readonly lightCamera = new OrthographicCamera();
   private readonly geometries: Record<MeshKind, BufferGeometry>;
@@ -324,6 +328,7 @@ export class Renderer {
     this.lightCamera.layers.set(SHADOW_LAYER);
 
     this.billboardScene.add(this.billboards.mesh);
+    this.bubbleScene.add(this.bubbles.mesh);
 
     // 먼 우주는 모델 없이 캔버스에 그린 큐브맵 한 장이다. 한 번 만들고 바뀌지 않는다.
     const sky = new CubeTexture(drawSkyboxFaces());
@@ -445,6 +450,7 @@ export class Renderer {
     this.updateSharedUniforms(frame);
     this.syncItems(frame.items);
     this.billboards.update(frame.billboards, frame.camera);
+    this.bubbles.update(frame.bubbles, frame.camera, frame.environment.lightDirection);
 
     this.contentFrames.clear();
     for (const content of frame.contents) this.contentFrames.set(content.kind, content);
@@ -469,6 +475,8 @@ export class Renderer {
     r.render(this.scene, this.camera);
     // 빌보드는 반투명 가장자리가 있으므로 불투명한 장면 뒤에 그린다. 깊이 검사로 행성·위성이 그 뒤를 가린다.
     r.render(this.billboardScene, this.camera);
+    // 비눗방울은 깊이를 쓰지 않으므로 빌보드보다 먼저 그리면 뒤의 별이 방울을 덮는다.
+    r.render(this.bubbleScene, this.camera);
 
     // 3. 콘텐츠 렌더러: 이번 프레임에 값이 있는 것만 등록한 순서대로 그린다.
     for (const [kind, content] of this.contentRenderers) {

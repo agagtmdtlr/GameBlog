@@ -14,6 +14,7 @@
 | 먼 우주 스카이박스 | 큐브맵 텍스처로 그린 아주 먼 배경 우주, 알록달록한 점·반짝이·별·초승달의 개수·크기·색 | 없음 | [analysis/skybox.md](analysis/skybox.md) |
 | 별 빌보드 | 행성 둘레의 의인화된 코믹한 별, 별 얼굴 텍스처·개수·배치 | 없음 | [analysis/starfield.md](analysis/starfield.md) |
 | 빌보드 일괄 렌더링 | 카메라를 보는 빌보드(별, 햇살, 해 눈)를 모아 한 번에 그리는 계층, 텍스처 아틀라스, 새 빌보드 추가 | 없음 | [analysis/billboard.md](analysis/billboard.md) |
+| 비눗방울 띠 | 행성을 소행성대처럼 감싸고 떠다니는 비눗방울, 띠의 기울기·범위·개수·크기, 공전·둥실거림, 무지개빛 막 셰이더 | 없음 | [analysis/bubbles.md](analysis/bubbles.md) |
 | 위성 | 행성 주변에 떠서 자전하는 바위 위성, 충돌구 모양 | 없음 | [analysis/moon.md](analysis/moon.md) |
 | 표면 장면 | 행성 표면에 놓는 객체(집 자리 상자, 로켓 모형)의 장면 파일, 위치·크기·색·충돌, 객체 추가, 로켓 모형 모양 | 없음 | [analysis/surfaceScene.md](analysis/surfaceScene.md) |
 | 몽환적인 땅 | 행성 땅의 언덕·높이 함수, 파스텔 색 물결, 둥근 지형물(언덕·기둥·공·막대사탕)의 수·크기·색·충돌, 땅 충돌 | [rules/content.md](rules/content.md) | [analysis/terrain.md](analysis/terrain.md) |

@@ -8,7 +8,7 @@
 
 ## 1. 컨셉
 
-사이트 전체가 하나의 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다니고, 표면에 칠해진 원형 영역에 들어가 콘텐츠를 켠다(지금은 등록된 콘텐츠가 없다). 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
+사이트 전체가 하나의 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다니고, 표면에 칠해진 원형 영역에 들어가 콘텐츠를 켠다(지금은 등록된 콘텐츠가 없다). 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
 
 ## 2. 기술 구성
 
@@ -44,6 +44,7 @@ GameBlog/
 │  │  ├─ billboard.ts          빌보드 모양, 아틀라스 배치, 그리기 순서 ([analysis/billboard.md](analysis/billboard.md))
 │  │  ├─ billboardAtlas.ts     빌보드 그림을 한 캔버스에 그림
 │  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
+│  │  ├─ bubbleRenderer.ts     비눗방울을 인스턴스 한 번으로 가산 혼합해 그리는 BubbleBatch ([analysis/bubbles.md](analysis/bubbles.md))
 │  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
 │  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
 │  │  ├─ alienShape.ts         문어 외계인의 머리 단면, 눈가리개 구면 조각, 촉수 스킨 메시 ([analysis/alien.md](analysis/alien.md))
@@ -67,6 +68,7 @@ GameBlog/
 │  │  ├─ sun.ts                행성을 도는 해, 햇살 빌보드, 궤적 고리, 직사광 방향 ([analysis/sun.md](analysis/sun.md))
 │  │  ├─ sunFace.ts            해 빌보드 축, 캐릭터를 보는 눈(흰자·검은자)
 │  │  ├─ moon.ts               제자리에서 자전하는 위성의 자리와 크기 ([analysis/moon.md](analysis/moon.md))
+│  │  ├─ bubbleBelt.ts         행성을 감싸고 떠다니는 비눗방울 띠 ([analysis/bubbles.md](analysis/bubbles.md))
 │  │  ├─ train.ts              선로 노선과 그 위를 도는 기차 ([analysis/train.md](analysis/train.md))
 │  │  ├─ player.ts             캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
 │  │  ├─ npc.ts                혼자 돌아다니는 NPC, 캐릭터끼리 밀어내기 ([analysis/npc.md](analysis/npc.md))
@@ -83,7 +85,7 @@ GameBlog/
 │  │  └─ registry.ts           작동 영역과 콘텐츠 등록 목록 (지금은 비어 있음)
 │  ├─ assets/character.glb     Blender에서 내보낸 다리 스킨 메시
 │  ├─ scenes/surface.json      행성 표면에 놓는 객체(집·로켓 자리)의 장면 파일
-│  ├─ shaders/                 mesh.vert, toon.frag, billboard.vert, billboard.frag
+│  ├─ shaders/                 mesh.vert, toon.frag, billboard.vert, billboard.frag, bubble.vert, bubble.frag
 │  └─ ui/overlay.ts            화면 안내와 HUD 제어
 ├─ tools/blender/build_character.py  캐릭터 다리 모델(character.glb)을 만드는 Blender 스크립트
 ├─ docs/
@@ -109,7 +111,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 - `engine/`은 게임 규칙을 모른다.
 - `World`는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다.
-- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 쓴다.
+- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/bubbleRenderer.ts`, `engine/contentRenderers/`, `main.ts`에서만 쓴다.
 - `Renderer`는 특정 콘텐츠를 모른다. 콘텐츠 전용 그리기는 `ContentRenderer`를 상속한 클래스가 맡는다.
 - 콘텐츠는 `ContentContext`를 통해서만 월드에 영향을 준다. 작동 영역은 콘텐츠의 내용을 모른다.
 
@@ -117,7 +119,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 1. `main.ts`가 입력을 읽어 카메라 기준 이동 방향을 계산한다.
 2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `fixedStep`은 해의 궤도 진행, 위성 자전, 기차 진행, 캐릭터 물리 몸체의 이동과 충돌, NPC 이동과 캐릭터끼리 밀어내기, 걸음(`Walker`), 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
+3. `fixedStep`은 해의 궤도 진행, 위성 자전, 비눗방울 떠다니기, 기차 진행, 캐릭터 물리 몸체의 이동과 충돌, NPC 이동과 캐릭터끼리 밀어내기, 걸음(`Walker`), 영역 판정, 활성 콘텐츠 갱신을 순서대로 처리한다.
 4. 카메라가 보간된 물리 몸체 위치를 따라간다.
 5. `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광), `buildContentFrames`가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한 뒤 값이 있는 콘텐츠 렌더러를 호출한다. 지금은 콘텐츠 렌더러가 없다.
 
@@ -163,6 +165,7 @@ main.ts ─┬─ game/ ─┬─ content/
 - 로켓이 놓일 자리에 단순화한 주황색 로켓 모형(달걀 몸통, 짧은 다리 넷, 정면의 둥근 창, 옆문, 리벳 줄)을 세운다. 처음에는 붉은 정육면체였고, 사용자가 보여 준 리벳 박힌 달걀 모양 로켓 사진을 단순화해 바꿨다 (2026-11-21 사용자 요청). 충돌은 모형을 감싼 상자(폭 6.5, 높이 7.5)로 한다. 처음 크기(폭 2.6, 높이 3.0)에서 2.5배로 키웠다 (2026-11-21 사용자 요청). 위성으로 향하는 부근이라는 요청에 따라 위성 바로 아래 표면(위도 약 30, 경도 약 207.5)에 두었고, 위쪽이 위성을 향한다. 위치는 `MOON.direction`에서 계산하므로 위성을 옮기면 따라간다. 집 자리와 같이 충돌체다. 크기와 색은 장면 파일 `scenes/surface.json`의 `rocket`에서 바꾼다.
 - 시작 지점을 둘러싸고 위도 46~54 사이를 물결치는 닫힌 스플라인 선로에 기관차와 객차 셋이 끝없이 돈다. 차량은 움직이는 충돌 상자라 선로 위의 캐릭터를 밀어낸다 (2026-11-21 사용자 요청, [analysis/train.md](analysis/train.md)).
 - 행성 주변 하늘(시작 시점 왼쪽 위, 거리 40)에 충돌구가 패인 회색 위성이 떠서 제자리에서 자전한다 (2026-11-21 사용자 요청).
+- 비눗방울 240개가 소행성대처럼 행성을 감싼 띠(행성 중심에서 32~44, 적도에서 조금 기운 평면)를 이루어 천천히 공전하며 둥실거린다. 가장자리가 무지개빛이고 가운데는 비친 창과 반짝임만 보인다 (2026-11-22 사용자 요청, [analysis/bubbles.md](analysis/bubbles.md)).
 - 주황색 해가 행성 중심에서 70 떨어진 궤도를 48초에 한 바퀴 돈다. 직사광이 해를 따라 움직여 낮과 밤이 바뀌고, 밤 쪽은 간접광으로만 보인다. 해는 둘레의 햇살과 캐릭터를 바라보는 눈을 가지며, 궤적이 가는 고리로 보인다 ([analysis/sun.md](analysis/sun.md)).
 - 행성 중심에서 110~200 떨어진 곳에 얼굴이 있는 별 48개가 카메라를 보며 떠 있다 ([analysis/starfield.md](analysis/starfield.md)).
 - 카메라의 위쪽은 캐릭터가 있는 곳의 표면 바깥 방향이다. 좌우 각도 대신 표면에 접하는 진행 방향을 들고 다녀 극점에서도 뒤집히지 않는다.
@@ -233,6 +236,7 @@ main.ts ─┬─ game/ ─┬─ content/
 | [`sunRays.test.ts`](../src/engine/sunRays.test.ts) | 4 | 해 햇살 모양 |
 | [`physics.test.ts`](../src/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
 | [`game.test.ts`](../src/game/game.test.ts) | 47 | 구 조작(중력, 한 바퀴 돌기), 카메라, 작동 영역, 콘텐츠 관리, 월드 통합, 집 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
+| [`bubbleBelt.test.ts`](../src/game/bubbleBelt.test.ts) | 5 | 비눗방울 띠의 기저, 씨앗 재현, 크기 분포, 카메라·위성·해 궤도와의 간격, 떠다니기 |
 | [`npc.test.ts`](../src/game/npc.test.ts) | 9 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기 |
 | [`bodyShape.test.ts`](../src/game/bodyShape.test.ts) | 10 | NPC 몸 모양의 엉덩이 자리, 땅과의 간격, 방향과 기저 |
 | [`terrain.test.ts`](../src/game/terrain.test.ts) | 9 | 땅 높낮이와 평평한 곳, 비탈, 언덕 위에 서기, 땅·캡슐 충돌, 지형물 배치 |
