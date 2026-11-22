@@ -46,6 +46,7 @@ import { separateBodies, Wanderer, type Random } from './npc';
 import { PLAYER_RADIUS, Player, type MoveCommand } from './player';
 import { SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
 import { ROCKET_SHAPE } from '../engine/rocketShape';
+import { TV_SHAPE } from '../engine/tvShape';
 import { SurfaceZone } from './surfaceZone';
 import { Train, type TrainPartModel } from './train';
 import { SMOKE } from './smoke';
@@ -172,10 +173,19 @@ function drawItemFromModel(mesh: MeshKind, model: Mat4, mat: Material, castShado
   return { mesh, model, normal: normalMatrix(model), material: mat, castShadow };
 }
 
-/** 표면 객체의 그리기 항목. 로켓은 몸통과 창 유리를 따로 칠한다. */
+/** 표면 객체의 그리기 항목. 로켓은 몸통과 창 유리를, 텔레비전은 나무·은색 테·검은 판·화면을 따로 칠한다. */
 function surfaceObjectDrawItems(o: SurfaceObject): DrawItem[] {
   const body = material(o.color, o.roughness);
   if (o.shape === 'box') return [drawItemFromModel('box', o.model, body)];
+  if (o.shape === 'tv') {
+    const tv = TV_SHAPE;
+    return [
+      drawItemFromModel('tv', o.model, body),
+      drawItemFromModel('tvTrim', o.model, material(tv.trimColor, tv.trimRoughness)),
+      drawItemFromModel('tvDark', o.model, material(tv.darkColor, tv.darkRoughness), false),
+      drawItemFromModel('tvScreen', o.model, material(tv.screenColor, tv.screenRoughness), false),
+    ];
+  }
   return [
     drawItemFromModel('rocket', o.model, body),
     drawItemFromModel('rocketGlass', o.model, material(ROCKET_SHAPE.glassColor, ROCKET_SHAPE.glassRoughness), false),

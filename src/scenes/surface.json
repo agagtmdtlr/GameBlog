@@ -1,13 +1,13 @@
 {
   "objects": [
     {
-      "id": "house",
-      "shape": "box",
+      "id": "tv",
+      "shape": "tv",
       "placement": { "latitude": 66, "longitude": 180 },
-      "size": [3.2, 2.8, 3.2],
-      "sink": 0.1,
-      "color": [0.3, 0.36, 0.46],
-      "roughness": 0.8,
+      "size": [3.3, 3.0, 2.5],
+      "sink": 0.12,
+      "color": [0.2, 0.075, 0.03],
+      "roughness": 0.6,
       "collides": true
     },
     {

@@ -18,7 +18,7 @@
 | 위성 | 행성 주변에 떠서 자전하는 바위 위성, 충돌구 모양 | 없음 | [analysis/moon.md](analysis/moon.md) |
 | 우주인 스티커 | 위성 곁에 떠 있는 잡지 오림 스티커 꼴의 우주인 사진, 스티커 그림 만들기, 자리·크기·둥실거림, 파일에서 불러오는 빌보드 그림 | 없음 | [analysis/astronaut.md](analysis/astronaut.md) |
 | 인공위성 | 행성을 도는 인공위성, 몸통·접시 안테나·태양 전지판 모양, 해를 따라 도는 전지판, 궤도와 궤적 고리, 접시에서 퍼지는 신호 물결 | 없음 | [analysis/satellite.md](analysis/satellite.md) |
-| 표면 장면 | 행성 표면에 놓는 객체(집 자리 상자, 로켓 모형)의 장면 파일, 위치·크기·색·충돌, 객체 추가, 로켓 모형 모양 | 없음 | [analysis/surfaceScene.md](analysis/surfaceScene.md) |
+| 표면 장면 | 행성 표면에 놓는 객체(아날로그 텔레비전 모형, 로켓 모형)의 장면 파일, 위치·크기·색·충돌, 객체 추가, 로켓·텔레비전 모형 모양 | 없음 | [analysis/surfaceScene.md](analysis/surfaceScene.md) |
 | 몽환적인 땅 | 행성 땅의 언덕·높이 함수, 파스텔 색 물결, 둥근 지형물(언덕·기둥·공·막대사탕)의 수·크기·색·충돌, 땅 충돌 | [rules/content.md](rules/content.md) | [analysis/terrain.md](analysis/terrain.md) |
 | 기차 | 행성 표면의 스플라인 선로(레일·침목), 노선 조절점, 선로를 도는 기차의 차량·빠르기·충돌, 굴뚝 연기 | 없음 | [analysis/train.md](analysis/train.md) |
 | 해 | 행성을 도는 해, 햇살 빌보드, 캐릭터를 보는 눈, 궤적 고리, 해와 맞춘 직사광 방향, 낮과 밤 | 없음 | [analysis/sun.md](analysis/sun.md) |

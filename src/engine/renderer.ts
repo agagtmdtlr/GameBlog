@@ -8,6 +8,7 @@ import {
   Color,
   CubeTexture,
   DynamicDrawUsage,
+  ExtrudeGeometry,
   DepthTexture,
   FramebufferTexture,
   GLSL3,
@@ -25,6 +26,8 @@ import {
   RawShaderMaterial,
   RGBFormat,
   Scene,
+  Shape,
+  ShapeGeometry,
   SkinnedMesh,
   SphereGeometry,
   SRGBColorSpace,
@@ -48,6 +51,7 @@ import { displaceToMoon } from './moonShape';
 import { dishProfile } from './satelliteShape';
 import { DREAM_SHAPE, moundProfile, pillarProfile, type Profile } from './dreamShape';
 import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from './rocketShape';
+import { roundedRect, tvDarkBoxes, tvKnobs, tvLegs, tvScreenDepths, tvWoodBoxes, TV_SHAPE, type TvBox } from './tvShape';
 import { BillboardBatch } from './billboardRenderer';
 import type { BillboardImage } from './billboard';
 import { BubbleBatch } from './bubbleRenderer';
@@ -172,6 +176,71 @@ function createRocketGeometry(): BufferGeometry {
   return merged;
 }
 
+/** 부품 지오메트리를 놓고 합친다. 합치려고 uv를 지우고 색인 없는 지오메트리로 바꾼다. */
+function mergeParts(parts: readonly [BufferGeometry, Matrix4?][]): BufferGeometry {
+  const prepared = parts.map(([geometry, matrix]) => {
+    if (matrix) geometry.applyMatrix4(matrix);
+    geometry.deleteAttribute('uv');
+    if (!geometry.index) return geometry;
+    const flat = geometry.toNonIndexed();
+    geometry.dispose();
+    return flat;
+  });
+  const merged = mergeGeometries(prepared);
+  for (const part of prepared) part.dispose();
+  merged.computeBoundingSphere();
+  return merged;
+}
+
+const tvBoxPart = ({ center, size }: TvBox): [BufferGeometry, Matrix4] => [
+  new BoxGeometry(...size),
+  new Matrix4().makeTranslation(...center),
+];
+
+const tvShapeOf = (points: [number, number][]): Shape => new Shape(points.map(([x, y]) => new Vector2(x, y)));
+
+/** 텔레비전의 나무 부분: 몸통, 뚜껑, 다리, 스피커 가로 살. 모양은 `tvShape.ts`가 정한다. */
+function createTvGeometry(): BufferGeometry {
+  return mergeParts([
+    ...tvWoodBoxes().map(tvBoxPart),
+    ...tvLegs().map(({ center, length, topRadius, bottomRadius }): [BufferGeometry, Matrix4] => [
+      new CylinderGeometry(topRadius, bottomRadius, length, 16),
+      new Matrix4().makeTranslation(...center),
+    ]),
+  ]);
+}
+
+/** 텔레비전의 은색 부분: 화면 테와 손잡이 */
+function createTvTrimGeometry(): BufferGeometry {
+  const { x, y, width, height, cornerRadius, bezel, bezelDepth } = TV_SHAPE.screen;
+  const frame = tvShapeOf(roundedRect(width + 2 * bezel, height + 2 * bezel, cornerRadius + bezel));
+  frame.holes.push(tvShapeOf(roundedRect(width, height, cornerRadius)));
+  const { knobRadius, knobDepth } = TV_SHAPE.panel;
+  return mergeParts([
+    [
+      new ExtrudeGeometry(frame, { depth: bezelDepth, bevelEnabled: false, curveSegments: 8 }),
+      new Matrix4().makeTranslation(x, y, tvScreenDepths().bezelBack),
+    ],
+    ...tvKnobs().map((center): [BufferGeometry, Matrix4] => [
+      new CylinderGeometry(knobRadius, knobRadius, knobDepth, 16).rotateX(Math.PI / 2),
+      new Matrix4().makeTranslation(...center),
+    ]),
+  ]);
+}
+
+/** 텔레비전의 검은 부분: 조작판과 스피커 천 */
+function createTvDarkGeometry(): BufferGeometry {
+  return mergeParts(tvDarkBoxes().map(tvBoxPart));
+}
+
+/** 텔레비전 화면 유리. 테 안쪽, 몸통 앞면 바로 앞에 놓은 둥근 모서리 판이다. */
+function createTvScreenGeometry(): BufferGeometry {
+  const { x, y, width, height, cornerRadius } = TV_SHAPE.screen;
+  return mergeParts([
+    [new ShapeGeometry(tvShapeOf(roundedRect(width, height, cornerRadius))), new Matrix4().makeTranslation(x, y, tvScreenDepths().glass)],
+  ]);
+}
+
 /**
  * 사각뿔. 상자처럼 한 변 1인 공간에 맞춰 밑면이 y = -0.5, 꼭짓점이 (0, 0.5, 0)이다.
  * 면마다 정점을 따로 두어 법선이 면을 따르므로 모서리가 각져 보인다.
@@ -284,7 +353,7 @@ export class Renderer {
     this.geometries = {
       // 행성에도 쓰므로 촘촘하게 나눈다. 성기면 구가 행성 표면에 살짝 묻혀 보인다.
       sphere: new SphereGeometry(1, 96, 64),
-      // 캐릭터 집 자리 표시
+      // 상자. NPC 정육면체 몸, 기차, 인공위성 부품에 쓴다.
       box: new BoxGeometry(1, 1, 1),
       // NPC의 피라미드 몸. 상자처럼 한 변 1인 공간에 맞춘다.
       pyramid: createPyramidGeometry(),
@@ -296,6 +365,11 @@ export class Renderer {
       // 로켓 자리의 모형. 장면 파일의 `size`가 한 변 1인 상자를 늘린다.
       rocket: createRocketGeometry(),
       rocketGlass: createRocketGlassGeometry(),
+      // 텔레비전 자리의 모형. 칠하는 색마다 지오메트리를 나눈다.
+      tv: createTvGeometry(),
+      tvTrim: createTvTrimGeometry(),
+      tvDark: createTvDarkGeometry(),
+      tvScreen: createTvScreenGeometry(),
       // 축을 Z로 돌린 원기둥. 기차 바퀴와 보일러에 쓴다.
       cylinder: new CylinderGeometry(0.5, 0.5, 1, 24).rotateX(Math.PI / 2),
       // 선로. setTrack 전에는 비어 있다.
