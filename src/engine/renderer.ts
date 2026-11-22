@@ -52,6 +52,8 @@ import { LEG_BONE_COUNT, MAX_SURFACE_ZONES, RING_TUBE_RATIO, type ContentFrame, 
 
 const SHADOW_MAP_SIZE = 2048;
 const MAX_DEVICE_PIXEL_RATIO = 2;
+/** 그늘에 씌우는 하프톤 점 격자 한 칸의 크기(CSS 픽셀) */
+const HALFTONE_CELL_CSS_PX = 7;
 /** 그림자를 드리우는 메시만 켜는 레이어. 광원 카메라는 이 레이어만 본다. */
 const SHADOW_LAYER = 1;
 /** `frame.ts`의 `leg` 뼈 순서에 맞춘 glTF 뼈 이름 */
@@ -187,6 +189,7 @@ export class Renderer {
     uGroundColor: { value: new Vector3() },
     uMoonColor: { value: new Vector3() },
     uNightAmbient: { value: new Vector3() },
+    uHalftoneCell: { value: HALFTONE_CELL_CSS_PX },
   };
   private readonly toonShared: Uniforms;
 
@@ -355,6 +358,7 @@ export class Renderer {
     const height = Math.max(1, canvas.clientHeight);
     const size = this.renderer.getSize(this.bufferSize);
     if (this.renderer.getPixelRatio() !== ratio) this.renderer.setPixelRatio(ratio);
+    this.shared.uHalftoneCell.value = HALFTONE_CELL_CSS_PX * ratio;
     if (size.x !== width || size.y !== height) this.renderer.setSize(width, height, false);
     return width / height;
   }

@@ -54,6 +54,27 @@ float toonDiffuse(float x) {
   return dot(TOON_STEPS, vec3(toonStep(TOON_EDGES.x, x), toonStep(TOON_EDGES.y, x), toonStep(TOON_EDGES.z, x)));
 }
 
+/** 하프톤 점. 화면 격자를 기울이고, 그늘이 짙을수록 점이 커진다. 점은 그 자리 색을 `HALFTONE_INK`배로 어둡게 칠한다 */
+const float HALFTONE_ANGLE = 0.35;
+const float HALFTONE_MAX_RADIUS = 0.48;
+const float HALFTONE_INK = 0.5;
+/** 빛의 양(N·L × 그림자)이 이 값 이상이면 점이 없다. 0에서 가장 크다 */
+const float HALFTONE_LIGHT_LIMIT = 0.5;
+/** 점 격자 한 칸의 크기(화면 픽셀). 기기 픽셀 비율을 곱해 CSS 픽셀 기준으로 같은 크기가 된다 */
+uniform float uHalftoneCell;
+
+// 화면 공간 점 무늬. 반지름은 칸 크기 단위이고, 경계는 한 픽셀 폭으로 부드럽게 넘긴다.
+float halftoneDots(float shade) {
+  if (shade <= 0.0) return 0.0;
+  float c = cos(HALFTONE_ANGLE);
+  float s = sin(HALFTONE_ANGLE);
+  vec2 p = mat2(c, s, -s, c) * gl_FragCoord.xy / uHalftoneCell;
+  float d = length(fract(p) - 0.5);
+  float radius = HALFTONE_MAX_RADIUS * sqrt(shade);
+  float aa = 1.0 / uHalftoneCell;
+  return 1.0 - smoothstep(radius - aa, radius + aa, d);
+}
+
 float sampleShadow() {
   vec3 coord = vShadowCoord;
   if (any(lessThan(coord, vec3(0.0))) || any(greaterThan(coord, vec3(1.0)))) return 1.0;
@@ -158,5 +179,12 @@ void main() {
   vec3 ambientLight = mix(mix(uGroundColor, uSkyColor, 0.6), uNightAmbient, night);
   vec3 ambient = (diffuseColor + albedo * uMetallic * 0.5) * ambientLight * visibility;
 
-  fragColor = vec4(linearToSrgb(acesFilm(direct + ambient + emissive)), 1.0);
+  // 그늘과 그림자에 하프톤 점을 씌운다. 해와 달 중 밝은 쪽 빛이 밝은 단계에 못 미칠수록 점이 커지고,
+  // 몸 아래 오클루전도 그늘로 친다. 발광은 점의 영향을 받지 않는다.
+  float lightAmount = max(NoL * shadow, max(dot(N, -L), 0.0) * night);
+  float shade = 1.0 - smoothstep(0.0, HALFTONE_LIGHT_LIMIT, lightAmount);
+  shade = max(shade, 0.6 * (1.0 - visibility) / 0.45);
+  vec3 shaded = (direct + ambient) * mix(1.0, HALFTONE_INK, halftoneDots(shade));
+
+  fragColor = vec4(linearToSrgb(acesFilm(shaded + emissive)), 1.0);
 }
