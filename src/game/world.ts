@@ -90,7 +90,7 @@ const npcAt = (latitude: number, longitude: number, color: Vec3, shape: BodyShap
  * 첫째는 시작할 때 보이는 집 자리 옆이고, 나머지는 행성 둘레에 흩어 둔다.
  */
 export const NPCS: readonly NpcSpec[] = [
-  npcAt(74, 145, [0.078, 0.434, 0.871], 'cube'), // 하늘색 #4FB0F0
+  npcAt(70, 128, [0.078, 0.434, 0.871], 'cube'), // 하늘색 #4FB0F0
   npcAt(45, 70, [0.871, 0.162, 0.332], 'pyramid'), // 분홍 #F0709C
   npcAt(10, 290, [0.15, 0.597, 0.114], 'sphere'), // 초록 #6CCB5F
   npcAt(-25, 10, [0.376, 0.202, 0.807], 'cube'), // 보라 #A57CE8
@@ -100,7 +100,7 @@ export const NPCS: readonly NpcSpec[] = [
  * 둥둥 떠다니는 문어 꼴 외계인의 시작 자리 (위도, 경도). 줄을 더하면 수가 는다.
  * 첫째는 시작할 때 보이는 집 자리 왼쪽 앞이다.
  */
-export const ALIEN_SPAWNS: readonly Vec3[] = [[70, 212]].map(([lat, lon]) => {
+export const ALIEN_SPAWNS: readonly Vec3[] = [[68, 232]].map(([lat, lon]) => {
   const dir = surfaceDirection(lat, lon);
   return alienSpawn(dir, groundRadius(TERRAIN, dir));
 });

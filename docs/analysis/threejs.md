@@ -41,7 +41,7 @@ git log --oneline cc0d160..HEAD -- src/engine src/shaders src/main.ts package.js
 
 | 포팅 전 (자체 엔진) | 포팅 후 (three.js) |
 |---|---|
-| `canvas.getContext('webgl2')` | `new WebGLRenderer({ canvas, alpha: false, antialias: true })` |
+| `canvas.getContext('webgl2')` | `new WebGLRenderer({ canvas, alpha: true, antialias: true })`. 처음엔 `alpha: false`였고, 텔레비전 화면 자리를 뚫으려고 바꿨다 (2026-11-22). 지우기 알파는 1이다 |
 | WebGL2 미지원 시 `null` 확인 | `three/addons/capabilities/WebGL.js`의 `isWebGL2Available()` |
 | `ShaderProgram` (컴파일, 링크, uniform 위치 캐시) | `RawShaderMaterial` (`glslVersion: GLSL3`) |
 | `uploadMesh`의 VAO와 버퍼 | `SphereGeometry(1, 96, 64)`, 표면 장면 객체(텔레비전·로켓, [analysis/surfaceScene.md](surfaceScene.md))의 `BoxGeometry(1, 1, 1)`(2026-11-21), 텔레비전 모형의 `BoxGeometry`·`CylinderGeometry`·`ExtrudeGeometry`·`ShapeGeometry`를 색마다 합친 것(2026-11-22), 로켓 모형의 `LatheGeometry`·`CapsuleGeometry`·`TorusGeometry`·`SphereGeometry`를 `mergeGeometries`로 합친 것과 창 유리 `CircleGeometry`(2026-11-21), 해 궤적의 `TorusGeometry`(2026-11-21, [analysis/sun.md](sun.md)), 위성의 `IcosahedronGeometry` + `mergeVertices`(2026-11-21, [analysis/moon.md](moon.md)), 인공위성 접시 안테나의 `LatheGeometry`(2026-11-22, [analysis/satellite.md](satellite.md)), 문어 외계인의 머리 `LatheGeometry`와 배열로 만든 눈가리개·촉수 지오메트리(2026-11-22, [analysis/alien.md](alien.md)), `GLTFLoader`로 불러온 캐릭터 다리 부품(2026-11-21, [analysis/character.md](character.md)). 포팅 직후에는 `BoxGeometry`도, 발판에는 `CylinderGeometry`도 썼으나 행성과 표면 작동 영역으로 바꾸면서 뺐다 |
@@ -110,6 +110,7 @@ three.js의 톤 매핑과 출력 색공간 변환은 내장 재질과 셰이더 
 
 ## 포팅 중 확인한 점
 
+- **캔버스 구멍과 HTML 영상 (2026-11-22):** 텔레비전 화면의 YouTube 영상은 WebGL 텍스처로 읽을 수 없어(다른 출처 iframe) `CSS3DRenderer`로 캔버스 뒤(`#video-layer`, `z-index: -1`)에 같은 카메라로 놓는다. `Renderer.addVideoScreen`이 `tvScreen` 지오메트리에 `MeshBasicMaterial`(검정, `opacity: 0`, `transparent`, `NoBlending`, `depthFunc: LessEqualDepth`, `depthWrite: false`)을 씌운 구멍 메시를 장면에 더한다. 투명 목록이라 불투명한 메시 뒤에 그려지고, 같은 깊이의 화면 유리 위에 색과 알파 0을 덮어써 영상이 보인다. 앞에 있는 캐릭터·물체는 깊이 검사로 구멍을 가린다. 비눗방울(가산 혼합)은 알파를 1로 만들므로 화면 앞을 지나면 그 자리만 영상이 가려진다. `body`에 배경색을 칠하면 그 배경이 음수 `z-index` 층을 덮으므로 바탕색은 `html`에만 둔다. 영상은 뒤에서 보거나 카메라 뒤에 있으면 `visibility: hidden`으로 감춘다(`display: none`은 iframe을 다시 불러올 수 있다).
 - **장면 복사 형식:** 캔버스가 `alpha: false`라 RGBA 텍스처로는 복사할 수 없다. `FramebufferTexture.format = RGBFormat`만 주면 three.js가 크기 없는 `RGB` 내부 형식으로 `texStorage2D`를 호출해 `INVALID_ENUM`이 난다. `internalFormat = 'RGB8'`을 함께 지정해야 한다.
 - **필터 기본값:** `DepthTexture`와 `FramebufferTexture`는 기본 필터가 `NearestFilter`다. 그림자의 하드웨어 PCF와 굴절 배경에는 `LinearFilter`를 지정한다.
 - **그림자 타깃:** `WebGLRenderTarget`은 색 첨부를 항상 만든다. 깊이만 쓰는데도 2048×2048 RGBA8(약 16MB)이 추가로 잡힌다. `count: 0`은 0.187 기준 WebGPURenderer 전용이다.

@@ -40,6 +40,23 @@ body {
   -webkit-touch-callout: none;
 }
 
+/* 바탕색은 html에만 둔다. body에 칠하면 그 배경이 z-index가 음수인 영상 층을 덮는다. */
+body {
+  background: transparent;
+}
+
+/* 텔레비전 화면의 영상. 캔버스 뒤에 깔고, 캔버스에 뚫린 화면 자리로만 보인다. */
+#video-layer {
+  position: fixed !important;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+#video-layer iframe {
+  pointer-events: none;
+}
+
 [hidden] {
   display: none !important;
 }

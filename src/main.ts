@@ -2,11 +2,12 @@ import WebGL from 'three/addons/capabilities/WebGL.js';
 import characterModelUrl from './assets/character.glb?url';
 import astronautStickerUrl from './assets/astronaut-sticker.png?url';
 import { Input } from './engine/input';
-import { add, length, scale, type Vec3 } from './engine/math';
+import { add, length, scale, sub, type Vec3 } from './engine/math';
 import { Renderer } from './engine/renderer';
 import { trackMesh } from './engine/trackPath';
 import { CameraRig } from './game/cameraRig';
 import { PLANET } from './game/planet';
+import { SURFACE_OBJECTS, tvVideoScreen, videoVolume } from './game/surfaceScene';
 import { TERRAIN, terrainHeight } from './game/terrain';
 import { TRACK_PATH } from './game/train';
 import { World } from './game/world';
@@ -72,6 +73,12 @@ function main(): void {
 
   // 우주인 스티커 그림도 비동기로 불러온다. 실패해도 스티커만 빠지므로 플레이는 계속한다.
   renderer.loadBillboardImage('astronaut', astronautStickerUrl).catch((error: unknown) => console.error(error));
+
+  // 텔레비전 화면의 YouTube 영상. 음소거로 재생하다가 플레이 중에 가까이 가면 소리가 난다.
+  const videoScreens = SURFACE_OBJECTS.flatMap((o) => {
+    const place = tvVideoScreen(o);
+    return place ? [{ center: place.center, player: renderer.addVideoScreen(place.youtube, place.model, place) }] : [];
+  });
 
   const input = new Input(canvas);
   const stepper = new FixedStepper(PHYSICS_STEP_SECONDS, MAX_FRAME_SECONDS);
@@ -142,6 +149,11 @@ function main(): void {
       alpha = stepper.advance(frameSeconds, (dt) => world.fixedStep(dt, { direction }));
       camera.follow(world.interpolatedPlayerPosition(alpha), frameSeconds);
       overlay.setJoystick(input.joystick);
+    }
+
+    for (const screen of videoScreens) {
+      const distance = length(sub(world.player.position, screen.center));
+      screen.player.setVolume(state === 'playing' ? videoVolume(distance) : 0);
     }
 
     const aspect = renderer.resizeToDisplay();

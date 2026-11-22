@@ -20,6 +20,8 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  NoBlending,
+  LessEqualDepth,
   OrthographicCamera,
   PerspectiveCamera,
   Quaternion,
@@ -49,6 +51,7 @@ import { dishProfile } from './satelliteShape';
 import { DREAM_SHAPE, moundProfile, pillarProfile, type Profile } from './dreamShape';
 import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from './rocketShape';
 import { roundedRect, tvDarkBoxes, tvKnobs, tvLegs, tvScreenDepths, tvWoodBoxes, TV_SHAPE, type TvBox } from './tvShape';
+import { VideoScreenLayer, type VideoScreenPlacement, type YouTubeScreen } from './videoScreenLayer';
 import { BillboardBatch } from './billboardRenderer';
 import type { BillboardImage } from './billboard';
 import { BubbleBatch } from './bubbleRenderer';
@@ -319,12 +322,16 @@ export class Renderer {
     uHalftoneCell: { value: HALFTONE_CELL_CSS_PX },
   };
   private readonly toonShared: Uniforms;
+  /** 텔레비전 화면의 YouTube 영상. 캔버스 뒤에 그리고, 화면 유리 자리를 뚫어 보인다. */
+  private readonly videoLayer = new VideoScreenLayer();
 
   /** `onShaderError`는 셰이더 컴파일이나 링크가 실패했을 때 한 번 이상 호출된다. */
   constructor(canvas: HTMLCanvasElement, onShaderError: () => void) {
     this.renderer = new WebGLRenderer({
       canvas,
-      alpha: false,
+      // 텔레비전 화면 자리를 투명하게 뚫어 캔버스 뒤의 영상이 보이게 하려고 알파 채널을 둔다.
+      // 나머지는 모두 알파 1로 지우고 그린다.
+      alpha: true,
       antialias: true,
       powerPreference: 'high-performance',
     });
@@ -484,7 +491,10 @@ export class Renderer {
     const size = this.renderer.getSize(this.bufferSize);
     if (this.renderer.getPixelRatio() !== ratio) this.renderer.setPixelRatio(ratio);
     this.shared.uHalftoneCell.value = HALFTONE_CELL_CSS_PX * ratio;
-    if (size.x !== width || size.y !== height) this.renderer.setSize(width, height, false);
+    if (size.x !== width || size.y !== height) {
+      this.renderer.setSize(width, height, false);
+      this.videoLayer.setSize(width, height);
+    }
     return width / height;
   }
 
@@ -506,7 +516,7 @@ export class Renderer {
     // 2. 메인 패스
     r.setRenderTarget(null);
     const bg = frame.environment.background;
-    r.setClearColor(this.clearColor.setRGB(bg[0], bg[1], bg[2], SRGBColorSpace));
+    r.setClearColor(this.clearColor.setRGB(bg[0], bg[1], bg[2], SRGBColorSpace), 1);
     r.clear();
     // 내장 배경 셰이더는 깊이를 쓰지 않으므로 그 위에 무엇이든 그려진다.
     r.render(this.skyScene, this.camera);
@@ -515,6 +525,32 @@ export class Renderer {
     r.render(this.billboardScene, this.camera);
     // 비눗방울은 깊이를 쓰지 않으므로 빌보드보다 먼저 그리면 뒤의 별이 방울을 덮는다.
     r.render(this.bubbleScene, this.camera);
+    // 3. 캔버스 뒤의 HTML 영상 화면을 같은 카메라로 놓는다.
+    this.videoLayer.render(this.camera);
+  }
+
+  /**
+   * 텔레비전 화면에 YouTube 영상을 띄운다. `model`은 텔레비전 모델 행렬이고, 그 `tvScreen` 유리 자리를
+   * 색과 알파 0으로 덮어써 캔버스에 구멍을 낸다. 구멍은 불투명한 장면 뒤에 같은 깊이로 그리므로
+   * 화면 앞의 물체는 구멍을 가린다. 영상은 `place`에 맞춰 캔버스 뒤에 놓는다.
+   */
+  addVideoScreen(videoId: string, model: Mat4, place: VideoScreenPlacement): YouTubeScreen {
+    const hole = new Mesh(
+      this.geometries.tvScreen,
+      new MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0,
+        blending: NoBlending,
+        depthFunc: LessEqualDepth,
+        depthWrite: false,
+      }),
+    );
+    hole.matrixAutoUpdate = false;
+    hole.matrix.fromArray(model);
+    hole.matrixWorldNeedsUpdate = true;
+    this.scene.add(hole);
+    return this.videoLayer.add(videoId, place);
   }
 
   private updateCameras(frame: FrameData, aspect: number): void {

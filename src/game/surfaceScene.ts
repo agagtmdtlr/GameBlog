@@ -1,4 +1,5 @@
-import { cross, dot, mat4FromBasis, normalize, scale, sub, type Mat4, type Vec3 } from '../engine/math';
+import { add, cross, dot, mat4FromBasis, normalize, scale, sub, type Mat4, type Vec3 } from '../engine/math';
+import { TV_SHAPE, tvScreenDepths } from '../engine/tvShape';
 import type { OrientedBox } from '../physics/collision';
 import SURFACE_SCENE_DATA from '../scenes/surface.json';
 import { MOON } from './moon';
@@ -32,6 +33,8 @@ export interface SurfaceObjectData {
   roughness: number;
   /** 캐릭터가 통과할 수 없으면 true */
   collides: boolean;
+  /** `tv`의 화면에서 반복 재생할 YouTube 영상 id (11자). 없으면 화면이 꺼져 있다. */
+  youtube?: string;
 }
 
 export interface SurfaceSceneData {
@@ -49,6 +52,8 @@ export interface SurfaceObject {
   color: Vec3;
   roughness: number;
   collides: boolean;
+  /** 화면에서 재생할 YouTube 영상 id. `tv`에만 있다. */
+  youtube: string | null;
   /** 그리기와 충돌에 같은 값을 쓴다. */
   box: OrientedBox;
   model: Mat4;
@@ -91,6 +96,9 @@ export function placementLatLon(placement: SurfacePlacement): { latitude: number
   return { latitude: placement.latitude, longitude: placement.longitude };
 }
 
+/** YouTube 영상 id. 주소 `watch?v=` 뒤의 11자다. */
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isVec3 = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3 && v.every(isNumber);
 
@@ -129,6 +137,12 @@ export function validateSurfaceScene(data: unknown): SurfaceSceneData {
       if (!isVec3(o.color) || o.color.some((v) => v < 0)) throw new Error(`${at}.color: 0 이상인 선형 RGB 세 개여야 한다`);
       if (!isNumber(o.roughness) || o.roughness < 0 || o.roughness > 1) throw new Error(`${at}.roughness: 0~1이어야 한다`);
       if (typeof o.collides !== 'boolean') throw new Error(`${at}.collides: true 또는 false여야 한다`);
+      if (o.youtube !== undefined) {
+        if (o.shape !== 'tv') throw new Error(`${at}.youtube: shape가 "tv"인 객체에만 쓸 수 있다`);
+        if (typeof o.youtube !== 'string' || !YOUTUBE_ID.test(o.youtube)) {
+          throw new Error(`${at}.youtube: 11자 YouTube 영상 id여야 한다`);
+        }
+      }
       return {
         id: o.id,
         shape: o.shape as SurfaceShape,
@@ -138,6 +152,7 @@ export function validateSurfaceScene(data: unknown): SurfaceSceneData {
         color: o.color,
         roughness: o.roughness,
         collides: o.collides,
+        ...(o.youtube !== undefined ? { youtube: o.youtube as string } : {}),
       };
     }),
   };
@@ -157,6 +172,7 @@ export function loadSurfaceScene(data: unknown): SurfaceObject[] {
       color: o.color,
       roughness: o.roughness,
       collides: o.collides,
+      youtube: o.youtube ?? null,
       box,
       model: boxModel(box),
     };
@@ -165,3 +181,40 @@ export function loadSurfaceScene(data: unknown): SurfaceObject[] {
 
 /** `scenes/surface.json`에 적힌 표면 객체들 */
 export const SURFACE_OBJECTS: readonly SurfaceObject[] = loadSurfaceScene(SURFACE_SCENE_DATA);
+
+/**
+ * 텔레비전 화면에 영상을 띄울 자리. 화면 유리 판의 중심, 축, 월드 크기와 텔레비전의 모델 행렬이다.
+ * 렌더러는 모델 행렬로 유리 자리에 캔버스 구멍을 내고, 그 뒤에 같은 크기의 영상을 놓는다.
+ */
+export interface VideoScreen {
+  youtube: string;
+  /** 텔레비전 모델 행렬 (`tvScreen` 메시를 놓는 행렬) */
+  model: Mat4;
+  center: Vec3;
+  right: Vec3;
+  up: Vec3;
+  /** 화면이 보는 방향 */
+  normal: Vec3;
+  width: number;
+  height: number;
+}
+
+/** 영상이 있는 텔레비전의 화면 자리. 영상이 없거나 텔레비전이 아니면 null이다. */
+export function tvVideoScreen(o: SurfaceObject): VideoScreen | null {
+  if (o.shape !== 'tv' || o.youtube === null) return null;
+  const { x, y, width, height } = TV_SHAPE.screen;
+  const local: Vec3 = [x, y, tvScreenDepths().glass];
+  const [right, up, normal] = o.box.axes;
+  const center = o.box.axes.reduce((p, axis, i) => add(p, scale(axis, local[i] * o.size[i])), o.box.center);
+  return { youtube: o.youtube, model: o.model, center, right, up, normal, width: width * o.size[0], height: height * o.size[1] };
+}
+
+/** 영상 소리가 가장 큰 거리와 들리지 않게 되는 거리 (화면 중심에서) */
+export const VIDEO_SOUND = { fullDistance: 10, silentDistance: 32 };
+
+/** 화면 중심에서 `distance`만큼 떨어졌을 때의 소리 크기(0~1). 멀어질수록 부드럽게 줄어든다. */
+export function videoVolume(distance: number): number {
+  const { fullDistance, silentDistance } = VIDEO_SOUND;
+  const t = Math.min(1, Math.max(0, (silentDistance - distance) / (silentDistance - fullDistance)));
+  return t * t * (3 - 2 * t);
+}

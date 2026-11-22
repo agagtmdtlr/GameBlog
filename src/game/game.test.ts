@@ -3,7 +3,7 @@ import { STARFIELD } from '../engine/starfield';
 import { SUN_RAYS } from '../engine/sunRays';
 import { add, cross, dot, length, normalize, scale, sub, type Vec3 } from '../engine/math';
 import { CameraRig } from './cameraRig';
-import { loadSurfaceScene, SURFACE_OBJECTS, type SurfaceObject } from './surfaceScene';
+import { loadSurfaceScene, SURFACE_OBJECTS, tvVideoScreen, VIDEO_SOUND, videoVolume, type SurfaceObject } from './surfaceScene';
 import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { MOON } from './moon';
@@ -182,7 +182,8 @@ describe('텔레비전 자리', () => {
 
   it('텔레비전 모형으로 서고, 화면이 시작 지점 쪽을 본다', () => {
     expect(TV.shape).toBe('tv');
-    expect(dot(TV.box.axes[2], normalize(sub([0, PLANET.radius, 0], TV.box.center)))).toBeGreaterThan(0.9);
+    const base = scale(surfaceDirection(TV.latitude, TV.longitude), PLANET.radius);
+    expect(dot(TV.box.axes[2], normalize(sub([0, PLANET.radius, 0], base)))).toBeGreaterThan(0.9);
   });
 });
 
@@ -219,8 +220,43 @@ describe('표면 장면 파일', () => {
     expect(() => loadSurfaceScene({ objects: [{ ...valid, placement: { latitude: 100, longitude: 0 } }] })).toThrow(
       '(a).placement',
     );
+    expect(() => loadSurfaceScene({ objects: [{ ...valid, youtube: 'aqz-KE-bpKQ' }] })).toThrow('(a).youtube');
+    expect(() => loadSurfaceScene({ objects: [{ ...valid, shape: 'tv', youtube: 'watch?v=1' }] })).toThrow('(a).youtube');
   });
 
+});
+
+describe('텔레비전 영상', () => {
+  const screen = tvVideoScreen(TV);
+
+  it('텔레비전에 YouTube 영상이 있고, 다른 표면 객체에는 없다', () => {
+    expect(TV.youtube).toMatch(/^[A-Za-z0-9_-]{11}$/);
+    expect(SURFACE_OBJECTS.filter((o) => o !== TV).map(tvVideoScreen)).toEqual(SURFACE_OBJECTS.filter((o) => o !== TV).map(() => null));
+  });
+
+  it('화면 자리가 텔레비전 정면 안쪽에 있고 시작 지점 쪽을 본다', () => {
+    expect(screen).not.toBeNull();
+    const s = screen!;
+    const local = sub(s.center, TV.box.center);
+    const [right, up, front] = TV.box.axes;
+    // 정면(몸통 앞면은 뚜껑보다 조금 들어가 있다) 가까이, 상자 폭과 높이 안
+    expect(dot(local, front)).toBeGreaterThan(TV.box.halfExtents[2] - 0.2);
+    expect(dot(local, front)).toBeLessThan(TV.box.halfExtents[2] + 0.2);
+    expect(Math.abs(dot(local, right)) + s.width / 2).toBeLessThan(TV.box.halfExtents[0]);
+    expect(Math.abs(dot(local, up)) + s.height / 2).toBeLessThan(TV.box.halfExtents[1]);
+    expect(dot(s.normal, front)).toBeCloseTo(1, 9);
+    expect(s.model).toEqual(TV.model);
+  });
+
+  it('가까우면 소리가 크고 멀어질수록 줄어 들리지 않게 된다', () => {
+    expect(videoVolume(0)).toBe(1);
+    expect(videoVolume(VIDEO_SOUND.fullDistance)).toBe(1);
+    expect(videoVolume(VIDEO_SOUND.silentDistance)).toBe(0);
+    expect(videoVolume(PLANET.radius * 2)).toBe(0);
+    const mid = videoVolume((VIDEO_SOUND.fullDistance + VIDEO_SOUND.silentDistance) / 2);
+    expect(mid).toBeGreaterThan(0.3);
+    expect(mid).toBeLessThan(0.7);
+  });
 });
 
 describe('로켓 자리', () => {
@@ -233,7 +269,9 @@ describe('로켓 자리', () => {
   it('텔레비전 자리, 시작 지점과 떨어져 있다', () => {
     const angle = (a: Vec3, b: Vec3) => Math.acos(Math.min(1, dot(a, b))) * PLANET.radius;
     const tv = surfaceDirection(TV.latitude, TV.longitude);
-    expect(angle(up, tv)).toBeGreaterThan(TV.size[0] + ROCKET.size[0] + 2 * PLAYER_RADIUS);
+    // 두 상자의 바닥 대각선 절반과 캐릭터 지름만큼 떨어져 있으면 사이로 지나갈 수 있다.
+    const halfDiagonal = ([w, , d]: Vec3) => Math.hypot(w, d) / 2;
+    expect(angle(up, tv)).toBeGreaterThan(halfDiagonal(TV.size) + halfDiagonal(ROCKET.size) + 2 * PLAYER_RADIUS);
     expect(angle(up, [0, 1, 0])).toBeGreaterThan(ROCKET.size[0] + PLAYER_RADIUS);
   });
 
