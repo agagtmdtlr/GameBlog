@@ -2,6 +2,7 @@ import WebGL from 'three/addons/capabilities/WebGL.js';
 import { CONTENT_ENTRIES } from './content/registry';
 import { createContentRenderers } from './engine/contentRenderers/registry';
 import characterModelUrl from './assets/character.glb?url';
+import astronautStickerUrl from './assets/astronaut-sticker.png?url';
 import { Input } from './engine/input';
 import { add, length, scale, type Vec3 } from './engine/math';
 import { Renderer } from './engine/renderer';
@@ -70,6 +71,9 @@ function main(): void {
     console.error(error);
     showGraphicsFailure();
   });
+
+  // 우주인 스티커 그림도 비동기로 불러온다. 실패해도 스티커만 빠지므로 플레이는 계속한다.
+  renderer.loadBillboardImage('astronaut', astronautStickerUrl).catch((error: unknown) => console.error(error));
 
   const input = new Input(canvas);
   const stepper = new FixedStepper(PHYSICS_STEP_SECONDS, MAX_FRAME_SECONDS);

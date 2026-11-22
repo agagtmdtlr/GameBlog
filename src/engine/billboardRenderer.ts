@@ -13,8 +13,8 @@ import {
 } from 'three';
 import billboardVert from '../shaders/billboard.vert?raw';
 import billboardFrag from '../shaders/billboard.frag?raw';
-import { atlasUv, backToFrontOrder, packAtlas, type AtlasLayout, type Billboard } from './billboard';
-import { drawBillboardAtlas } from './billboardAtlas';
+import { atlasUv, backToFrontOrder, packAtlas, type AtlasLayout, type Billboard, type BillboardImage } from './billboard';
+import { drawBillboardAtlas, drawImageIntoCell } from './billboardAtlas';
 import type { CameraView } from './frame';
 
 const INITIAL_CAPACITY = 64;
@@ -38,13 +38,15 @@ type AttributeName = keyof typeof ATTRIBUTES;
 export class BillboardBatch {
   readonly mesh: Mesh<InstancedBufferGeometry, RawShaderMaterial>;
   private readonly layout: AtlasLayout;
+  private readonly canvas: HTMLCanvasElement;
   private readonly texture: CanvasTexture;
   private capacity = 0;
   private attributes!: Record<AttributeName, InstancedBufferAttribute>;
 
   constructor() {
     this.layout = packAtlas();
-    this.texture = new CanvasTexture(drawBillboardAtlas(this.layout));
+    this.canvas = drawBillboardAtlas(this.layout);
+    this.texture = new CanvasTexture(this.canvas);
     this.texture.colorSpace = SRGBColorSpace;
 
     const geometry = new InstancedBufferGeometry();
@@ -71,6 +73,15 @@ export class BillboardBatch {
     // 정점 위치는 셰이더가 정하므로 지오메트리의 경계 구로는 화면 밖을 판단할 수 없다.
     this.mesh.frustumCulled = false;
     this.ensureCapacity(INITIAL_CAPACITY);
+  }
+
+  /** 그림 파일을 불러와 아틀라스의 그 칸에 그리고 텍스처를 다시 올린다. */
+  async loadImage(image: BillboardImage, url: string): Promise<void> {
+    const element = new Image();
+    element.src = url;
+    await element.decode();
+    drawImageIntoCell(this.canvas, this.layout, image, element);
+    this.texture.needsUpdate = true;
   }
 
   /** 이번 프레임에 그릴 빌보드를 인스턴스 속성에 옮긴다. */

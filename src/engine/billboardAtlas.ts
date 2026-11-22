@@ -29,7 +29,22 @@ export function drawBillboardAtlas(layout: AtlasLayout): HTMLCanvasElement {
 
 type Draw = (ctx: CanvasRenderingContext2D, rect: AtlasRect, frame: number) => void;
 
+/** 파일에서 불러온 그림을 그 칸에 맞춰 그린다. 그림의 가로세로 비를 지키고 가운데에 둔다. */
+export function drawImageIntoCell(canvas: HTMLCanvasElement, layout: AtlasLayout, image: BillboardImage, source: CanvasImageSource & { width: number; height: number }): void {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('빌보드 아틀라스의 2D 캔버스를 얻을 수 없습니다.');
+  const rect = layout.rects.get(atlasKey(image))!;
+  const fit = Math.min(rect.width / source.width, rect.height / source.height);
+  const w = source.width * fit;
+  const h = source.height * fit;
+  ctx.clearRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.drawImage(source, rect.x + (rect.width - w) / 2, rect.y + (rect.height - h) / 2, w, h);
+}
+
 const DRAW: Record<BillboardImage, Draw> = {
+  // 파일에서 불러와 `drawImageIntoCell`로 채운다. 그 전에는 비워 둔다.
+  astronaut() {},
+
   starFace(ctx, rect, frame) {
     ctx.drawImage(drawStarFace(STAR_FACES[frame], rect.width), rect.x, rect.y, rect.width, rect.height);
   },

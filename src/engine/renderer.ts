@@ -49,6 +49,7 @@ import { dishProfile } from './satelliteShape';
 import { DREAM_SHAPE, moundProfile, pillarProfile, type Profile } from './dreamShape';
 import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from './rocketShape';
 import { BillboardBatch } from './billboardRenderer';
+import type { BillboardImage } from './billboard';
 import { BubbleBatch } from './bubbleRenderer';
 import { drawSkyboxFaces } from './skybox';
 import type { TriangleMesh } from './trackPath';
@@ -376,6 +377,11 @@ export class Renderer {
    * 메시 Leg의 기본 자세 정점과 뼈 번호·가중치만 쓰고, 내보낸 뼈의 변환은 쓰지 않는다.
    * 뼈 번호는 이름으로 찾아 [Thigh, Shin, Foot] 순서로 바꾼다.
    */
+  /** 파일에서 불러오는 빌보드 그림(`FILE_BILLBOARD_IMAGES`)을 아틀라스에 넣는다. 그 전에는 그 빌보드가 보이지 않는다. */
+  loadBillboardImage(image: BillboardImage, url: string): Promise<void> {
+    return this.billboards.loadImage(image, url);
+  }
+
   async loadCharacter(url: string): Promise<void> {
     const gltf = await new GLTFLoader().loadAsync(url);
     // instanceof 대신 isSkinnedMesh로 확인한다. 개발 서버의 의존성 최적화 중에는 three.js가 두 번 불러와질 수 있다.
