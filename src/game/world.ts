@@ -34,6 +34,7 @@ import {
 } from '../engine/frame';
 import { Alien, ALIEN_ROUGHNESS, alienSpawn, type AlienPart } from './alien';
 import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './moon';
+import { Satellite, SATELLITE_ORBIT_EMISSIVE, type SatellitePart } from './satellite';
 import { BubbleBelt } from './bubbleBelt';
 import { PLANET, surfaceDirection } from './planet';
 import { DREAM_PROPS, PROP_COLLIDERS, TERRAIN, type DreamProp } from './terrain';
@@ -201,6 +202,11 @@ function alienPartDrawItem(part: AlienPart): DrawItem {
   return part.skin ? { ...item, skin: part.skin } : item;
 }
 
+/** 인공위성 부품의 그리기 항목. 그림자 맵 범위 밖에 있으므로 그림자를 드리우지 않는다. */
+function satellitePartDrawItem(part: SatellitePart): DrawItem {
+  return drawItemFromModel(part.mesh, part.model, material(part.color, part.roughness, { metallic: part.metallic }), false);
+}
+
 /** 움직이지 않는 지형물이므로 한 번만 만든다. */
 const PROP_DRAW_ITEMS: readonly DrawItem[] = DREAM_PROPS.flatMap(propDrawItems);
 
@@ -236,6 +242,7 @@ export class World {
   readonly content: ContentManager;
   readonly sun = new Sun(STUDIO_ENVIRONMENT.lightDirection);
   readonly moon = new Moon();
+  readonly satellite = new Satellite();
   readonly bubbles = new BubbleBelt();
   readonly train = new Train();
   readonly npcs: readonly Wanderer[];
@@ -274,6 +281,7 @@ export class World {
   fixedStep(dt: number, command: MoveCommand): void {
     this.sun.step(dt);
     this.moon.step(dt);
+    this.satellite.step(dt);
     this.bubbles.step(dt);
     this.train.step(dt);
     // 기차는 움직이는 벽이다. 이번 걸음의 자리로 캐릭터를 밀어낸다.
@@ -341,6 +349,9 @@ export class World {
         false,
       ),
       drawItemFromModel('ring', this.sunOrbitModel(), material([0, 0, 0], 1, { emissive: SUN_ORBIT_EMISSIVE }), false),
+      // 인공위성과 궤적 고리. 해처럼 그림자 맵 범위 밖이다.
+      ...this.satellite.parts(alpha, this.sun.direction(alpha)).map(satellitePartDrawItem),
+      drawItemFromModel('ring', this.satellite.orbitModel(), material([0, 0, 0], 1, { emissive: SATELLITE_ORBIT_EMISSIVE }), false),
     ];
     return items;
   }

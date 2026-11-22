@@ -45,6 +45,7 @@ import type { Mat4, Vec3 } from './math';
 import { headProfile, slitPatch, tentacleSkin, visorPatch, type MeshArrays } from './alienShape';
 import { skinVertices, type SkinSource } from './skinning';
 import { displaceToMoon } from './moonShape';
+import { dishProfile } from './satelliteShape';
 import { DREAM_SHAPE, moundProfile, pillarProfile, type Profile } from './dreamShape';
 import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from './rocketShape';
 import { BillboardBatch } from './billboardRenderer';
@@ -309,6 +310,8 @@ export class Renderer {
       alienVisor: createArrayGeometry(visorPatch()),
       alienSlit: createArrayGeometry(slitPatch()),
       tentacle: createArrayGeometry(TENTACLE_SKIN),
+      // 인공위성의 접시 안테나 (`satelliteShape.ts`)
+      satelliteDish: createLatheGeometry(dishProfile()),
     };
 
     const shadowMap = new DepthTexture(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);

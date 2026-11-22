@@ -12,6 +12,7 @@ import { PLANET, surfaceDirection } from './planet';
 import { Player, PLAYER_RADIUS, type MoveCommand } from './player';
 import { SurfaceZone } from './surfaceZone';
 import { MOON } from './moon';
+import { SATELLITE } from './satellite';
 import { SUN } from './sun';
 import { pupilOffset, SUN_FACE, sunBillboardBasis, sunEyes } from './sunFace';
 import { TRAIN_CARS } from './train';
@@ -346,7 +347,9 @@ describe('집 자리', () => {
     const trainBoxes = TRAIN_CARS.flatMap((car) => car.parts).filter((part) => part.mesh === 'box').length;
     // 외계인의 광선총 손잡이도 `box`다.
     const alienBoxes = new World().aliens.flatMap((alien) => alien.parts(1)).filter((part) => part.mesh === 'box').length;
-    expect(count('box')).toBe(shapes.filter((v) => v === 'box').length + cubeNpcs + trainBoxes + alienBoxes);
+    // 인공위성의 몸통, 단열재 띠, 전지판도 `box`다.
+    const satelliteBoxes = new World().satellite.parts(1, [0, 1, 0]).filter((part) => part.mesh === 'box').length;
+    expect(count('box')).toBe(shapes.filter((v) => v === 'box').length + cubeNpcs + trainBoxes + alienBoxes + satelliteBoxes);
     expect(count('rocket')).toBe(shapes.filter((v) => v === 'rocket').length);
     expect(count('rocketGlass')).toBe(count('rocket'));
   });
@@ -504,9 +507,9 @@ describe('해', () => {
     // 가장 긴 햇살의 끝까지 덮는다.
     expect(ray.size[0] / 2).toBeGreaterThan((SUN_RAYS.innerRadius + SUN_RAYS.maxLength) * SUN.radius);
     expect(ray.toneMapped).toBe(true);
-    // 해 빌보드는 그리기 목록(그림자 패스)에 들어가지 않는다. 빛나는 항목은 해 구체, 궤적 고리, 기차 전조등뿐이다.
+    // 해 빌보드는 그리기 목록(그림자 패스)에 들어가지 않는다. 빛나는 항목은 해 구체, 해와 인공위성의 궤적 고리, 기차 전조등뿐이다.
     const lamps = TRAIN_CARS.flatMap((car) => car.parts).filter((part) => part.emissive).length;
-    expect(world.buildDrawList(1).filter((item) => item.material.emissive[0] > 0)).toHaveLength(2 + lamps);
+    expect(world.buildDrawList(1).filter((item) => item.material.emissive[0] > 0)).toHaveLength(3 + lamps);
   });
 
   it('눈은 흰자와 검은자를 따로 그리고, 해 구면 앞에 놓인다', () => {
@@ -553,6 +556,76 @@ describe('해', () => {
 
   it('그림자를 드리우지 않는다', () => {
     expect(sunItem(new World()).castShadow).toBe(false);
+  });
+});
+
+describe('인공위성', () => {
+  const stepWorld = (world: World, seconds: number) => {
+    for (let i = 0; i < Math.round(seconds / DT); i++) world.fixedStep(DT, IDLE);
+  };
+  const rings = (world: World) => world.buildDrawList(1).filter((item) => item.mesh === 'ring');
+
+  it('궤도를 돌아 한 주기 뒤 제자리로 오고, 궤적 고리가 그 궤도와 같은 원이다', () => {
+    const world = new World();
+    const start = world.satellite.position(1);
+    const normal = world.satellite.axis;
+    expect(length(start)).toBeCloseTo(SATELLITE.orbitRadius, 4);
+    stepWorld(world, SATELLITE.periodSeconds / 4);
+    const quarter = world.satellite.position(1);
+    expect(dot(normalize(quarter), normalize(start))).toBeCloseTo(0, 2);
+    expect(dot(quarter, normal)).toBeCloseTo(0, 4);
+    stepWorld(world, (SATELLITE.periodSeconds * 3) / 4);
+    expect(length(sub(world.satellite.position(1), start))).toBeLessThan(0.05);
+
+    const orbit = rings(world)[1];
+    expect(orbit.castShadow).toBe(false);
+    const m = orbit.model;
+    for (let t = 0; t < 2 * Math.PI; t += 0.7) {
+      const p: Vec3 = [
+        m[0] * Math.cos(t) + m[4] * Math.sin(t) + m[12],
+        m[1] * Math.cos(t) + m[5] * Math.sin(t) + m[13],
+        m[2] * Math.cos(t) + m[6] * Math.sin(t) + m[14],
+      ];
+      expect(length(p)).toBeCloseTo(SATELLITE.orbitRadius, 4);
+      expect(dot(p, normal)).toBeCloseTo(0, 4);
+    }
+  });
+
+  it('위성, 비눗방울 띠, 해 궤도와 부딪치지 않는 거리를 돈다', () => {
+    const world = new World();
+    // 전지판 끝까지의 반경 (월드)
+    const reach = (SATELLITE.body[0] / 2 + SATELLITE.boomLength + SATELLITE.panel.length) * SATELLITE.scale * 1.05;
+    const moonCenter = scale(MOON.direction, MOON.distance);
+    for (let i = 0; i < 24; i++) {
+      stepWorld(world, SATELLITE.periodSeconds / 24);
+      const p = world.satellite.position(1);
+      expect(length(sub(p, moonCenter))).toBeGreaterThan(MOON.radius * 1.25 + reach);
+    }
+    expect(SATELLITE.orbitRadius - reach).toBeGreaterThan(44 + 2.2 + 4);
+    expect(SUN.orbitRadius - SATELLITE.orbitRadius).toBeGreaterThan(SUN.radius + reach);
+  });
+
+  it('전지판이 해를 보고, 접시가 행성을 보며, 그림자를 드리우지 않는다', () => {
+    const world = new World();
+    stepWorld(world, 5);
+    const sun = world.sun.direction(1);
+    const parts = world.satellite.parts(1, sun);
+    const center = world.satellite.position(1);
+    // 전지판 칸: 가장 얇은 축이 판의 법선이다. 해 방향을 궤도면 법선(붐)에 수직인 평면에 투영한 것과 나란하다.
+    const boom = world.satellite.axis;
+    const projected = normalize(sub(sun, scale(boom, dot(sun, boom))));
+    const cells = parts.filter((part) => part.mesh === 'box' && part.color[0] < 0.1);
+    expect(cells).toHaveLength(16);
+    for (const cell of cells) {
+      const panelNormal = normalize([cell.model[4], cell.model[5], cell.model[6]]);
+      expect(Math.abs(dot(panelNormal, projected))).toBeCloseTo(1, 4);
+    }
+    // 접시 메시의 -Y(오목한 쪽)가 행성 중심을 본다.
+    const dish = parts.find((part) => part.mesh === 'satelliteDish')!;
+    const dishDown = normalize([-dish.model[4], -dish.model[5], -dish.model[6]]);
+    expect(dot(dishDown, normalize(scale(center, -1)))).toBeCloseTo(1, 4);
+    const satelliteItems = world.buildDrawList(1).filter((item) => item.mesh === 'satelliteDish');
+    expect(satelliteItems.every((item) => !item.castShadow)).toBe(true);
   });
 });
 
