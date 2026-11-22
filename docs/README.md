@@ -26,6 +26,7 @@
 
 ## 프로젝트 전체
 
+- [../README.md](../README.md): 저장소 소개, 조작, 시작 방법
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): 현재 구조, 기능, 명령어, 알려진 한계
 - [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md): 결정 배경과 앞으로의 계획
 

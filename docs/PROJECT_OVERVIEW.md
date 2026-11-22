@@ -18,7 +18,7 @@
 | 개발 도구 | TypeScript, Vite, Vitest, `@types/three` (모두 개발 시에만 사용) |
 | 배포 | `main` 푸시 시 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 배포 |
 | 코드 규모 | TypeScript 3,556줄, 셰이더 264줄, CSS 257줄, 테스트 1,233줄, Blender 스크립트 179줄 |
-| 빌드 크기 | JS 674.54KB (gzip 176.19KB), CSS 3.59KB (gzip 1.30KB), 캐릭터 모델 43.48KB. JS가 500KB를 넘어 Vite가 청크 크기 경고를 낸다 |
+| 빌드 크기 | JS 729.30KB (gzip 194.97KB), CSS 3.59KB, 캐릭터 모델 43.48KB, 우주인 스티커 251.48KB. JS가 500KB를 넘어 Vite가 청크 크기 경고를 낸다 |
 
 ### 명령어
 
@@ -91,6 +91,7 @@ GameBlog/
 │  ├─ scenes/surface.json      행성 표면에 놓는 객체(집·로켓 자리)의 장면 파일
 │  ├─ shaders/                 mesh.vert, toon.frag, billboard.vert, billboard.frag, bubble.vert, bubble.frag
 │  └─ ui/overlay.ts            화면 안내와 HUD 제어
+├─ README.md                  저장소 소개, 조작, 시작 방법
 ├─ tools/blender/build_character.py  캐릭터 다리 모델(character.glb)을 만드는 Blender 스크립트
 ├─ tools/sticker/                    우주인 원본 사진과 스티커 그림을 만드는 Python 스크립트
 ├─ docs/
@@ -231,7 +232,7 @@ main.ts ─┬─ game/ ─┬─ content/
 
 ### 자동 테스트
 
-`npm test` 기준 8개 파일, 105개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 16개 파일, 173개가 모두 통과한다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
@@ -286,11 +287,11 @@ main.ts ─┬─ game/ ─┬─ content/
 |---|---|
 | 콘텐츠 폭 | 등록된 콘텐츠가 없다. 콘텐츠 렌더러 구조는 남아 있지만 등록된 렌더러가 없고, 그림자 패스에 참여하지 못한다 |
 | 안 쓰는 코드 | `math.ts`의 `mat4Perspective`, `mat4LookAt`, `mat4Ortho`, `mat4TransformPoint`, `quatMultiply`, `quatNormalize`, `quatNlerp`, `quatFromUnitVectors`는 다른 런타임 코드에서 쓰지 않고 테스트만 남아 있다 |
-| 빌드 크기 | three.js로 옮기면서 JS가 크게 늘었고, 지금은 674.54KB(gzip 176.19KB)라 Vite가 500KB 청크 경고를 낸다 |
+| 빌드 크기 | three.js로 옮기면서 JS가 크게 늘었고, 지금은 729.30KB(gzip 194.97KB)라 Vite가 500KB 청크 경고를 낸다 |
 | 그림자 메모리 | 그림자 렌더 타깃에 쓰지 않는 색 첨부(약 16MB)가 함께 잡힌다 |
 | 재질 | 툰 셰이더가 `metallic`(하이라이트·앰비언트를 바탕색으로 물들임)을 지원하지만 모든 재질이 0을 쓴다 |
 | 프레임 비용 | 그림자 패스를 매 프레임 전부 다시 그린다. 실제 부담은 측정하지 않았다 |
 | 시야 | 행성이 작아 지평선이 가깝다. 구 앞쪽으로 약 7 거리까지만 보이고, 작동 영역은 표면에 칠한 원이라 지평선 너머에서는 전혀 보이지 않는다 |
 | 낮과 밤 | 해가 48초에 한 바퀴 돌아 어느 곳이든 한동안 밤이 된다. 밤에는 간접광만 남는다. 작동 영역의 위치 검사는 시작할 때의 해 방향만 본다 |
 | 모바일 | 터치로 플레이할 수 있지만 그림자 해상도와 픽셀 비율은 PC와 같다. 성능을 측정하지 않았다 |
-| 문서 | 저장소 루트에 README가 없다 (문서 색인은 `docs/README.md`). 개발 계획서는 첫 버전 계획이며, 이후 바뀐 결정은 규칙 문서와 이 문서에 있다 |
+| 문서 | 저장소 루트 `README.md`는 소개, 조작, 시작 방법을 담고, 문서 색인은 `docs/README.md`다. 개발 계획서는 첫 버전 계획이며, 이후 바뀐 결정은 규칙 문서와 이 문서에 있다 |
