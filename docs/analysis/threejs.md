@@ -60,7 +60,7 @@ git log --oneline cc0d160..HEAD -- src/engine src/content/*/graphics src/content
 
 `Renderer`(`engine/render/renderer.ts`)는 그리기 장면 몇 개와 카메라 두 개를 가진다. 콘텐츠를 모르고, 씬이 `Graphics`로 등록한 메시·스킨·빌보드 그림·배경·셰이더 층을 그린다 (2026-11-24, [architecture.md](architecture.md)). 메시는 이름(`MeshKind`)으로 찾고, 엔진 기본 메시는 `sphere`, `box`, `cylinder`뿐이다. 2026-11-22까지는 콘텐츠 전용 그리기를 맡기는 `engine/contentRenderers/`(`ContentRenderer`, `RenderContext`, 장면 복사 `copySceneColor`)가 있었으나, 등록된 렌더러가 없어 작동 영역·콘텐츠 시스템과 함께 지웠다. 참고 구현은 커밋 `ad4cee7`에 있다.
 
-- `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
+- `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 셰이더(`ShaderKind`)마다 따로 있고, 그리기 항목은 재질의 셰이더 풀로 간다 (툰 재질은 `toon`). 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다. 메시의 정점 속성이 셰이더의 `layout`과 맞지 않으면 그 항목을 숨기고 한 번만 알린다. 정점 속성과 셰이더 등록은 [architecture.md](architecture.md)의 "정점 속성과 셰이더"에 있다 (2026-11-24).
 - `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
 - `skyScene`: 씬이 `setSkybox`로 넘긴 큐브맵을 `background`로만 가진 장면. 없으면 그리지 않는다. 행성 씬은 먼 우주를 넘긴다. 메인 패스에서 가장 먼저 그린다 ([analysis/skybox.md](skybox.md), 2026-11-21)
 - `billboardScene`: 별, 햇살, 해 눈을 한 번에 그리는 `BillboardBatch`의 메시 하나만 가진 장면. 그림자 패스에 넣지 않으려고 분리했다. 구조는 [analysis/billboard.md](billboard.md)에 있다 (2026-11-21, 그 전에는 별 `Sprite`만 가진 `skyScene`이었다)
@@ -132,12 +132,13 @@ three.js의 톤 매핑과 출력 색공간 변환은 내장 재질과 셰이더 
 
 예전 `analysis/content.md`에서 옮겼다 (2026-11-22).
 
-- **정점 셰이더:** `mesh.vert`를 재사용할 수 있다. three.js가 채우는 `modelMatrix`, `viewMatrix`, `projectionMatrix` 외에 `uNormalMatrix`, `uLightViewProj`를 uniform으로 넘겨야 한다. 출력은 `vWorldPos`, `vNormal`, `vObjectPos`, `vShadowCoord`다.
+- **등록:** 메시에 입히는 셰이더는 `graphics.defineShader(kind, spec)`으로 등록하고 `DrawItem.material`에 `{ shader: kind, uniforms }`를 넣는다. 엔진이 `RawShaderMaterial`(`glslVersion: GLSL3`)을 만들고 `FRAME_UNIFORMS`(`engine/shader.ts`)를 채운다.
+- **정점 셰이더:** `mesh.vert`(`MESH_VERTEX_SHADER`)를 재사용할 수 있다. three.js가 채우는 `modelMatrix`, `viewMatrix`, `projectionMatrix` 외에 `uNormalMatrix`, `uLightViewProj`를 uniform으로 넘겨야 한다. 출력은 `vWorldPos`, `vNormal`, `vObjectPos`, `vShadowCoord`다.
 - **재질:** `RawShaderMaterial`에 `glslVersion: GLSL3`를 준다. 셰이더 파일에 `#version`은 쓰지 않는다.
 - **겹쳐 그리기:** 같은 메시를 `mesh.vert`로 그리면 깊이가 같다. 재질의 깊이 함수 기본값이 `LessEqualDepth`이므로 `transparent: true`, `depthWrite: false`만 주면 된다.
 - **색공간:** 프레임 버퍼에는 ACES와 sRGB 변환을 마친 값이 들어 있다. ACES는 새로 더하는 빛에만 적용한다.
 - **씬 셰이더:** 새 셰이더는 `content/<씬>/shaders/`에 두고 그 씬의 `graphics/`에서 `RenderLayer`로 그린다. 툰 재질의 프레임 uniform이 필요하면 `RenderLayer.update`가 받는 `camera`, `environment`로 채운다.
-- **uniform:** 툰 재질의 프레임 단위 값은 `Renderer.shared`의 객체를 모든 재질이 함께 참조한다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
+- **uniform:** 프레임 단위 값은 `Renderer.frameUniforms`의 객체를 모든 셰이더의 재질이 함께 참조한다. 그리기 항목마다의 값(`ShaderSpec.uniforms`, `ShaderMaterial.uniforms`)은 `engine/render/uniforms.ts`가 배열 길이로 벡터·행렬을 골라 메시의 재질에 덮어쓴다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
 - **시간:** 전역 시계는 없다. 시간이 필요한 셰이더는 상태 클래스가 진행한 시간을 프레임 값으로 받는다.
 - **위쪽:** 셰이더에서도 위쪽을 +Y로 가정하지 않는다. 행성 위에서 위쪽은 `normalize(위치 - PLANET.center)`다.
 - **격자:** `SurfacePattern.Grid`는 구 메시 전용이다. 오브젝트 공간 방향을 정육면체 면에 투영해 격자를 그린다. 지금은 쓰는 곳이 없다.

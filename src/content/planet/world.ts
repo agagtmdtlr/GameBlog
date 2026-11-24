@@ -22,7 +22,7 @@ import { placeStars } from './shapes/starfield';
 import { sunRaysExtent } from './shapes/sunRays';
 import {
   SurfacePattern,
-  type DrawItem,
+  type DrawItem as EngineDrawItem,
   type Environment,
   type Material,
   type MeshKind,
@@ -54,6 +54,9 @@ import {
 } from './objects/sunFace';
 import { BODY_FORMS, type BodyShape } from '../common/character/bodyShape';
 import { BODY_RADIUS, CHARACTER_SCALE, LEG_BONE_COUNT, restBones, Walker, type BoneTransform } from '../common/character/walker';
+
+/** 행성 씬은 모두 엔진 툰 재질로 그린다. */
+type DrawItem = EngineDrawItem<Material>;
 
 /** 행성의 꼭대기에서 시작한다. */
 const SPAWN: Vec3 = [0, PLANET.radius + PLAYER_RADIUS, 0];

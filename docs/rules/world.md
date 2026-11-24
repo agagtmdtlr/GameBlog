@@ -22,7 +22,7 @@
 
 코드는 코어 엔진 계층(`src/engine/`)과 콘텐츠 계층(`src/content/`)으로 나눈다 (2026-11-24 사용자 결정, 여러 씬을 더하기 위해). 구조와 새 씬 추가 절차는 [analysis/architecture.md](../analysis/architecture.md)에 있다.
 
-- `engine/`은 `content/`를 가져오지 않는다. 특정 씬의 메시, 그림, 셰이더, 수치를 엔진에 넣지 않고, 콘텐츠가 `Graphics`(`engine/render/graphics.ts`)로 등록한다.
+- `engine/`은 `content/`를 가져오지 않는다. 특정 씬의 메시, 그림, 셰이더, 정점 속성, 수치를 엔진에 넣지 않고, 콘텐츠가 `Graphics`(`engine/render/graphics.ts`)로 등록한다.
 - `engine/`에 게임 규칙을 넣지 않는다. 엔진과 콘텐츠는 `engine/scene.ts`의 `SceneDefinition`·`SceneInstance`로만 만난다.
 - 씬은 `content/<씬>/`에 둔다. 씬끼리는 서로 가져오지 않고, 여러 씬이 함께 쓰는 월드 오브젝트(캐릭터, 카메라)는 `content/common/`에 둔다. `content/common/`은 씬을 가져오지 않는다.
 - 씬 안에서 three.js와 GLSL은 `graphics/`(와 `shaders/`)에만 둔다. `World`와 상태(`objects/`)·모양(`shapes/`) 코드는 GPU와 DOM에 의존하지 않는다.

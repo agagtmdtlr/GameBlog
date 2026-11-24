@@ -1,27 +1,28 @@
 import {
-  BoxGeometry,
+  AdditiveBlending,
+  BackSide,
   BufferAttribute,
   BufferGeometry,
   Color,
   CubeTexture,
-  CylinderGeometry,
+  DoubleSide,
   DynamicDrawUsage,
+  FrontSide,
   DepthTexture,
   GLSL3,
   type IUniform,
   LessEqualCompare,
   LessEqualDepth,
   LinearFilter,
-  Matrix3,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
   NoBlending,
+  NormalBlending,
   OrthographicCamera,
   PerspectiveCamera,
   RawShaderMaterial,
   Scene,
-  SphereGeometry,
   SRGBColorSpace,
   Vector2,
   Vector3,
@@ -29,18 +30,34 @@ import {
   WebGLRenderer,
   WebGLRenderTarget,
 } from 'three';
-import meshVert from './shaders/mesh.vert?raw';
-import toonFrag from './shaders/toon.frag?raw';
 import type { Mat4 } from '../math';
 import { skinVertices, type SkinSource } from '../skinning';
-import type { DrawItem, Environment, FrameData, MeshKind } from '../frame';
+import { isShaderMaterial, type DrawItem, type Environment, type FrameData, type MeshKind } from '../frame';
+import { TOON_SHADER, type ShaderKind, type ShaderSpec, type UniformValue } from '../shader';
+import { layoutMismatches, type GeometryData } from '../vertex';
+import { createEngineMeshes, geometryFromData, geometryLayout } from './geometry';
+import { TOON_SHADER_SPEC, toonUniforms } from './toonShader';
+import { assignUniform } from './uniforms';
 import { BillboardBatch } from './billboardRenderer';
 import type { BillboardImage, BillboardImageDef } from './billboard';
 import type { Graphics, RenderLayer } from './graphics';
 import { VideoScreenLayer, type VideoScreenPlacement, type YouTubeScreen } from './videoScreenLayer';
 
 type Uniforms = Record<string, IUniform>;
-type ToonMesh = Mesh<BufferGeometry, RawShaderMaterial>;
+type ShaderMesh = Mesh<BufferGeometry, RawShaderMaterial>;
+
+/** 셰이더 하나로 그리는 메시 풀. 프레임마다 앞에서부터 `used`개를 쓰고 나머지는 숨긴다. */
+interface ShaderPool {
+  spec: ShaderSpec;
+  meshes: ShaderMesh[];
+  used: number;
+}
+
+const BLENDING = { opaque: NoBlending, normal: NormalBlending, additive: AdditiveBlending } as const;
+const SIDE = { front: FrontSide, back: BackSide, double: DoubleSide } as const;
+
+const isBufferGeometry = (g: BufferGeometry | GeometryData): g is BufferGeometry =>
+  (g as BufferGeometry).isBufferGeometry === true;
 
 const SHADOW_MAP_SIZE = 2048;
 const MAX_DEVICE_PIXEL_RATIO = 2;
@@ -48,17 +65,6 @@ const MAX_DEVICE_PIXEL_RATIO = 2;
 const HALFTONE_CELL_CSS_PX = 7;
 /** 그림자를 드리우는 메시만 켜는 레이어. 광원 카메라는 이 레이어만 본다. */
 const SHADOW_LAYER = 1;
-
-/** 엔진이 늘 가진 기본 메시 (`frame.ts`의 `ENGINE_MESHES`) */
-function createEngineMeshes(): Record<string, BufferGeometry> {
-  return {
-    // 큰 구에도 쓰므로 촘촘하게 나눈다. 성기면 구가 땅에 살짝 묻혀 보인다.
-    sphere: new SphereGeometry(1, 96, 64),
-    box: new BoxGeometry(1, 1, 1),
-    // 축을 Z로 돌린 원기둥
-    cylinder: new CylinderGeometry(0.5, 0.5, 1, 24).rotateX(Math.PI / 2),
-  };
-}
 
 /**
  * three.js로 장면을 그린다. 게임 상태도 콘텐츠도 모르고, 콘텐츠가 `Graphics`로 등록한 메시·그림·층을
@@ -83,18 +89,21 @@ export class Renderer implements Graphics {
   private readonly skins = new Map<MeshKind, SkinSource>();
   private readonly depthMaterial: MeshBasicMaterial;
   private readonly shadowTarget: WebGLRenderTarget;
-  private readonly pool: ToonMesh[] = [];
+  /** 셰이더마다의 메시 풀. 툰 셰이더는 늘 있다. */
+  private readonly pools = new Map<ShaderKind, ShaderPool>();
+  /** 지오메트리마다 셰이더의 정점 속성과 맞는지 확인한 결과 */
+  private readonly layoutChecks = new WeakMap<BufferGeometry, Map<ShaderKind, boolean>>();
   /** 풀의 메시마다 스키닝 결과를 쓰는 지오메트리. 메시가 그리는 스킨 메시 종류가 바뀌면 새로 만든다. */
-  private readonly skinned = new Map<ToonMesh, { kind: MeshKind; source: SkinSource; geometry: BufferGeometry }>();
+  private readonly skinned = new Map<ShaderMesh, { kind: MeshKind; source: SkinSource; base: BufferGeometry; geometry: BufferGeometry }>();
   /** 영상 화면 자리를 뚫는 메시 */
   private readonly videoHoles: Mesh<BufferGeometry, MeshBasicMaterial>[] = [];
-  /** 등록되지 않은 메시 이름. 한 번만 알린다. */
-  private readonly missing = new Set<MeshKind>();
+  /** 이미 알린 문제. 같은 문제는 한 번만 알린다. */
+  private readonly warned = new Set<string>();
   private readonly empty = new BufferGeometry();
 
   private readonly clearColor = new Color();
   private readonly bufferSize = new Vector2();
-  /** 모든 재질이 같은 객체를 참조하는 프레임 단위 uniform */
+  /** 모든 셰이더 재질이 같은 객체를 참조하는 프레임 단위 uniform (`shader.ts`의 `FRAME_UNIFORMS`) */
   private readonly shared = {
     uLightViewProj: { value: new Matrix4() },
     uCameraPos: { value: new Vector3() },
@@ -106,7 +115,7 @@ export class Renderer implements Graphics {
     uNightAmbient: { value: new Vector3() },
     uHalftoneCell: { value: HALFTONE_CELL_CSS_PX },
   };
-  private readonly toonShared: Uniforms;
+  private readonly frameUniforms: Uniforms;
   /** HTML 영상 화면. 캔버스 뒤에 그리고, 화면 자리를 뚫어 보인다. */
   private readonly videoLayer = new VideoScreenLayer();
 
@@ -147,27 +156,36 @@ export class Renderer implements Graphics {
 
     this.billboardScene.add(this.billboards.mesh);
 
-    this.toonShared = {
+    this.frameUniforms = {
       ...this.shared,
       uShadowMap: { value: shadowMap },
       uShadowTexel: { value: 1 / SHADOW_MAP_SIZE },
       uOccluder: { value: new Vector4() },
     };
+    this.pools.set(TOON_SHADER, { spec: TOON_SHADER_SPEC, meshes: [], used: 0 });
   }
 
   // ---- Graphics: 콘텐츠 등록 ----
 
-  defineMesh(kind: MeshKind, geometry: BufferGeometry): void {
+  defineMesh(kind: MeshKind, geometry: BufferGeometry | GeometryData): void {
+    const next = isBufferGeometry(geometry) ? geometry : geometryFromData(geometry);
     const old = this.geometries.get(kind);
-    if (old && old !== geometry) old.dispose();
-    this.geometries.set(kind, geometry);
+    if (old && old !== next) old.dispose();
+    this.geometries.set(kind, next);
     this.skins.delete(kind);
-    this.missing.delete(kind);
+    this.warned.delete(`mesh:${kind}`);
   }
 
-  defineSkinnedMesh(kind: MeshKind, geometry: BufferGeometry, skin: SkinSource): void {
+  defineSkinnedMesh(kind: MeshKind, geometry: BufferGeometry | GeometryData, skin: SkinSource): void {
     this.defineMesh(kind, geometry);
     this.skins.set(kind, skin);
+  }
+
+  defineShader(kind: ShaderKind, spec: ShaderSpec): void {
+    if (kind === TOON_SHADER) throw new Error(`${TOON_SHADER}는 엔진 툰 셰이더라 바꿀 수 없습니다.`);
+    this.removePool(kind);
+    this.pools.set(kind, { spec, meshes: [], used: 0 });
+    for (const key of [...this.warned]) if (key.endsWith(`:${kind}`)) this.warned.delete(key);
   }
 
   setBillboardImages(images: Readonly<Record<BillboardImage, BillboardImageDef>>): void {
@@ -238,14 +256,15 @@ export class Renderer implements Graphics {
     this.billboards.setImages({});
     for (const { geometry } of this.skinned.values()) geometry.dispose();
     this.skinned.clear();
-    for (const mesh of this.pool) {
+    for (const kind of [...this.pools.keys()]) if (kind !== TOON_SHADER) this.removePool(kind);
+    for (const mesh of this.pools.get(TOON_SHADER)!.meshes) {
       mesh.geometry = this.empty;
       mesh.visible = false;
     }
     for (const geometry of this.geometries.values()) geometry.dispose();
     this.geometries.clear();
     this.skins.clear();
-    this.missing.clear();
+    this.warned.clear();
     this.defineEngineMeshes();
   }
 
@@ -311,11 +330,45 @@ export class Renderer implements Graphics {
   private geometry(kind: MeshKind): BufferGeometry {
     const geometry = this.geometries.get(kind);
     if (geometry) return geometry;
-    if (!this.missing.has(kind)) {
-      this.missing.add(kind);
-      console.error(`등록되지 않은 메시: ${kind}`);
-    }
+    this.warnOnce(`mesh:${kind}`, `등록되지 않은 메시: ${kind}`);
     return this.empty;
+  }
+
+  private warnOnce(key: string, message: string): void {
+    if (this.warned.has(key)) return;
+    this.warned.add(key);
+    console.error(message);
+  }
+
+  /** 셰이더의 메시 풀을 장면에서 빼고 재질을 지운다. */
+  private removePool(kind: ShaderKind): void {
+    const pool = this.pools.get(kind);
+    if (!pool) return;
+    for (const mesh of pool.meshes) {
+      this.scene.remove(mesh);
+      mesh.material.dispose();
+      const entry = this.skinned.get(mesh);
+      if (entry) {
+        entry.geometry.dispose();
+        this.skinned.delete(mesh);
+      }
+    }
+    this.pools.delete(kind);
+  }
+
+  /** `geometry`가 `kind` 셰이더의 정점 속성을 모두 가졌는지. 맞지 않으면 한 번 알린다. */
+  private fitsLayout(geometry: BufferGeometry, meshKind: MeshKind, kind: ShaderKind, spec: ShaderSpec): boolean {
+    if (geometry === this.empty) return true;
+    let checks = this.layoutChecks.get(geometry);
+    if (!checks) this.layoutChecks.set(geometry, (checks = new Map()));
+    let ok = checks.get(kind);
+    if (ok === undefined) {
+      const problems = layoutMismatches(spec.layout, geometryLayout(geometry));
+      ok = problems.length === 0;
+      checks.set(kind, ok);
+      if (!ok) this.warnOnce(`layout:${meshKind}:${kind}`, `메시 ${meshKind}의 정점 속성이 셰이더 ${kind}와 맞지 않습니다: ${problems.join(', ')}`);
+    }
+    return ok;
   }
 
   private updateCameras(frame: FrameData, aspect: number): void {
@@ -362,64 +415,85 @@ export class Renderer implements Graphics {
     shared.uNightAmbient.value.fromArray(env.nightAmbient);
 
     const { center, radius } = frame.occluder;
-    this.toonShared.uOccluder.value.set(center[0], center[1], center[2], radius);
+    this.frameUniforms.uOccluder.value.set(center[0], center[1], center[2], radius);
   }
 
-  /** 그리기 목록을 메시 풀에 옮긴다. 목록보다 남는 메시는 숨긴다. */
+  /** 그리기 목록을 셰이더마다의 메시 풀에 옮긴다. 이번 프레임에 쓰지 않은 메시는 숨긴다. */
   private syncItems(items: readonly DrawItem[]): void {
-    for (let i = 0; i < items.length; i++) {
-      let mesh = this.pool[i];
+    for (const pool of this.pools.values()) pool.used = 0;
+    for (const item of items) {
+      const kind = isShaderMaterial(item.material) ? item.material.shader : TOON_SHADER;
+      const pool = this.pools.get(kind);
+      if (!pool) {
+        this.warnOnce(`shader:${kind}`, `등록되지 않은 셰이더: ${kind}`);
+        continue;
+      }
+      let mesh = pool.meshes[pool.used];
       if (!mesh) {
-        mesh = this.createToonMesh();
-        this.pool.push(mesh);
+        mesh = this.createMesh(pool.spec);
+        pool.meshes.push(mesh);
         this.scene.add(mesh);
       }
-      this.applyItem(mesh, items[i]);
-      mesh.visible = true;
+      pool.used++;
+      mesh.visible = this.applyItem(mesh, item, kind, pool.spec);
     }
-    for (let i = items.length; i < this.pool.length; i++) this.pool[i].visible = false;
+    for (const pool of this.pools.values()) {
+      for (let i = pool.used; i < pool.meshes.length; i++) pool.meshes[i].visible = false;
+    }
   }
 
-  private createToonMesh(): ToonMesh {
+  private createMesh(spec: ShaderSpec): ShaderMesh {
+    const blending = spec.blending ?? 'opaque';
+    const uniforms: Uniforms = { ...this.frameUniforms, uNormalMatrix: { value: null } };
+    for (const [name, value] of Object.entries(spec.uniforms ?? {})) {
+      uniforms[name] = { value: null };
+      assignUniform(uniforms[name], value);
+    }
     const material = new RawShaderMaterial({
       glslVersion: GLSL3,
-      vertexShader: meshVert,
-      fragmentShader: toonFrag,
-      uniforms: {
-        ...this.toonShared,
-        uNormalMatrix: { value: new Matrix3() },
-        uBaseColor: { value: new Vector3() },
-        uEmissive: { value: new Vector3() },
-        uMetallic: { value: 0 },
-        uRoughness: { value: 1 },
-        uPattern: { value: 0 },
-        uReceiveOccluder: { value: false },
-      },
+      vertexShader: spec.vertexShader,
+      fragmentShader: spec.fragmentShader,
+      uniforms,
+      transparent: blending !== 'opaque',
+      blending: blending === 'opaque' ? NormalBlending : BLENDING[blending],
+      depthWrite: spec.depthWrite ?? blending === 'opaque',
+      side: SIDE[spec.side ?? 'front'],
     });
-    const mesh = new Mesh(this.geometry('sphere'), material);
+    const mesh = new Mesh(this.empty, material);
     // 모델 행렬은 콘텐츠가 계산해 넘겨 준다.
     mesh.matrixAutoUpdate = false;
     return mesh;
   }
 
-  private applyItem(mesh: ToonMesh, item: DrawItem): void {
-    mesh.geometry = item.skin ? this.skinnedGeometry(mesh, item.mesh, item.skin) : this.geometry(item.mesh);
+  /** 그리기 항목을 메시에 옮긴다. 정점 속성이 셰이더와 맞지 않으면 그리지 않는다(`false`). */
+  private applyItem(mesh: ShaderMesh, item: DrawItem, kind: ShaderKind, spec: ShaderSpec): boolean {
+    // 스킨 메시는 모델을 비동기로 불러오는 중일 수 있으므로 등록 전이면 알리지 않고 그리지 않는다.
+    const base = item.skin ? (this.geometries.get(item.mesh) ?? this.empty) : this.geometry(item.mesh);
+    if (!this.fitsLayout(base, item.mesh, kind, spec)) return false;
+    if (item.castShadow && base !== this.empty && !base.getAttribute('position')) {
+      this.warnOnce(`shadow:${item.mesh}`, `그림자를 드리우는 메시 ${item.mesh}에 position 속성이 없습니다.`);
+      return false;
+    }
+    mesh.geometry = item.skin ? this.skinnedGeometry(mesh, item.mesh, item.skin) : base;
     // 스키닝한 정점은 이미 월드 좌표라 경계 구를 따로 계산하지 않고 화면 밖 제외를 끈다.
-    mesh.frustumCulled = !item.skin;
+    // 3차원 position이 없으면 경계 구를 계산할 수 없으므로 역시 끈다.
+    mesh.frustumCulled = !item.skin && mesh.geometry.getAttribute('position')?.itemSize === 3;
     mesh.matrix.fromArray(item.model);
     mesh.matrixWorldNeedsUpdate = true;
     mesh.layers.set(0);
     if (item.castShadow) mesh.layers.enable(SHADOW_LAYER);
 
     const u = mesh.material.uniforms;
-    const m = item.material;
-    u.uNormalMatrix.value.fromArray(item.normal);
-    u.uBaseColor.value.fromArray(m.baseColor);
-    u.uEmissive.value.fromArray(m.emissive);
-    u.uMetallic.value = m.metallic;
-    u.uRoughness.value = m.roughness;
-    u.uPattern.value = m.pattern;
-    u.uReceiveOccluder.value = m.receivesOccluder;
+    assignUniform(u.uNormalMatrix, item.normal);
+    const values = isShaderMaterial(item.material) ? item.material.uniforms : toonUniforms(item.material);
+    if (values) for (const [name, value] of Object.entries(values)) this.setUniform(u, name, value);
+    return true;
+  }
+
+  private setUniform(uniforms: Uniforms, name: string, value: UniformValue): void {
+    // 셰이더 기본값에 없는 이름은 처음 넣을 때 만든다. three.js가 다음 그리기부터 올린다.
+    const target = uniforms[name] ?? (uniforms[name] = { value: null });
+    assignUniform(target, value);
   }
 
   /**
@@ -427,17 +501,22 @@ export class Renderer implements Graphics {
    * 같은 메시는 보통 매 프레임 같은 스킨 메시를 그리므로 종류가 같으면 지오메트리를 다시 만들지 않는다.
    * 스킨이 아직 등록되지 않았으면(비동기로 불러오는 모델) 빈 지오메트리를 그린다.
    */
-  private skinnedGeometry(mesh: ToonMesh, kind: MeshKind, bones: readonly Mat4[]): BufferGeometry {
+  private skinnedGeometry(mesh: ShaderMesh, kind: MeshKind, bones: readonly Mat4[]): BufferGeometry {
     const source = this.skins.get(kind);
     if (!source) return this.empty;
+    const base = this.geometry(kind);
     let entry = this.skinned.get(mesh);
-    if (!entry || entry.kind !== kind || entry.source !== source) {
+    if (!entry || entry.kind !== kind || entry.source !== source || entry.base !== base) {
       entry?.geometry.dispose();
       const geometry = new BufferGeometry();
-      geometry.setIndex(this.geometry(kind).index);
+      geometry.setIndex(base.index);
+      // 스키닝하지 않는 속성(uv, 색 등)은 등록한 지오메트리의 것을 그대로 함께 쓴다.
+      for (const [name, attribute] of Object.entries(base.attributes)) {
+        if (name !== 'position' && name !== 'normal') geometry.setAttribute(name, attribute);
+      }
       geometry.setAttribute('position', new BufferAttribute(source.positions.slice(), 3).setUsage(DynamicDrawUsage));
       geometry.setAttribute('normal', new BufferAttribute(source.normals.slice(), 3).setUsage(DynamicDrawUsage));
-      entry = { kind, source, geometry };
+      entry = { kind, source, base, geometry };
       this.skinned.set(mesh, entry);
     }
     const { geometry } = entry;
