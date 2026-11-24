@@ -1,0 +1,14 @@
+{
+  "cuts": {
+    "a": {
+      "title": "행성 산책",
+      "preview": { "image": "planet.jpg" },
+      "open": { "scene": "planet" }
+    },
+    "b": {
+      "title": "텔레비전 영상",
+      "preview": { "youtube": "aqz-KE-bpKQ" },
+      "open": { "youtube": "aqz-KE-bpKQ" }
+    }
+  }
+}
