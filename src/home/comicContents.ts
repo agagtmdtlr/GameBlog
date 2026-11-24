@@ -3,7 +3,7 @@
  * DOM 없이 계산하므로 테스트할 수 있다.
  *
  * ```json
- * { "cuts": { "<컷 id>": { "title": "...", "preview": { ... }, "open": { ... } } } }
+ * { "title": "Game Blog", "cuts": { "<컷 id>": { "title": "...", "preview": { ... }, "open": { ... } } } }
  * ```
  *
  * - `preview`: `{ "image": "<previews/의 파일>" }`, `{ "video": "<previews/의 파일>" }`(소리 없이 반복),
@@ -81,6 +81,14 @@ export function loadCutContents(data: unknown): Map<string, CutContent> {
     });
   }
   return contents;
+}
+
+/** `contents.json`의 `title`: 코믹 프레임 위 오림 글자 제목. 영어만 쓴다 (오림 글자가 영어만 지원). */
+export function loadPageTitle(data: unknown): string {
+  const title = isRecord(data) ? data.title : undefined;
+  if (typeof title !== 'string' || !/^[A-Za-z0-9 .,!?&'\-:\n]+$/.test(title) || title.trim() === '')
+    throw new Error("contents.title: 영어 글자, 숫자, 공백, 줄바꿈, . , ! ? & ' - : 로만 된 제목이어야 합니다");
+  return title;
 }
 
 /** 컷을 눌렀을 때 갈 주소와 새 탭으로 열지 여부 */

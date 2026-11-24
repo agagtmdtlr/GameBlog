@@ -30,8 +30,8 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 
 | 파일 | 내용 |
 |---|---|
-| `src/home/comicLayout.ts` | 컷 배치 `COMIC_LAYOUT`(페이지 크기, 바깥 여백, 컷 사이 여백, 컷 다각형), 볼록 다각형 줄이기(`insetPolygon`), 종이 좌표로 옮기기(`placeCuts`). DOM 없음 |
-| `src/home/contents.json` | 컷 id마다 넣을 콘텐츠 |
+| `src/home/comicLayout.ts` | 컷 배치 `COMIC_LAYOUT`(페이지 크기, 바깥 여백, 컷 사이 여백, 제목 띠 높이, 컷 다각형), 볼록 다각형 줄이기(`insetPolygon`), 종이 좌표로 옮기기(`placeCuts`). DOM 없음 |
+| `src/home/contents.json` | 페이지 제목(`title`, 영어)과 컷 id마다 넣을 콘텐츠 |
 | `src/home/comicContents.ts` | `contents.json` 읽기·검사(`loadCutContents`), 누르면 갈 주소(`targetLink`), YouTube 썸네일 주소. DOM 없음 |
 | `src/home/comicPage.ts` | DOM 그리기 (`showComicPage`) |
 | `src/home/previews/` | 컷 미리 보기 그림·영상 파일 |
@@ -50,7 +50,8 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 | 아래 (y 112~150) | `g`, `h` | (64,112)→(67.4,150) 사선으로 나눈 두 컷 |
 
 - 컷을 바꿀 때 사선 위의 꼭짓점은 그 사선 위에 정확히 놓아야 한다. 테스트가 컷 넓이의 합이 페이지 넓이와 같은지, 모두 볼록한지, id가 겹치지 않는지 검사한다.
-- 페이지 비율은 `(width + 2·margin) / (height + 2·margin)`이고 CSS `aspect-ratio`로 화면 안에 통째로 맞춘다 (스크롤 없음).
+- 컷 영역 위에 높이 `header`(20)의 제목 띠가 있고, `contents.json`의 `title`을 오림 글자([ransomText.md](ransomText.md), `letterSize` 72)로 띠 안에 맞춰 그린다. 제목은 영어만 쓴다 (`loadPageTitle`이 검사).
+- 페이지 비율은 `(width + 2·margin) / (height + header + 2·margin)`이고 CSS `aspect-ratio`로 화면 안에 통째로 맞춘다 (스크롤 없음).
 
 ## 컷 콘텐츠 (`contents.json`)
 
