@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SCENES } from '../content';
-import { loadCutContents, loadPageTitle, targetLink } from './comicContents';
-import { COMIC_LAYOUT, insetPolygon, isConvex, placeCuts, signedArea, type Point } from './comicLayout';
+import { loadCutContents, loadPageTitle, targetLink, titleLineOptions } from './comicContents';
+import { COMIC_LAYOUT, insetPolygon, isConvex, MIN_PAGE_ASPECT, naturalAspect, placeCuts, signedArea, type Point } from './comicLayout';
 import contentsData from './contents.json';
 
 const PREVIEW_FILES = Object.keys(import.meta.glob('./previews/*')).map((path) => path.slice('./previews/'.length));
@@ -52,6 +52,31 @@ describe('코믹 프레임 배치', () => {
       expect(cut.box.y + cut.box.height, cut.id).toBeLessThanOrEqual(page.height - COMIC_LAYOUT.margin);
     }
   });
+
+  it('세로로 긴 화면에 맞춰 종이를 늘이되, 컷 사이 여백 두께는 그대로다', () => {
+    const natural = placeCuts(COMIC_LAYOUT);
+    const tall = placeCuts(COMIC_LAYOUT, 0.47);
+    expect(tall.width / tall.height).toBeCloseTo(0.47);
+    expect(tall.header.height).toBeGreaterThan(natural.header.height);
+    // 위 줄 a, b 사이 세로 여백은 늘여도 gutter 그대로
+    const gap = (page: typeof natural) => {
+      const [a, b] = page.cuts;
+      return Math.min(...b.points.map((p) => p[0])) - Math.max(...a.points.map((p) => p[0]));
+    };
+    expect(gap(tall)).toBeCloseTo(gap(natural));
+    // 가로 사이 여백(위 줄과 가운데 줄 사이)도 gutter 그대로
+    const rowGap = (page: typeof natural) =>
+      Math.min(...page.cuts[2].points.map((p) => p[1])) - Math.max(...page.cuts[0].points.map((p) => p[1]));
+    expect(rowGap(tall)).toBeCloseTo(COMIC_LAYOUT.gutter);
+    for (const cut of tall.cuts) expect(isConvex(cut.points), cut.id).toBe(true);
+  });
+
+  it('넓은 화면에서는 늘이지 않고, 너무 긴 화면에서는 한계까지만 늘인다', () => {
+    expect(placeCuts(COMIC_LAYOUT, 2)).toEqual(placeCuts(COMIC_LAYOUT));
+    const page = placeCuts(COMIC_LAYOUT, 0.2);
+    expect(page.width / page.height).toBeCloseTo(MIN_PAGE_ASPECT);
+    expect(naturalAspect(COMIC_LAYOUT)).toBeGreaterThan(MIN_PAGE_ASPECT);
+  });
 });
 
 describe('컷 콘텐츠 (contents.json)', () => {
@@ -97,5 +122,12 @@ describe('컷 콘텐츠 (contents.json)', () => {
     expect(loadPageTitle({ title: "Hello, World!" })).toBe('Hello, World!');
     expect(() => loadPageTitle({ title: '게임 블로그' })).toThrow('contents.title');
     expect(() => loadPageTitle({})).toThrow('contents.title');
+  });
+
+  it('제목을 한 줄과 고르게 나눈 두 줄로 나눠 본다', () => {
+    expect(titleLineOptions('Game Blog')).toEqual(['Game Blog', 'Game\nBlog']);
+    expect(titleLineOptions('My Big Game Blog')).toEqual(['My Big Game Blog', 'My Big\nGame Blog']);
+    expect(titleLineOptions('Games')).toEqual(['Games']);
+    expect(titleLineOptions('A\nB C')).toEqual(['A\nB C']);
   });
 });
