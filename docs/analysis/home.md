@@ -17,6 +17,7 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 / (주소에 ?scene= 없음) ── main.ts ── home/comicPage.ts: 코믹 프레임을 그린다. WebGL·엔진·씬 코드는 내려받지 않는다
    │ 컷 클릭
    ├─ open.scene  → ?scene=<id>  ── main.ts가 engine/app.ts와 content/를 동적으로 불러와 그 씬을 올린다
+   ├─ open.game   → ?game=<id>   ── main.ts가 games/를 동적으로 불러와 미니 게임을 연다 ([coloring.md](coloring.md))
    ├─ open.youtube → https://www.youtube.com/watch?v=<id> (새 탭)
    └─ open.url     → 그 주소 (새 탭)
 ?scene=<id> 의 시작·일시 정지 화면 ── "메인으로" 링크(index.html의 #screen-home) → ./
@@ -70,11 +71,11 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 | 키 | 값 |
 |---|---|
 | `title` | 스크린 리더 이름과 마우스 툴팁. 화면에 글로 쓰지 않는다 |
-| `preview` | 하나만: `image`(previews/의 그림), `video`(previews/의 mp4·webm, 소리 없이 반복), `youtube`(영상 id → 16:9 썸네일 `maxresdefault`, 없으면 `mqdefault`) |
-| `open` | 하나만: `scene`(이 사이트의 씬 id), `youtube`(영상 id, 새 탭), `url`(`https://` 주소, 새 탭) |
+| `preview` | 하나만: `image`(previews/의 그림. png·jpg·webp·gif·svg), `video`(previews/의 mp4·webm, 소리 없이 반복), `youtube`(영상 id → 16:9 썸네일 `maxresdefault`, 없으면 `mqdefault`) |
+| `open` | 하나만: `scene`(이 사이트의 씬 id), `game`(이 사이트의 미니 게임 id, `GAMES`), `youtube`(영상 id, 새 탭), `url`(`https://` 주소, 새 탭) |
 
 - 콘텐츠가 없는 컷은 망점 무늬 빈 컷으로 남고 누를 수 없다.
-- 테스트가 콘텐츠의 컷 id가 배치에 있는지, `scene`이 `SCENES`에 있는지, 미리 보기 파일이 `previews/`에 있는지 검사한다.
+- 테스트가 콘텐츠의 컷 id가 배치에 있는지, `scene`이 `SCENES`에, `game`이 `GAMES`에 있는지, 미리 보기 파일이 `previews/`에 있는지 검사한다.
 - `open.youtube` 컷에는 가운데에 재생 삼각형을 얹는다.
 
 ### 컷에 콘텐츠를 넣는 절차
@@ -86,6 +87,8 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 `b`는 사용자가 게임 "Flower"를 모방해 Unity로 만든 시연 영상이다 (2026-11-24 사용자 요청, 임시로 넣었던 "Big Buck Bunny"를 대체).
 
 `c`는 사용자가 보드게임 "치킨차차"를 온라인 게임으로 이식한 프로젝트의 시연 영상이다 (2026-11-24 사용자 요청).
+
+`d`는 색칠 놀이다 (2026-11-24 사용자 요청). 미리 보기 `previews/coloring.svg`는 색칠 그림을 반쯤 칠한 SVG이고 만드는 법은 [coloring.md](coloring.md)에 있다.
 
 `previews/planet.jpg`는 개발 서버의 `?scene=planet` 시작 화면에서 캔버스를 3:2로 잘라 900×600 JPEG로 저장했다.
 

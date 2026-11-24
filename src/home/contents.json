@@ -15,6 +15,11 @@
       "title": "치킨차차 보드게임 온라인 이식 시연",
       "preview": { "youtube": "aUECXWnuohA" },
       "open": { "youtube": "aUECXWnuohA" }
+    },
+    "d": {
+      "title": "색칠 놀이",
+      "preview": { "image": "coloring.svg" },
+      "open": { "game": "coloring" }
     }
   }
 }

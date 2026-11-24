@@ -8,7 +8,7 @@
 
 ## 1. 컨셉
 
-첫 화면은 코믹 프레임 메인 페이지로, 컷마다 콘텐츠 미리 보기를 보여 주고 누르면 그 콘텐츠(3D 씬, YouTube 등)로 간다 ([analysis/home.md](analysis/home.md)). 콘텐츠의 중심은 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다닌다. 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
+첫 화면은 코믹 프레임 메인 페이지로, 컷마다 콘텐츠 미리 보기를 보여 주고 누르면 그 콘텐츠(3D 씬, 미니 게임, YouTube 등)로 간다 ([analysis/home.md](analysis/home.md)). 미니 게임으로 선으로 나뉜 칸을 눌러 무작위 색을 채우는 색칠 놀이가 있다 ([analysis/coloring.md](analysis/coloring.md)). 콘텐츠의 중심은 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다닌다. 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
 
 ## 2. 기술 구성
 
@@ -37,7 +37,10 @@ npm run preview  # 빌드 결과 미리 보기
 GameBlog/
 ├─ index.html                  메인 페이지 자리, 캔버스, 시작·일시 정지 화면(메인으로 링크)의 뼈대
 ├─ src/
-│  ├─ main.ts                  진입점: ?scene= 이 없으면 메인 페이지, 있으면 App과 씬을 동적으로 불러와 올린다
+│  ├─ main.ts                  진입점: ?game= 이면 미니 게임, ?scene= 이면 App과 씬을 동적으로 불러와 올리고, 둘 다 없으면 메인 페이지
+│  ├─ games/                   엔진 없는 미니 게임 (?game=<id>, [analysis/coloring.md](analysis/coloring.md))
+│  │  ├─ game.ts, index.ts     GameDefinition, GAMES
+│  │  └─ coloring/             색칠 놀이: 그림(pictures/), 영역 나누기, 색 묶음, 판 상태, three.js 그리기(graphics/, shaders/)
 │  ├─ lib/ransomText/          오림 글자: 찢어 오린 종이 글자로 만든 영어 제목 ([analysis/ransomText.md](analysis/ransomText.md))
 │  ├─ home/                    메인 페이지: 코믹 프레임 컷마다 콘텐츠 미리 보기 ([analysis/home.md](analysis/home.md))
 │  │  ├─ comicLayout.ts        컷 배치(볼록 다각형)와 컷 사이 여백 계산
@@ -139,7 +142,8 @@ GameBlog/
 ```
 main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ ─┐
          │                                    └───────────────────┴─ engine/ (scene, frame, math, physics, render/graphics)
-         └─ engine/app.ts ─ engine/render/ ─ engine/ui/
+         ├─ engine/app.ts ─ engine/render/ ─ engine/ui/
+         └─ games/index.ts ─ games/<게임>/ (엔진·콘텐츠·메인 페이지를 가져오지 않음)
 ```
 
 - `engine/`은 `content/`를 모른다. 씬은 `Graphics`로 메시·빌보드 그림·배경·셰이더 층을 등록한다.
@@ -233,12 +237,13 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 
 ### 자동 테스트
 
-`npm test` 기준 22개 파일, 191개가 모두 통과한다 (2026-11-24, 정점 속성 추상화 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 25개 파일, 226개가 모두 통과한다 (2026-11-24, 색칠 놀이 추가 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 12 | 벡터, 쿼터니언, 행렬 |
-| [`layers.test.ts`](../src/layers.test.ts) | 5 | 계층 가져오기 규칙: 엔진 → 콘텐츠 금지, 씬끼리 금지, three.js를 가져오는 곳 |
+| [`layers.test.ts`](../src/layers.test.ts) | 9 | 계층 가져오기 규칙: 엔진 → 콘텐츠 금지, 씬끼리 금지, three.js를 가져오는 곳, 메인 페이지·lib·미니 게임의 가져오기 |
+| [`coloring.test.ts`](../src/games/coloring/coloring.test.ts) | 11 | 색칠 놀이의 영역 나누기(바깥, 작은 틈, 이웃, 선 채우기), 색 고르기와 완성, 색 묶음, 그림 문서 |
 | [`vertexLayout.test.ts`](../src/engine/render/vertexLayout.test.ts) | 8 | 셰이더 정점 속성 맞추기, 속성 정점 수 검사, 사용자 속성을 가진 GeometryData 변환, 엔진 기본 메시 속성, uniform 변환, 툰 재질 uniform |
 | [`billboard.test.ts`](../src/engine/render/billboard.test.ts) | 4 | 빌보드 아틀라스 배치와 텍스처 좌표, 그리기 순서 (시험용 그림 목록) |
 | [`billboardImages.test.ts`](../src/content/planet/graphics/billboardImages.test.ts) | 2 | 행성 빌보드 그림의 아틀라스 칸, 햇살 그림 범위 |
