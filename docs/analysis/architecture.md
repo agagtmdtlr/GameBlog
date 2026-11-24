@@ -99,12 +99,13 @@ main.ts ── content/index.ts (SCENES) ── content/<씬>/index.ts (SceneDef
 
 ## 새 씬 추가 절차
 
-1. `src/content/<씬>/index.ts`에 `SceneDefinition`을 만든다. `id`는 주소의 `?scene=` 값이 된다.
+1. `src/content/<씬>/index.ts`에 `SceneDefinition`을 만든다. `id`는 주소의 `?scene=` 값이 된다. 주소에 `?scene=`이 없으면 씬 대신 메인 페이지가 뜬다 ([home.md](home.md)).
 2. `create`에서 필요한 그래픽을 등록한다. 캐릭터를 쓰면 `defineCharacterMeshes(graphics)`를 부른다. 엔진 기본 메시만 쓰면 등록할 것이 없다.
 3. 게임 상태는 GPU 없이 테스트할 수 있게 `world.ts`와 `objects/`에 두고, `frame()`에서 `FrameData`로 바꾼다.
 4. 새 셰이더는 `content/<씬>/shaders/`에 둔다. 메시에 입히는 셰이더는 `graphics.defineShader`로 등록하고 `DrawItem.material`에 `{ shader, uniforms }`를 넣는다. 셰이더가 새 정점 속성을 읽으면 그 속성을 가진 `GeometryData`를 `defineMesh`로 등록한다. 메시 단위로 나눌 수 없는 그리기(한 번에 많은 객체, 따로 정렬하는 투명 객체)는 `graphics/`의 `RenderLayer`로 그린다.
-5. `src/content/index.ts`의 `SCENES`에 더한다. 첫째가 기본 씬이다.
-6. 다른 씬과 함께 쓸 것이 생기면 `content/common/`으로 옮긴다.
+5. `src/content/index.ts`의 `SCENES`에 더한다. 첫째는 `?scene=`의 id를 찾지 못했을 때 쓰는 씬이다.
+6. 메인 페이지에서 들어가게 하려면 `src/home/contents.json`의 빈 컷에 `"open": { "scene": "<id>" }`와 미리 보기를 넣는다.
+7. 다른 씬과 함께 쓸 것이 생기면 `content/common/`으로 옮긴다.
 
 ## 브라우저 확인 (2026-11-24, 개발 서버)
 

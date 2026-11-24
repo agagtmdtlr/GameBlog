@@ -6,6 +6,7 @@
 
 | 기능 | 해당 작업 | 규칙 | 분석 |
 |---|---|---|---|
+| 메인 페이지 | 첫 화면 코믹 프레임, 컷 배치(다각형·여백)와 컷 나누기, 컷에 넣는 콘텐츠(미리 보기 그림·영상·YouTube 썸네일, 씬·YouTube·외부 주소로 가기), 씬에서 메인으로 돌아가기 | [rules/world.md](rules/world.md) | [analysis/home.md](analysis/home.md) |
 | 월드 컨셉과 구조 | 글 없이 그래픽으로 전달하는 컨셉, 지워진 콘텐츠·작동 영역 시스템의 참고 커밋 | [rules/world.md](rules/world.md) | [analysis/threejs.md](analysis/threejs.md) |
 | 엔진·콘텐츠 계층과 씬 | 코어 엔진(`engine/`)과 콘텐츠(`content/`)의 역할 나누기, 씬 정의(`SceneDefinition`)와 그래픽 등록(`Graphics`), 새 씬·씬 셰이더 추가, 셰이더별 정점 속성(`GeometryData`, `VertexLayout`)과 셰이더 등록(`defineShader`), 씬 바꾸기, 가져오기 규칙 검사 | [rules/world.md](rules/world.md) | [analysis/architecture.md](analysis/architecture.md) |
 | 입력과 조작 | 키보드·마우스·터치 입력, 가상 조이스틱, 일시 정지, 조작 안내 | 없음 | [analysis/input.md](analysis/input.md) |
