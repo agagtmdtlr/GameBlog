@@ -17,7 +17,7 @@
 | 그래픽스 | three.js 0.187 (WebGL2). 직접 작성한 툰 셰이더(`toon.frag`)를 `RawShaderMaterial`로 사용. 적용 내용은 [analysis/threejs.md](analysis/threejs.md) |
 | 개발 도구 | TypeScript, Vite, Vitest, `@types/three` (모두 개발 시에만 사용) |
 | 배포 | `main` 푸시 시 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 배포 |
-| 코드 규모 | TypeScript 7,292줄(엔진 2,005줄, 콘텐츠 5,273줄), 셰이더 413줄, CSS 232줄, 테스트 2,273줄 (2026-11-24) |
+| 코드 규모 | TypeScript 7,633줄(엔진 2,343줄, 콘텐츠 5,276줄), 셰이더 413줄, CSS 232줄, 테스트 2,364줄 (2026-11-24) |
 | 빌드 크기 | JS 770.47KB (gzip 209.16KB), CSS 3.08KB, 캐릭터 모델 43.48KB, 우주인 스티커 251.48KB. JS가 500KB를 넘어 Vite가 청크 크기 경고를 낸다 |
 
 ### 명령어
@@ -44,6 +44,8 @@ GameBlog/
 │  │  ├─ app.ts                게임 루프, 시작·일시 정지 상태, 포인터 잠금, 씬 올리기(load)
 │  │  ├─ scene.ts              엔진·콘텐츠 약속: SceneDefinition, SceneInstance, Controls
 │  │  ├─ frame.ts              렌더러 입력 타입 (three.js와 무관), 엔진 기본 메시 이름
+│  │  ├─ vertex.ts             정점 속성 묶음 GeometryData, 셰이더가 요구하는 속성 VertexLayout
+│  │  ├─ shader.ts             셰이더 등록 모양 ShaderSpec, 셰이더 재질, 엔진이 채우는 uniform
 │  │  ├─ math.ts               Vec3, Quat, Mat4 연산
 │  │  ├─ random.ts             결과가 늘 같은 난수
 │  │  ├─ meshData.ts           three.js 없는 메시 데이터 타입 (단면, 배열, 삼각형 목록)
@@ -55,7 +57,9 @@ GameBlog/
 │  │  ├─ render/
 │  │  │  ├─ renderer.ts        three.js 렌더러: 그림자 패스, 메인 패스, 콘텐츠 등록(Graphics 구현)
 │  │  │  ├─ graphics.ts        콘텐츠 등록 창구 Graphics와 셰이더 층 RenderLayer
-│  │  │  ├─ geometry.ts        지오메트리 도우미 (회전체, 배열, 밀어낸 구, 부품 합치기)
+│  │  │  ├─ geometry.ts        지오메트리 도우미 (GeometryData 변환, 회전체, 배열, 밀어낸 구, 부품 합치기, 엔진 기본 메시)
+│  │  │  ├─ toonShader.ts      엔진 툰 셰이더 등록 모양과 툰 재질 → uniform
+│  │  │  ├─ uniforms.ts        uniform 값을 three.js 벡터·행렬로 바꿈
 │  │  │  ├─ billboard.ts       빌보드 모양, 그림 정의, 아틀라스 배치, 그리기 순서 ([analysis/billboard.md](analysis/billboard.md))
 │  │  │  ├─ billboardAtlas.ts  등록된 빌보드 그림을 한 캔버스에 그림
 │  │  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
@@ -222,12 +226,13 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 
 ### 자동 테스트
 
-`npm test` 기준 21개 파일, 183개가 모두 통과한다 (2026-11-24, 엔진·콘텐츠 계층 분리 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 22개 파일, 191개가 모두 통과한다 (2026-11-24, 정점 속성 추상화 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 12 | 벡터, 쿼터니언, 행렬 |
 | [`layers.test.ts`](../src/layers.test.ts) | 5 | 계층 가져오기 규칙: 엔진 → 콘텐츠 금지, 씬끼리 금지, three.js를 가져오는 곳 |
+| [`vertexLayout.test.ts`](../src/engine/render/vertexLayout.test.ts) | 8 | 셰이더 정점 속성 맞추기, 속성 정점 수 검사, 사용자 속성을 가진 GeometryData 변환, 엔진 기본 메시 속성, uniform 변환, 툰 재질 uniform |
 | [`billboard.test.ts`](../src/engine/render/billboard.test.ts) | 4 | 빌보드 아틀라스 배치와 텍스처 좌표, 그리기 순서 (시험용 그림 목록) |
 | [`billboardImages.test.ts`](../src/content/planet/graphics/billboardImages.test.ts) | 2 | 행성 빌보드 그림의 아틀라스 칸, 햇살 그림 범위 |
 | [`moonShape.test.ts`](../src/content/planet/shapes/moonShape.test.ts) | 4 | 위성의 충돌구·바위 덩어리 모양 |

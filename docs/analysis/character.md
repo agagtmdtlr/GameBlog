@@ -22,7 +22,7 @@ git log --oneline cc0d160..HEAD -- tools/blender src/content/common/character/ch
 | 그리기 목록 | `content/planet/world.ts` | 몸(`sphere`)과 다리마다 `leg` 항목 하나를 만든다. 전체 순서는 행성, 표면 장면 상자들, 몸, 왼다리, 오른다리, NPC마다 몸·왼다리·오른다리([npc.md](npc.md)), 위성, 해, 해 궤적 고리다. 플레이어와 NPC가 `characterDrawItems(walker, alpha, color)`를 함께 쓴다. 다리 항목의 `skin`은 뼈마다 `지금 뼈 × 기본 자세 뼈의 역행렬`이다 |
 | 스키닝 | `engine/skinning.ts` | 정점마다 뼈 행렬을 가중치로 섞는 선형 블렌드 스키닝 (CPU) |
 | 모델 불러오기 | `content/common/character/characterGraphics.ts` | `defineCharacterMeshes`가 glb를 `GLTFLoader`로 불러와 기본 자세 정점과 뼈 번호·가중치를 꺼내 `graphics.defineSkinnedMesh('leg', …)`로 등록한다. NPC의 `pyramid` 메시도 여기서 등록한다 |
-| 렌더러 | `engine/render/renderer.ts` | 풀의 메시마다 스킨 메시 지오메트리 복사본을 두고 매 프레임 스키닝 결과를 쓴다. 스킨이 등록되기 전에는 그리지 않으므로 몸만 보인다 |
+| 렌더러 | `engine/render/renderer.ts` | 풀의 메시마다 스킨 메시 지오메트리 복사본을 두고 매 프레임 스키닝 결과를 쓴다. 뼈로 옮기는 속성은 `position`, `normal`뿐이고 나머지 속성은 원본 배열을 함께 쓴다. 스킨이 등록되기 전에는 그리지 않으므로 몸만 보인다 |
 
 ## Blender 다리 메시 규약
 

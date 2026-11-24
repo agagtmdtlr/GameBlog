@@ -1,7 +1,9 @@
 import type { BufferGeometry, Object3D } from 'three';
 import type { CameraView, Environment, MeshKind } from '../frame';
 import type { Mat4 } from '../math';
+import type { ShaderKind, ShaderSpec } from '../shader';
 import type { SkinSource } from '../skinning';
+import type { GeometryData } from '../vertex';
 import type { BillboardImage, BillboardImageDef } from './billboard';
 import type { VideoScreenPlacement, YouTubeScreen } from './videoScreenLayer';
 
@@ -19,13 +21,21 @@ export interface RenderLayer {
  * 씬을 바꾸면 렌더러가 등록된 것을 모두 지운다 (`Renderer.resetContent`).
  */
 export interface Graphics {
-  /** 이름으로 그릴 메시를 등록한다. 같은 이름이면 바꾼다. 지오메트리는 렌더러가 맡아 지운다. */
-  defineMesh(kind: MeshKind, geometry: BufferGeometry): void;
+  /**
+   * 이름으로 그릴 메시를 등록한다. 같은 이름이면 바꾼다. 지오메트리는 렌더러가 맡아 지운다.
+   * 정점 속성은 이름과 성분 수가 자유롭다. three.js 지오메트리나 three.js 없이 만든 `GeometryData`를 받는다.
+   */
+  defineMesh(kind: MeshKind, geometry: BufferGeometry | GeometryData): void;
   /**
    * CPU 스키닝 메시를 등록한다. `DrawItem.skin`의 뼈 행렬로 `skin`의 기본 자세를 옮겨 그린다.
-   * `geometry`는 색인만 쓴다 (색인이 없으면 정점 순서대로 그린다).
+   * `position`, `normal`은 스키닝한 값을 쓰고, `geometry`의 색인과 다른 정점 속성(예: `uv`)은 그대로 쓴다.
    */
-  defineSkinnedMesh(kind: MeshKind, geometry: BufferGeometry, skin: SkinSource): void;
+  defineSkinnedMesh(kind: MeshKind, geometry: BufferGeometry | GeometryData, skin: SkinSource): void;
+  /**
+   * 셰이더를 등록한다. `DrawItem.material`이 `{ shader: kind, uniforms }`이면 이 셰이더로 그린다.
+   * 같은 이름이면 바꾼다. `toon`은 엔진 툰 셰이더라 바꿀 수 없다.
+   */
+  defineShader(kind: ShaderKind, spec: ShaderSpec): void;
   /** 빌보드 아틀라스의 그림 목록을 바꾼다. 파일 그림은 그 뒤에 `loadBillboardImage`로 채운다. */
   setBillboardImages(images: Readonly<Record<BillboardImage, BillboardImageDef>>): void;
   /** 파일 그림(`draw`가 없는 그림)을 불러와 아틀라스 칸에 그린다. 그 전에는 투명하다. */

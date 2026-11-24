@@ -47,8 +47,9 @@ main.ts ── content/index.ts (SCENES) ── content/<씬>/index.ts (SceneDef
 
 | 함수 | 하는 일 |
 |---|---|
-| `defineMesh(kind, geometry)` | 이름으로 그릴 메시를 등록한다. `DrawItem.mesh`가 이 이름을 쓴다 |
+| `defineMesh(kind, geometry)` | 이름으로 그릴 메시를 등록한다. `DrawItem.mesh`가 이 이름을 쓴다. `geometry`는 three.js `BufferGeometry`나 `GeometryData` |
 | `defineSkinnedMesh(kind, geometry, skin)` | CPU 스키닝 메시를 등록한다. `DrawItem.skin`의 뼈 행렬로 그린다 (다리, 촉수) |
+| `defineShader(kind, spec)` | 콘텐츠 셰이더(`ShaderSpec`)를 이름으로 등록한다. `DrawItem.material`이 `{ shader: kind, uniforms }`이면 이 셰이더로 그린다. `toon`은 바꿀 수 없다 |
 | `setBillboardImages(images)` | 빌보드 아틀라스의 그림 목록(`BillboardImageDef`: 칸 크기, 프레임 수, 그리기 함수)을 바꾼다 |
 | `loadBillboardImage(image, url)` | `draw`가 없는 그림을 파일에서 불러와 칸에 그린다 |
 | `setSkybox(faces)` | 먼 배경 큐브맵의 여섯 면 캔버스. `null`이면 배경색만 |
@@ -57,11 +58,28 @@ main.ts ── content/index.ts (SCENES) ── content/<씬>/index.ts (SceneDef
 
 엔진 기본 메시는 `sphere`, `box`, `cylinder`뿐이다 (`frame.ts`의 `ENGINE_MESHES`). 등록되지 않은 이름을 그리면 콘솔에 한 번 알리고 빈 지오메트리로 그린다. 지오메트리 도우미(`arrayGeometry`, `triangleGeometry`, `latheGeometry`, `displacedSphereGeometry`, `mergeParts`)는 `engine/render/geometry.ts`에 있다.
 
-`App.load(definition)`은 지금 씬의 `dispose`를 부르고 `Renderer.resetContent()`로 등록된 메시·스킨·그림·배경·층·영상 화면을 모두 지운 뒤 새 씬을 만든다. 상태는 시작 화면으로 돌아간다.
+`App.load(definition)`은 지금 씬의 `dispose`를 부르고 `Renderer.resetContent()`로 등록된 메시·스킨·셰이더·그림·배경·층·영상 화면을 모두 지운 뒤 새 씬을 만든다. 상태는 시작 화면으로 돌아간다.
+
+### 정점 속성과 셰이더 (`engine/vertex.ts`, `engine/shader.ts`)
+
+정점 속성과 셰이더는 엔진에 고정하지 않는다. 지오메트리는 이름 붙은 속성의 묶음이고, 셰이더는 자기가 읽는 속성의 모양을 밝힌다. 렌더러는 둘을 이름과 성분 수로만 맞춰 본다.
+
+- `GeometryData { attributes, index? }`: 속성 이름마다 `VertexAttribute { array, itemSize(1~4), normalized? }`. 이름과 개수에 제한이 없다 (`position`, `normal`, `uv`, `color`, `aWeight` 같은). `position`이 없어도 된다 (정점 셰이더가 위치를 계산하는 경우). 등록할 때 `vertexCount`가 속성마다 정점 수가 같은지, 색인이 범위 안인지 검사한다.
+- `VertexLayout`: 셰이더가 요구하는 속성 이름과 성분 수. 툰 셰이더는 `STANDARD_LAYOUT`(`position:3`, `normal:3`)이다.
+- `ShaderSpec { vertexShader, fragmentShader, layout, uniforms?, blending?, depthWrite?, side? }`: GLSL 3.00 ES 원문. `modelMatrix`, `viewMatrix`, `projectionMatrix`와 `FRAME_UNIFORMS`(법선 행렬, 그림자, 카메라, 조명, 오클루전, 하프톤 칸)는 셰이더에 선언만 하면 엔진이 채운다. `uniforms`는 그리기 항목마다 따로 갖는 값과 기본값이다.
+- `UniformValue`: 숫자·참거짓, 길이 2·3·4 배열(벡터), 길이 9·16 배열(열 우선 행렬). 텍스처 uniform은 아직 없다.
+- `DrawItem.material`은 툰 재질 `Material`이나 `ShaderMaterial { shader, uniforms? }`이다 (`isShaderMaterial`로 가린다). 툰 재질은 `toonUniforms`로 툰 셰이더의 uniform이 된다.
+
+렌더러(`engine/render/renderer.ts`)는 셰이더마다 메시 풀을 따로 두고, 그리기 항목을 재질의 셰이더 풀로 보낸다. 메시의 속성이 셰이더의 `layout`과 맞지 않거나, 그림자를 드리우는 항목에 `position`(3)이 없거나, 등록되지 않은 셰이더를 쓰면 그 항목은 그리지 않고 콘솔에 한 번만 알린다. 같은 지오메트리·셰이더 짝의 검사 결과는 기억해 둔다.
+
+한계:
+
+- 그림자 패스는 정점 셰이더를 쓰지 않고 `position`만 읽는다. 정점 셰이더가 정점을 움직이면 그림자는 움직이지 않는다.
+- CPU 스키닝은 `position`, `normal`만 뼈로 옮기고, 나머지 속성(`uv` 같은)은 원본 배열을 그대로 쓴다.
 
 ### 엔진에 남긴 것
 
-- 툰 셰이더(`engine/render/shaders/toon.frag`)는 모든 씬이 함께 쓰는 표준 재질이다. 재질 입력은 `Material`(`frame.ts`)이다.
+- 툰 셰이더(`engine/render/shaders/toon.frag`, `engine/render/toonShader.ts`)는 모든 씬이 함께 쓰는 기본 셰이더다. 재질 입력은 `Material`(`frame.ts`)이다. 콘텐츠가 툰 셰이더를 바탕으로 제 셰이더를 만들 때는 `MESH_VERTEX_SHADER`, `TOON_FRAGMENT_SHADER` 원문을 가져다 고친다.
 - 툰 셰이더의 땅 무늬 `SurfacePattern.Dreamy`, `Gradient`는 행성 씬 전용이지만 툰 셰이더 안에 있어서 엔진에 남겼다. 씬마다 무늬를 바꾸려면 툰 셰이더에 조각을 끼우는 방법(`onBeforeCompile` 같은)이 필요하다.
 - 조명 모델(`Environment`: 해·달빛·하늘·땅 앰비언트, 그림자 반경)과 캐릭터 오클루전(`occluder`)도 엔진의 약속이다.
 
@@ -84,7 +102,7 @@ main.ts ── content/index.ts (SCENES) ── content/<씬>/index.ts (SceneDef
 1. `src/content/<씬>/index.ts`에 `SceneDefinition`을 만든다. `id`는 주소의 `?scene=` 값이 된다.
 2. `create`에서 필요한 그래픽을 등록한다. 캐릭터를 쓰면 `defineCharacterMeshes(graphics)`를 부른다. 엔진 기본 메시만 쓰면 등록할 것이 없다.
 3. 게임 상태는 GPU 없이 테스트할 수 있게 `world.ts`와 `objects/`에 두고, `frame()`에서 `FrameData`로 바꾼다.
-4. 새 셰이더는 `content/<씬>/shaders/`에 두고 `graphics/`의 `RenderLayer`로 그린다.
+4. 새 셰이더는 `content/<씬>/shaders/`에 둔다. 메시에 입히는 셰이더는 `graphics.defineShader`로 등록하고 `DrawItem.material`에 `{ shader, uniforms }`를 넣는다. 셰이더가 새 정점 속성을 읽으면 그 속성을 가진 `GeometryData`를 `defineMesh`로 등록한다. 메시 단위로 나눌 수 없는 그리기(한 번에 많은 객체, 따로 정렬하는 투명 객체)는 `graphics/`의 `RenderLayer`로 그린다.
 5. `src/content/index.ts`의 `SCENES`에 더한다. 첫째가 기본 씬이다.
 6. 다른 씬과 함께 쓸 것이 생기면 `content/common/`으로 옮긴다.
 
@@ -97,3 +115,12 @@ main.ts ── content/index.ts (SCENES) ── content/<씬>/index.ts (SceneDef
 | `gl.getError()`, 콘솔 오류 | 없음 |
 
 확인하지 않은 것: 행성이 아닌 두 번째 씬(아직 없다), 실제 키보드·마우스 조작.
+
+## 정점 속성 추상화 브라우저 확인 (2026-11-24, 개발 서버)
+
+| 항목 | 결과 |
+|---|---|
+| 행성 씬 | 바꾸기 전과 같은 장면 |
+| 개발 콘솔에서 `defineShader('vcolor', { layout: { position: 3, aColor: 4 } })`와 Uint8 정규화 `aColor`를 가진 `GeometryData` 삼각형 | 꼭짓점 색이 섞인 삼각형이 그려지고 `vcolor` 풀이 따로 생긴다 |
+| 같은 삼각형을 툰 재질로 그리기 | 그리지 않고 `normal(3) 없음`을 한 번만 알린다 |
+| `gl.getError()` | 0 |
