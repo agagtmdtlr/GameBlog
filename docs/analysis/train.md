@@ -8,7 +8,7 @@
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline -- src/engine/trackPath.ts src/game/train.ts src/game/smoke.ts
+git log --oneline -- src/content/planet/shapes/trackPath.ts src/content/planet/objects/train.ts src/content/planet/objects/smoke.ts
 ```
 
 ## 동작
@@ -26,15 +26,14 @@ git log --oneline -- src/engine/trackPath.ts src/game/train.ts src/game/smoke.ts
 
 | 파일 | 내용 |
 |---|---|
-| `engine/trackPath.ts` | `TRACK_SHAPE`(레일·침목 치수와 색), `RAIL_TOP`, `SphereTrackPath`(구 표면 닫힌 스플라인), `trackMesh`(레일·침목 삼각형 배열). three.js를 쓰지 않는다 |
-| `game/train.ts` | `TRACK_ROUTE`(조절점 위도·경도), `TRACK_PATH`, `TRAIN`(빠르기, 틈, 폭, 바퀴), `TRAIN_CARS`(차량 목록과 부품), `Train` 클래스(`step`, `position`, `poses`, `obstacles`, `parts`) |
-| `game/smoke.ts` | `SMOKE`(간격, 수명, 크기, 떠오르는 빠르기, 색), `puffRadius`, `SmokeTrail`(`step`, `models`). `Train.smoke`가 들고 `Train.step`이 굴뚝 꼭대기(`chimneyTop`)를 넘겨 진행한다 |
-| `game/world.ts` | `World.train`을 `fixedStep`에서 캐릭터보다 먼저 진행하고, 차량 상자를 표면 객체 상자와 함께 `obstacles`로 넘긴다. 그리기 목록에 `rails`, `sleepers`(단위 행렬)와 차량 부품, 연기 퍼프(`sphere`, 그림자 없음)를 넣는다 |
-| `engine/frame.ts` | `MeshKind`에 `cylinder`, `rails`, `sleepers` |
-| `engine/renderer.ts` | `cylinder`: 축을 Z로 돌린 `CylinderGeometry(0.5, 0.5, 1)`. `setTrack()`: `trackMesh`의 배열로 `rails`, `sleepers` 지오메트리를 채운다 |
-| `main.ts` | 렌더러를 만든 뒤 `renderer.setTrack(trackMesh(TRACK_PATH))`를 한 번 부른다 |
-| `game/train.test.ts` | 스플라인, 선로 자리, 기차 테스트 |
-| `game/smoke.test.ts` | 굴뚝 연기 테스트 |
+| `content/planet/shapes/trackPath.ts` | `TRACK_SHAPE`(레일·침목 치수와 색), `RAIL_TOP`, `SphereTrackPath`(구 표면 닫힌 스플라인), `trackMesh`(레일·침목 삼각형 배열). three.js를 쓰지 않는다 |
+| `content/planet/objects/train.ts` | `TRACK_ROUTE`(조절점 위도·경도), `TRACK_PATH`, `TRAIN`(빠르기, 틈, 폭, 바퀴), `TRAIN_CARS`(차량 목록과 부품), `Train` 클래스(`step`, `position`, `poses`, `obstacles`, `parts`) |
+| `content/planet/objects/smoke.ts` | `SMOKE`(간격, 수명, 크기, 떠오르는 빠르기, 색), `puffRadius`, `SmokeTrail`(`step`, `models`). `Train.smoke`가 들고 `Train.step`이 굴뚝 꼭대기(`chimneyTop`)를 넘겨 진행한다 |
+| `content/planet/world.ts` | `World.train`을 `fixedStep`에서 캐릭터보다 먼저 진행하고, 차량 상자를 표면 객체 상자와 함께 `obstacles`로 넘긴다. 그리기 목록에 `rails`, `sleepers`(단위 행렬)와 차량 부품, 연기 퍼프(`sphere`, 그림자 없음)를 넣는다 |
+| `engine/render/renderer.ts` | 엔진 기본 메시 `cylinder`: 축을 Z로 돌린 `CylinderGeometry(0.5, 0.5, 1)` |
+| `content/planet/graphics/meshes.ts` | `trackMesh(TRACK_PATH)`의 배열로 `rails`, `sleepers` 지오메트리를 등록한다 (`triangleGeometry`) |
+| `content/planet/objects/train.test.ts` | 스플라인, 선로 자리, 기차 테스트 |
+| `content/planet/objects/smoke.test.ts` | 굴뚝 연기 테스트 |
 
 ## 스플라인
 
@@ -70,9 +69,9 @@ git log --oneline -- src/engine/trackPath.ts src/game/train.ts src/game/smoke.ts
 
 ## 테스트
 
-- `game/train.test.ts`: 스플라인(표면 위, 조절점 통과, 닫힌 고리, 호 길이, 정규직교 축, 굽음 정도, 조절점 수), 선로 자리(시작 지점·표면 객체·NPC와의 간격, 레일 높이), 기차(한 바퀴 주기, 보간, 차량 간격, 행렬식 양수, 캐릭터 밀어내기).
-- `game/smoke.test.ts`: 퍼프 크기 곡선, 퍼프 수가 늘지 않음, 떠오름, 달리는 기관차 굴뚝에서 나와 뒤에 남음.
-- `game/game.test.ts`: 그리기 목록의 `box` 수와 빛나는 항목 수에 기차 부품을 더해 센다. 해 구체는 `sphere` 메시로 찾는다.
+- `content/planet/objects/train.test.ts`: 스플라인(표면 위, 조절점 통과, 닫힌 고리, 호 길이, 정규직교 축, 굽음 정도, 조절점 수), 선로 자리(시작 지점·표면 객체·NPC와의 간격, 레일 높이), 기차(한 바퀴 주기, 보간, 차량 간격, 행렬식 양수, 캐릭터 밀어내기).
+- `content/planet/objects/smoke.test.ts`: 퍼프 크기 곡선, 퍼프 수가 늘지 않음, 떠오름, 달리는 기관차 굴뚝에서 나와 뒤에 남음.
+- `content/planet/game.test.ts`: 그리기 목록의 `box` 수와 빛나는 항목 수에 기차 부품을 더해 센다. 해 구체는 `sphere` 메시로 찾는다.
 
 ## 브라우저 확인 (2026-11-21, 작업 브랜치 개발 서버)
 

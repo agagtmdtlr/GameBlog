@@ -8,20 +8,21 @@
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline cc0d160..HEAD -- tools/blender src/assets src/game/walker.ts src/game/characterClips.ts src/game/keyframes.ts src/game/player.ts src/game/world.ts src/engine/renderer.ts src/engine/skinning.ts
+git log --oneline cc0d160..HEAD -- tools/blender src/content/common/character/character.glb src/content/common/character/characterGraphics.ts src/content/common/character/walker.ts src/content/common/character/characterClips.ts src/content/common/character/keyframes.ts src/content/common/character/player.ts src/content/planet/world.ts src/engine/render/renderer.ts src/engine/skinning.ts
 ```
 
 ## 흐름
 
 | 단계 | 파일 | 하는 일 |
 |---|---|---|
-| 모델링 | `tools/blender/build_character.py` | Blender 스크립트로 다리 스킨 메시 `Leg`와 뼈 `Thigh`, `Shin`, `Foot`을 만들어 `src/assets/character.glb`로 내보낸다 |
-| 물리 | `game/player.ts` | 반지름 0.88 × `CHARACTER_SCALE`(1.32)의 보이지 않는 충돌 구. 중심이 몸의 중심이고, 반지름이 다리가 몸을 받치는 높이다. 굴러가는 회전은 계산하지 않는다. 행성 말고도 `obstacles`로 받은 상자(지금은 텔레비전과 로켓 자리)와 충돌한다 |
-| 클립 | `game/characterClips.ts`, `game/keyframes.ts` | 서기·걷기·내딛기 키프레임 클립과 트랙 샘플링 |
-| 걸음 | `game/walker.ts` | 물리 결과(위치, 속도, 접지)를 보고 클립을 재생해 몸의 위치·엉덩이 기울기와 두 발의 위치를 정한다. 그릴 때 두 마디 IK로 무릎을 풀어 다리마다 뼈 3개의 위치와 축을 낸다 |
-| 그리기 목록 | `game/world.ts` | 몸(`sphere`)과 다리마다 `leg` 항목 하나를 만든다. 전체 순서는 행성, 표면 장면 상자들, 몸, 왼다리, 오른다리, NPC마다 몸·왼다리·오른다리([npc.md](npc.md)), 위성, 해, 해 궤적 고리다. 플레이어와 NPC가 `characterDrawItems(walker, alpha, color)`를 함께 쓴다. 다리 항목의 `skin`은 뼈마다 `지금 뼈 × 기본 자세 뼈의 역행렬`이다 |
+| 모델링 | `tools/blender/build_character.py` | Blender 스크립트로 다리 스킨 메시 `Leg`와 뼈 `Thigh`, `Shin`, `Foot`을 만들어 `src/content/common/character/character.glb`로 내보낸다 |
+| 물리 | `content/common/character/player.ts` | 반지름 0.88 × `CHARACTER_SCALE`(1.32)의 보이지 않는 충돌 구. 중심이 몸의 중심이고, 반지름이 다리가 몸을 받치는 높이다. 굴러가는 회전은 계산하지 않는다. 행성 말고도 `obstacles`로 받은 상자(지금은 텔레비전과 로켓 자리)와 충돌한다 |
+| 클립 | `content/common/character/characterClips.ts`, `content/common/character/keyframes.ts` | 서기·걷기·내딛기 키프레임 클립과 트랙 샘플링 |
+| 걸음 | `content/common/character/walker.ts` | 물리 결과(위치, 속도, 접지)를 보고 클립을 재생해 몸의 위치·엉덩이 기울기와 두 발의 위치를 정한다. 그릴 때 두 마디 IK로 무릎을 풀어 다리마다 뼈 3개의 위치와 축을 낸다 |
+| 그리기 목록 | `content/planet/world.ts` | 몸(`sphere`)과 다리마다 `leg` 항목 하나를 만든다. 전체 순서는 행성, 표면 장면 상자들, 몸, 왼다리, 오른다리, NPC마다 몸·왼다리·오른다리([npc.md](npc.md)), 위성, 해, 해 궤적 고리다. 플레이어와 NPC가 `characterDrawItems(walker, alpha, color)`를 함께 쓴다. 다리 항목의 `skin`은 뼈마다 `지금 뼈 × 기본 자세 뼈의 역행렬`이다 |
 | 스키닝 | `engine/skinning.ts` | 정점마다 뼈 행렬을 가중치로 섞는 선형 블렌드 스키닝 (CPU) |
-| 렌더러 | `engine/renderer.ts` | `loadCharacter(url)`가 glb를 `GLTFLoader`로 불러와 기본 자세 정점과 뼈 번호·가중치를 꺼낸다. 풀의 메시마다 다리 지오메트리 복사본을 두고 매 프레임 스키닝 결과를 쓴다. 불러오기 전에는 몸만 보인다 |
+| 모델 불러오기 | `content/common/character/characterGraphics.ts` | `defineCharacterMeshes`가 glb를 `GLTFLoader`로 불러와 기본 자세 정점과 뼈 번호·가중치를 꺼내 `graphics.defineSkinnedMesh('leg', …)`로 등록한다. NPC의 `pyramid` 메시도 여기서 등록한다 |
+| 렌더러 | `engine/render/renderer.ts` | 풀의 메시마다 스킨 메시 지오메트리 복사본을 두고 매 프레임 스키닝 결과를 쓴다. 스킨이 등록되기 전에는 그리지 않으므로 몸만 보인다 |
 
 ## Blender 다리 메시 규약
 
@@ -101,7 +102,7 @@ git log --oneline cc0d160..HEAD -- tools/blender src/assets src/game/walker.ts s
 
 ## 테스트
 
-`game/walker.test.ts`: 키프레임 트랙이 키를 지나고 반복 이음매에서 끊기지 않는지, 서 있으면 숨쉬기로 몸만 움직이고 발은 그대로인지, 걸으면 걷기 클립으로 바뀌고 딛는 발이 미끄러지지 않는지 확인한다. 그리고 IK가 마디 길이를 지키고 pole 쪽으로 굽는지, 서 있을 때 발이 양옆 땅에 있는지, 걸을 때 발을 번갈아 내딛고 발목이 발바닥 위에 붙어 있는지, 진행 방향으로 도는지, 멈추면 발을 모으는지, 공중과 착지를 확인한다. 기본 자세가 Blender 스크립트와 같은지, 숨쉬기 한 바퀴 뒤 서 있는 자세의 무릎 높이가 기본 자세와 같은지, 이웃한 뼈의 스키닝 행렬이 관절을 같은 곳으로 옮기는지, CPU 스키닝이 가중치대로 섞는지도 확인한다.
+`content/common/character/walker.test.ts`: 키프레임 트랙이 키를 지나고 반복 이음매에서 끊기지 않는지, 서 있으면 숨쉬기로 몸만 움직이고 발은 그대로인지, 걸으면 걷기 클립으로 바뀌고 딛는 발이 미끄러지지 않는지 확인한다. 그리고 IK가 마디 길이를 지키고 pole 쪽으로 굽는지, 서 있을 때 발이 양옆 땅에 있는지, 걸을 때 발을 번갈아 내딛고 발목이 발바닥 위에 붙어 있는지, 진행 방향으로 도는지, 멈추면 발을 모으는지, 공중과 착지를 확인한다. 기본 자세가 Blender 스크립트와 같은지, 숨쉬기 한 바퀴 뒤 서 있는 자세의 무릎 높이가 기본 자세와 같은지, 이웃한 뼈의 스키닝 행렬이 관절을 같은 곳으로 옮기는지, CPU 스키닝이 가중치대로 섞는지도 확인한다.
 
 ## 브라우저 확인 (2026-11-21)
 

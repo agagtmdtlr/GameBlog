@@ -9,10 +9,10 @@
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline cc0d160..HEAD -- src/engine src/shaders src/main.ts package.json
+git log --oneline cc0d160..HEAD -- src/engine src/content/*/graphics src/content/*/shaders src/main.ts package.json
 ```
 
-"포팅 방침", "바뀐 파일", "대응표", "포팅 중 확인한 점", "결과", 2026-11-15 브라우저 확인은 포팅 당시의 기록이다. 물이 든 구, 발판, 자체 엔진 파일처럼 지금은 없는 것이 나온다. 현재 구조는 "렌더러 구조"를 본다.
+"포팅 방침", "바뀐 파일", "대응표", "포팅 중 확인한 점", "결과", 2026-11-15 브라우저 확인은 포팅 당시의 기록이다. 물이 든 구, 발판, 자체 엔진 파일처럼 지금은 없는 것이 나오고, 파일 경로도 2026-11-24 엔진·콘텐츠 계층 분리 전의 것이다(`engine/renderer.ts`는 지금 `engine/render/renderer.ts`, `shaders/`는 `engine/render/shaders/`와 `content/planet/shaders/`). 현재 구조는 "렌더러 구조"와 [architecture.md](architecture.md)를 본다.
 
 ## 포팅 방침
 
@@ -58,19 +58,19 @@ git log --oneline cc0d160..HEAD -- src/engine src/shaders src/main.ts package.js
 
 ## 렌더러 구조
 
-`Renderer`는 그리기 장면 몇 개와 카메라 두 개를 가진다. 2026-11-22까지는 콘텐츠 전용 그리기를 맡기는 `engine/contentRenderers/`(`ContentRenderer`, `RenderContext`, 장면 복사 `copySceneColor`)가 있었으나, 등록된 렌더러가 없어 작동 영역·콘텐츠 시스템과 함께 지웠다. 참고 구현은 커밋 `ad4cee7`에 있다.
+`Renderer`(`engine/render/renderer.ts`)는 그리기 장면 몇 개와 카메라 두 개를 가진다. 콘텐츠를 모르고, 씬이 `Graphics`로 등록한 메시·스킨·빌보드 그림·배경·셰이더 층을 그린다 (2026-11-24, [architecture.md](architecture.md)). 메시는 이름(`MeshKind`)으로 찾고, 엔진 기본 메시는 `sphere`, `box`, `cylinder`뿐이다. 2026-11-22까지는 콘텐츠 전용 그리기를 맡기는 `engine/contentRenderers/`(`ContentRenderer`, `RenderContext`, 장면 복사 `copySceneColor`)가 있었으나, 등록된 렌더러가 없어 작동 영역·콘텐츠 시스템과 함께 지웠다. 참고 구현은 커밋 `ad4cee7`에 있다.
 
 - `scene`: `DrawItem`마다 `Mesh` 하나. 메시 풀은 필요한 만큼 늘어나고, 남는 메시는 `visible = false`로 숨긴다.
 - `camera`: `CameraRig.view`의 값으로 매 프레임 갱신하는 `PerspectiveCamera`. 행성 위에서는 위쪽이 계속 바뀌므로 `lookAt` 전에 `camera.up`도 갱신한다
-- `skyScene`: 먼 우주 `CubeTexture`를 `background`로만 가진 장면. 메인 패스에서 가장 먼저 그린다 ([analysis/skybox.md](skybox.md), 2026-11-21)
+- `skyScene`: 씬이 `setSkybox`로 넘긴 큐브맵을 `background`로만 가진 장면. 없으면 그리지 않는다. 행성 씬은 먼 우주를 넘긴다. 메인 패스에서 가장 먼저 그린다 ([analysis/skybox.md](skybox.md), 2026-11-21)
 - `billboardScene`: 별, 햇살, 해 눈을 한 번에 그리는 `BillboardBatch`의 메시 하나만 가진 장면. 그림자 패스에 넣지 않으려고 분리했다. 구조는 [analysis/billboard.md](billboard.md)에 있다 (2026-11-21, 그 전에는 별 `Sprite`만 가진 `skyScene`이었다)
-- `bubbleScene`: 비눗방울을 한 번에 그리는 `BubbleBatch`의 메시 하나만 가진 장면. 깊이를 쓰지 않고 가산 혼합하므로 빌보드 뒤, 메인 패스 마지막에 그린다 ([analysis/bubbles.md](bubbles.md), 2026-11-22)
+- 콘텐츠 층: 씬이 `addLayer`로 더한 `RenderLayer`마다 장면 하나. 빌보드 뒤에 더한 순서대로 그린다. 행성 씬의 비눗방울(`BubbleLayer`)이 여기 있다. 깊이를 쓰지 않고 가산 혼합한다 ([analysis/bubbles.md](bubbles.md), 2026-11-22, 2026-11-24까지는 렌더러의 `bubbleScene`)
 - `lightCamera`: 그림자용 `OrthographicCamera`. 광원 방향은 해를 따라 매 프레임 바뀌고([analysis/sun.md](sun.md)), 방향이 +Y와 거의 나란하면 `lookAt`이 퇴화하지 않게 위쪽을 +Z로 바꾼다
 
 프레임 순서는 포팅 전과 같다. `renderer.autoClear = false`로 두고 지우기를 직접 호출한다.
 
 1. `setRenderTarget(shadowTarget)` → `clear()` → `overrideMaterial`을 걸고 `render(scene, lightCamera)`
-2. `setRenderTarget(null)` → `setClearColor` → `clear()` → `render(skyScene, camera)`(먼 우주) → `render(scene, camera)` → `render(billboardScene, camera)`(빌보드, [analysis/billboard.md](billboard.md)) → `render(bubbleScene, camera)`(비눗방울)
+2. `setRenderTarget(null)` → `setClearColor` → `clear()` → `render(skyScene, camera)`(먼 우주) → `render(scene, camera)` → `render(billboardScene, camera)`(빌보드, [analysis/billboard.md](billboard.md)) → 콘텐츠 층마다 `render(layerScene, camera)`(행성 씬은 비눗방울) → CSS3D 영상 층
 
 ### 행렬
 
@@ -136,14 +136,15 @@ three.js의 톤 매핑과 출력 색공간 변환은 내장 재질과 셰이더 
 - **재질:** `RawShaderMaterial`에 `glslVersion: GLSL3`를 준다. 셰이더 파일에 `#version`은 쓰지 않는다.
 - **겹쳐 그리기:** 같은 메시를 `mesh.vert`로 그리면 깊이가 같다. 재질의 깊이 함수 기본값이 `LessEqualDepth`이므로 `transparent: true`, `depthWrite: false`만 주면 된다.
 - **색공간:** 프레임 버퍼에는 ACES와 sRGB 변환을 마친 값이 들어 있다. ACES는 새로 더하는 빛에만 적용한다.
-- **uniform:** 프레임 단위 값은 `Renderer.shared`의 객체를 모든 재질이 함께 참조한다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
+- **씬 셰이더:** 새 셰이더는 `content/<씬>/shaders/`에 두고 그 씬의 `graphics/`에서 `RenderLayer`로 그린다. 툰 재질의 프레임 uniform이 필요하면 `RenderLayer.update`가 받는 `camera`, `environment`로 채운다.
+- **uniform:** 툰 재질의 프레임 단위 값은 `Renderer.shared`의 객체를 모든 재질이 함께 참조한다. 셰이더에 없는 uniform은 조용히 무시된다. 값이 안 먹으면 이름부터 확인한다.
 - **시간:** 전역 시계는 없다. 시간이 필요한 셰이더는 상태 클래스가 진행한 시간을 프레임 값으로 받는다.
 - **위쪽:** 셰이더에서도 위쪽을 +Y로 가정하지 않는다. 행성 위에서 위쪽은 `normalize(위치 - PLANET.center)`다.
 - **격자:** `SurfacePattern.Grid`는 구 메시 전용이다. 오브젝트 공간 방향을 정육면체 면에 투영해 격자를 그린다. 지금은 쓰는 곳이 없다.
 
 ## 브라우저 확인 방법
 
-서버는 `.claude/launch.json`의 `gameblog`다. 개발 서버에서만 `window.__game`(`world`, `camera`, `input`, `gl`, `getState`)을 쓸 수 있다.
+서버는 `.claude/launch.json`의 `gameblog`다. 개발 서버에서만 `window.__game`을 쓸 수 있다. 엔진이 `scene`(씬 id), `app`, `input`, `gl`, `getState`를, 행성 씬이 `world`, `camera`를 넣는다. 씬을 다시 올리려면 `__game.app.load((await import('/src/content/index.ts')).findScene('planet'))`.
 
 1. "시작하기" 버튼을 클릭한다. 상태가 `playing`이어야 물리가 돈다.
 2. 캐릭터를 옮기려면 물리 몸체의 위치를 바꾼다. 다리(`Walker`)는 발이 멀어지면 회복 걸음으로 따라온다.

@@ -11,8 +11,9 @@
 | 파일 | 역할 |
 |---|---|
 | [`src/engine/input.ts`](../../src/engine/input.ts) | 키보드, 마우스, 터치 입력을 모은다. 게임 규칙은 모른다 |
-| [`src/main.ts`](../../src/main.ts) | 입력을 이동 방향과 시점 회전으로 바꾸고, 시작·일시 정지 상태를 관리한다 |
-| [`src/ui/overlay.ts`](../../src/ui/overlay.ts) | 시작·일시 정지 화면, 일시 정지 버튼, 조이스틱 표시 |
+| [`src/engine/app.ts`](../../src/engine/app.ts) | 입력을 `Controls`(앞뒤, 좌우, 시점 회전)로 모아 씬에 넘기고, 시작·일시 정지 상태를 관리한다 |
+| [`src/content/planet/index.ts`](../../src/content/planet/index.ts) | `applyControls`에서 시점을 돌리고 카메라 기준 이동 방향을 정한다 |
+| [`src/engine/ui/overlay.ts`](../../src/engine/ui/overlay.ts) | 시작·일시 정지 화면, 일시 정지 버튼, 조이스틱 표시 |
 | [`index.html`](../../index.html), [`src/style.css`](../../src/style.css) | 조작 안내, 버튼과 조이스틱 요소, 터치 관련 CSS |
 
 ## 입력별 동작
@@ -29,10 +30,10 @@
 - 터치는 캔버스의 Touch Events(`touchstart`·`touchmove`·`touchend`·`touchcancel`, `passive: false`)로 받는다. `touchstart`와 `touchmove`에서 `preventDefault`해 스크롤, 확대, 호환용 마우스 이벤트를 막는다. 터치 대상은 처음 누른 요소로 고정되므로 포인터 캡처가 필요 없다.
 - 처음에는 Pointer Events와 `setPointerCapture`를 썼지만, 실제 휴대폰 세로 화면에서 조이스틱이 나타나기만 하고 움직이지 않아 2026-11-17에 바꿨다. 원인은 기기에서 확인하지 못했다.
 - 조이스틱과 시점 드래그는 각각 손가락 하나씩 `Touch.identifier`로 추적하므로 동시에 쓸 수 있다.
-- `main.ts`의 `readMoveDirection`은 키 입력과 `moveAxis`를 더한 뒤 길이가 1을 넘으면 정규화한다. 플레이어는 길이 1 이하의 방향을 그대로 가속에 쓴다.
+- `App.readControls`가 키 입력과 `moveAxis`를 더하고, 행성 씬의 `applyControls`가 카메라 기준 방향으로 바꾼 뒤 길이가 1을 넘으면 정규화한다. 플레이어는 길이 1 이하의 방향을 그대로 가속에 쓴다.
 - 포인터 잠금은 주 입력이 정밀한 포인터(`(pointer: fine)`)일 때만 요청한다. 휴대폰에서 잠금이 걸리면 터치 좌표가 고정되어 조이스틱이 움직이지 않을 수 있기 때문이다.
 - `Input.clear()`는 키, 시점 누적, 터치 추적을 모두 지운다. 일시 정지와 창 포커스 해제 때 불린다.
-- 조이스틱은 `main.ts`가 매 프레임 `overlay.setJoystick(input.joystick)`으로 그린다. CSS의 원 크기는 `JOYSTICK_RADIUS`와 맞춰 둔다.
+- 조이스틱은 `App`이 매 프레임 `overlay.setJoystick(input.joystick)`으로 그린다. CSS의 원 크기는 `JOYSTICK_RADIUS`와 맞춰 둔다.
 
 ## 화면과 CSS
 

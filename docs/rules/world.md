@@ -10,7 +10,7 @@
 - 내용은 글이 아니라 그래픽과 플레이로만 전달한다. 글 게시물, 읽기 오버레이, 목록을 만들지 않는다.
 - 화면의 글자는 시작·일시 정지 안내와 NPC 말풍선 정도로 제한한다.
 - 렌더링은 three.js로 한다. 그 밖의 런타임 라이브러리는 추가하지 않는다. 사용 규칙은 [threejs.md](threejs.md)에 있다.
-- 행성 표면에 칠한 원(작동 영역)으로 켜지는 그래픽스 콘텐츠 시스템, 콘텐츠 HUD, 콘텐츠 전용 렌더러 확장 구조(`engine/contentRenderers/`)는 등록된 콘텐츠가 없어 지웠다 (2026-11-22 사용자 결정). 참고 구현은 커밋 `ad4cee7`의 `src/content/`, `game/surfaceZone.ts`, `engine/contentRenderers/`에 있다.
+- 행성 표면에 칠한 원(작동 영역)으로 켜지는 그래픽스 콘텐츠 시스템, 콘텐츠 HUD, 콘텐츠 전용 렌더러 확장 구조(`engine/contentRenderers/`)는 등록된 콘텐츠가 없어 지웠다 (2026-11-22 사용자 결정). 참고 구현은 커밋 `ad4cee7`의 `src/content/`, `game/surfaceZone.ts`, `engine/contentRenderers/`에 있다 (당시 경로. 지금의 `src/content/`는 콘텐츠 계층이다).
 
 ## 행성 표면
 
@@ -20,9 +20,14 @@
 
 ## 구조
 
-- `engine/`에 게임 규칙을 넣지 않는다.
-- `World`와 `game/`의 상태 클래스는 GPU와 DOM에 의존하지 않는다.
+코드는 코어 엔진 계층(`src/engine/`)과 콘텐츠 계층(`src/content/`)으로 나눈다 (2026-11-24 사용자 결정, 여러 씬을 더하기 위해). 구조와 새 씬 추가 절차는 [analysis/architecture.md](../analysis/architecture.md)에 있다.
+
+- `engine/`은 `content/`를 가져오지 않는다. 특정 씬의 메시, 그림, 셰이더, 수치를 엔진에 넣지 않고, 콘텐츠가 `Graphics`(`engine/render/graphics.ts`)로 등록한다.
+- `engine/`에 게임 규칙을 넣지 않는다. 엔진과 콘텐츠는 `engine/scene.ts`의 `SceneDefinition`·`SceneInstance`로만 만난다.
+- 씬은 `content/<씬>/`에 둔다. 씬끼리는 서로 가져오지 않고, 여러 씬이 함께 쓰는 월드 오브젝트(캐릭터, 카메라)는 `content/common/`에 둔다. `content/common/`은 씬을 가져오지 않는다.
+- 씬 안에서 three.js와 GLSL은 `graphics/`(와 `shaders/`)에만 둔다. `World`와 상태(`objects/`)·모양(`shapes/`) 코드는 GPU와 DOM에 의존하지 않는다.
 - `Renderer`에 게임 상태를 두지 않는다. 값은 `FrameData`(`engine/frame.ts`)로 받는다.
+- 위 가져오기 규칙은 `src/layers.test.ts`가 검사한다.
 
 ## 완료 조건
 

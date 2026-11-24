@@ -6,7 +6,8 @@
 
 | 기능 | 해당 작업 | 규칙 | 분석 |
 |---|---|---|---|
-| 월드 컨셉과 구조 | 글 없이 그래픽으로 전달하는 컨셉, `engine`·`game`·`Renderer`의 역할 나누기, 지워진 콘텐츠·작동 영역 시스템의 참고 커밋 | [rules/world.md](rules/world.md) | [analysis/threejs.md](analysis/threejs.md) |
+| 월드 컨셉과 구조 | 글 없이 그래픽으로 전달하는 컨셉, 지워진 콘텐츠·작동 영역 시스템의 참고 커밋 | [rules/world.md](rules/world.md) | [analysis/threejs.md](analysis/threejs.md) |
+| 엔진·콘텐츠 계층과 씬 | 코어 엔진(`engine/`)과 콘텐츠(`content/`)의 역할 나누기, 씬 정의(`SceneDefinition`)와 그래픽 등록(`Graphics`), 새 씬·씬 셰이더 추가, 씬 바꾸기, 가져오기 규칙 검사 | [rules/world.md](rules/world.md) | [analysis/architecture.md](analysis/architecture.md) |
 | 입력과 조작 | 키보드·마우스·터치 입력, 가상 조이스틱, 일시 정지, 조작 안내 | 없음 | [analysis/input.md](analysis/input.md) |
 | 플레이어 캐릭터 | 구체 몸과 다리의 모양, Blender 모델, 서기·걷기 키프레임 애니메이션, 물리 몸체 | [rules/character.md](rules/character.md) | [analysis/character.md](analysis/character.md) |
 | 문어 외계인 | 행성 위를 떠다니는 문어 꼴 외계인, 챙 머리·눈가리개·더듬이·촉수·광선총 모양, 촉수 스킨 메시, 시작 자리 | 없음 | [analysis/alien.md](analysis/alien.md) |

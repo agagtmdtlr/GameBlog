@@ -57,25 +57,23 @@ npm run dev
 | `npm run build` | 타입 검사 후 `dist/`에 빌드 |
 | `npm run preview` | 빌드 결과 미리 보기 |
 
-개발 서버에서는 브라우저 콘솔에서 `window.__game`으로 월드, 카메라, 입력, WebGL 컨텍스트를 살펴볼 수 있다.
+개발 서버에서는 브라우저 콘솔에서 `window.__game`으로 월드, 카메라, 입력, WebGL 컨텍스트를 살펴볼 수 있다. 주소에 `?scene=<id>`를 붙이면 그 씬으로 시작한다 (지금은 `planet` 하나).
 
 ## 폴더 구조
 
 ```
 src/
-├─ main.ts        진입점, 게임 루프, 시작·일시 정지 상태
-├─ engine/        게임 규칙을 모르는 코드: three.js 렌더러, 수학, 입력, 빌보드, 모양 생성
-├─ physics/       충돌과 고정 시간 간격
-├─ game/          월드 조립과 게임 규칙: 캐릭터, NPC, 지형, 해, 위성, 기차 등
-├─ scenes/        표면 객체 장면 파일 (surface.json)
-├─ shaders/       GLSL 셰이더
-├─ assets/        캐릭터 모델, 우주인 스티커
-└─ ui/            시작·일시 정지 화면, 일시 정지 버튼, 조이스틱
+├─ main.ts        진입점: 엔진을 만들고 씬 하나를 올린다
+├─ engine/        코어 엔진: 게임 루프, 씬 약속, three.js 렌더러와 툰·빌보드 셰이더, 입력, 수학, 물리, 화면 안내
+└─ content/       콘텐츠
+   ├─ index.ts    씬 목록
+   ├─ common/     여러 씬이 쓰는 월드 오브젝트: 캐릭터, NPC, 카메라
+   └─ planet/     행성 씬: 월드, 오브젝트, 모양, 그래픽 등록, GLSL, 장면 파일, 그림
 tools/            Blender 캐릭터 스크립트, 스티커 생성 스크립트
 docs/             구조 분석과 규칙 문서
 ```
 
-three.js는 `engine/`의 렌더러 계층과 `main.ts`에서만 쓴다. `game/`과 `physics/`는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다.
+엔진은 콘텐츠를 모르고, 씬은 `Graphics`로 메시·그림·셰이더 층을 등록한다. three.js는 `engine/render/`와 콘텐츠의 `graphics/`에서만 쓰고, 월드와 오브젝트 상태는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다. 자세한 구조는 [docs/analysis/architecture.md](docs/analysis/architecture.md)에 있다.
 
 ## 문서
 
@@ -99,14 +97,14 @@ three.js는 `engine/`의 렌더러 계층과 `main.ts`에서만 쓴다. `game/`�
 
 ## 에셋 다시 만들기
 
-캐릭터 다리 모델(`src/assets/character.glb`)은 Blender 스크립트가 원본이다. glb를 직접 고치지 않는다.
+캐릭터 다리 모델(`src/content/common/character/character.glb`)은 Blender 스크립트가 원본이다. glb를 직접 고치지 않는다.
 
 ```bash
 "C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" --background --factory-startup --python tools/blender/build_character.py
 ```
 
-우주인 스티커(`src/assets/astronaut-sticker.png`)는 원본 사진에서 Pillow와 NumPy로 만든다.
+우주인 스티커(`src/content/planet/assets/astronaut-sticker.png`)는 원본 사진에서 Pillow와 NumPy로 만든다.
 
 ```bash
-python -I tools/sticker/make_astronaut_sticker.py tools/sticker/astronaut-source.png src/assets/astronaut-sticker.png preview.png
+python -I tools/sticker/make_astronaut_sticker.py tools/sticker/astronaut-source.png src/content/planet/assets/astronaut-sticker.png preview.png
 ```

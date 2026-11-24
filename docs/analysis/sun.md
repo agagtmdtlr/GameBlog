@@ -8,7 +8,7 @@
 
 ## 동작
 
-- 해는 주황색으로 스스로 빛나는 구체다. 행성 중심에서 70 떨어진 궤도를 48초에 한 바퀴 돈다 (`SUN` in `game/sun.ts`).
+- 해는 주황색으로 스스로 빛나는 구체다. 행성 중심에서 70 떨어진 궤도를 48초에 한 바퀴 돈다 (`SUN` in `content/planet/objects/sun.ts`).
 - 해 둘레에는 삼각형 햇살 14개가 해와 같은 색으로 둘러져 있다. 햇살은 평면 빌보드라 언제나 카메라를 정면으로 보고, 화면 위쪽에 맞춰 서므로 시점을 돌려도 화면 위에서 돌지 않는다.
 - 해는 의인화된 얼굴로 두 눈을 가진다. 흰자와 검은자를 따로 그리고, 검은자는 흰자 안에서 캐릭터(몸 중심)를 바라보는 쪽으로 움직인다. 눈도 햇살과 같은 축의 빌보드다.
 - 해의 궤적은 궤도와 같은 원 위에 가느다란 어두운 주황색 고리로 그린다.
@@ -23,13 +23,13 @@
 
 | 파일 | 내용 |
 |---|---|
-| `game/sun.ts` | `SUN` 상수, `SUN_EMISSIVE`, `SUN_ORBIT_EMISSIVE`, `Sun` 클래스(`step`, `direction(alpha)`, `position(alpha)`, 궤도 기저 `start`·`ahead`·`axis`) |
-| `game/world.ts` | `World.sun`을 `fixedStep`에서 진행하고, 그리기 목록 끝에 해 구체와 궤적 고리를, `buildBillboards`에 햇살과 눈(흰자·검은자 각 2개)을 넣고, `environment(alpha)`로 해 방향을 담은 조명 환경을 만든다 |
-| `main.ts` | 렌더러에 `STUDIO_ENVIRONMENT` 대신 `world.environment(alpha)`를 넘기고, `buildBillboards`에 카메라(`camera.view`)를 넘긴다 |
-| `game/sunFace.ts` | 해 빌보드 축(`sunBillboardBasis`), 눈 배치 값 `SUN_FACE`, 검은자 이동(`pupilOffset`), 두 눈의 흰자·검은자 위치(`sunEyes`) |
-| `engine/sunRays.ts` | 햇살 삼각형 정점을 만드는 `sunRayPositions`, 햇살 그림의 절반 크기 `sunRaysExtent`, 모양 값 `SUN_RAYS`. three.js를 쓰지 않는다 |
-| `engine/frame.ts` | `MeshKind`에 `ring`(XY 평면의 반지름 1 토러스)과 관 반지름 비율 `RING_TUBE_RATIO`(0.0015) |
-| `engine/renderer.ts` | `ring`을 `TorusGeometry(1, RING_TUBE_RATIO, 6, 512)`로 만든다. 광원 방향이 +Y와 거의 나란하면 그림자 카메라의 위쪽을 +Z로 바꾼다 (`lookAt` 특이점). 햇살과 눈은 빌보드 일괄 렌더링으로 그린다 ([analysis/billboard.md](billboard.md)) |
+| `content/planet/objects/sun.ts` | `SUN` 상수, `SUN_EMISSIVE`, `SUN_ORBIT_EMISSIVE`, `Sun` 클래스(`step`, `direction(alpha)`, `position(alpha)`, 궤도 기저 `start`·`ahead`·`axis`) |
+| `content/planet/world.ts` | `World.sun`을 `fixedStep`에서 진행하고, 그리기 목록 끝에 해 구체와 궤적 고리를, `buildBillboards`에 햇살과 눈(흰자·검은자 각 2개)을 넣고, `environment(alpha)`로 해 방향을 담은 조명 환경을 만든다 |
+| `content/planet/index.ts` | 렌더러에 `STUDIO_ENVIRONMENT` 대신 `world.environment(alpha)`를 넘기고, `buildBillboards`에 카메라(`camera.view`)를 넘긴다 |
+| `content/planet/objects/sunFace.ts` | 해 빌보드 축(`sunBillboardBasis`), 눈 배치 값 `SUN_FACE`, 검은자 이동(`pupilOffset`), 두 눈의 흰자·검은자 위치(`sunEyes`) |
+| `content/planet/shapes/sunRays.ts` | 햇살 삼각형 정점을 만드는 `sunRayPositions`, 햇살 그림의 절반 크기 `sunRaysExtent`, 모양 값 `SUN_RAYS`. three.js를 쓰지 않는다 |
+| `content/planet/graphics/meshes.ts` | `ring`(XY 평면의 반지름 1 토러스)을 `TorusGeometry(1, RING_TUBE_RATIO, 6, 512)`로 등록한다. 관 반지름 비율 `RING_TUBE_RATIO`는 0.0015 |
+| `engine/render/renderer.ts` | 광원 방향이 +Y와 거의 나란하면 그림자 카메라의 위쪽을 +Z로 바꾼다 (`lookAt` 특이점). 햇살과 눈은 빌보드 일괄 렌더링으로 그린다 ([analysis/billboard.md](billboard.md)) |
 
 ## 세부
 
@@ -44,7 +44,7 @@
 
 ## 테스트
 
-`game/game.test.ts`의 "해": 시작 방향, 직사광과 해 구체 위치의 일치, 한 주기 뒤 복귀, 머리 위 통과, 궤적 고리와 궤도의 일치, 햇살 빌보드가 해 가운데에서 가장 긴 햇살까지 덮음, 눈이 해 구면 앞에 있고 검은자가 흰자보다 카메라 쪽, 검은자가 대상 쪽으로 움직이되 흰자 안에 머묾, 그림자 제외. `engine/sunRays.test.ts`: 삼각형 수, 반시계 방향, 해 원반과 겹치지 않음, 같은 씨앗의 같은 모양.
+`content/planet/game.test.ts`의 "해": 시작 방향, 직사광과 해 구체 위치의 일치, 한 주기 뒤 복귀, 머리 위 통과, 궤적 고리와 궤도의 일치, 햇살 빌보드가 해 가운데에서 가장 긴 햇살까지 덮음, 눈이 해 구면 앞에 있고 검은자가 흰자보다 카메라 쪽, 검은자가 대상 쪽으로 움직이되 흰자 안에 머묾, 그림자 제외. `content/planet/shapes/sunRays.test.ts`: 삼각형 수, 반시계 방향, 해 원반과 겹치지 않음, 같은 씨앗의 같은 모양.
 
 ## 브라우저 확인 (2026-11-21, 개발 서버)
 

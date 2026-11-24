@@ -17,8 +17,8 @@
 | 그래픽스 | three.js 0.187 (WebGL2). 직접 작성한 툰 셰이더(`toon.frag`)를 `RawShaderMaterial`로 사용. 적용 내용은 [analysis/threejs.md](analysis/threejs.md) |
 | 개발 도구 | TypeScript, Vite, Vitest, `@types/three` (모두 개발 시에만 사용) |
 | 배포 | `main` 푸시 시 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 배포 |
-| 코드 규모 | TypeScript 3,556줄, 셰이더 264줄, CSS 257줄, 테스트 1,233줄, Blender 스크립트 179줄 |
-| 빌드 크기 | JS 729.30KB (gzip 194.97KB), CSS 3.59KB, 캐릭터 모델 43.48KB, 우주인 스티커 251.48KB. JS가 500KB를 넘어 Vite가 청크 크기 경고를 낸다 |
+| 코드 규모 | TypeScript 7,292줄(엔진 2,005줄, 콘텐츠 5,273줄), 셰이더 413줄, CSS 232줄, 테스트 2,273줄 (2026-11-24) |
+| 빌드 크기 | JS 770.47KB (gzip 209.16KB), CSS 3.08KB, 캐릭터 모델 43.48KB, 우주인 스티커 251.48KB. JS가 500KB를 넘어 Vite가 청크 크기 경고를 낸다 |
 
 ### 명령어
 
@@ -31,62 +31,84 @@ npm run preview  # 빌드 결과 미리 보기
 
 ## 3. 폴더 구조
 
+코드는 코어 엔진(`src/engine/`)과 콘텐츠(`src/content/`)로 나뉜다 (2026-11-24). 구조와 새 씬 추가 절차는 [analysis/architecture.md](analysis/architecture.md)에 있다.
+
 ```
 GameBlog/
 ├─ index.html                  캔버스, 시작·일시 정지 화면의 뼈대
 ├─ src/
-│  ├─ main.ts                  진입점, 게임 루프, 게임 상태 전환
+│  ├─ main.ts                  진입점: App을 만들고 ?scene= 의 씬(기본 planet)을 올린다
 │  ├─ style.css                오버레이 스타일
-│  ├─ engine/                  게임을 모르는 범용 코드
-│  │  ├─ frame.ts              렌더러 입력 타입 (three.js와 무관)
+│  ├─ layers.test.ts           계층 가져오기 규칙 검사
+│  ├─ engine/                  코어 엔진: 어떤 씬이 있는지 모른다
+│  │  ├─ app.ts                게임 루프, 시작·일시 정지 상태, 포인터 잠금, 씬 올리기(load)
+│  │  ├─ scene.ts              엔진·콘텐츠 약속: SceneDefinition, SceneInstance, Controls
+│  │  ├─ frame.ts              렌더러 입력 타입 (three.js와 무관), 엔진 기본 메시 이름
 │  │  ├─ math.ts               Vec3, Quat, Mat4 연산
-│  │  ├─ renderer.ts           three.js 렌더러: 그림자 패스, 메인 패스
-│  │  ├─ billboard.ts          빌보드 모양, 아틀라스 배치, 그리기 순서 ([analysis/billboard.md](analysis/billboard.md))
-│  │  ├─ billboardAtlas.ts     빌보드 그림을 한 캔버스에 그림
-│  │  ├─ speechBubble.ts       NPC 인사말 목록과 말풍선 그림 ([analysis/npc.md](analysis/npc.md))
-│  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
-│  │  ├─ bubbleRenderer.ts     비눗방울을 인스턴스 한 번으로 가산 혼합해 그리는 BubbleBatch ([analysis/bubbles.md](analysis/bubbles.md))
-│  │  ├─ videoScreenLayer.ts   텔레비전 화면의 YouTube iframe을 캔버스 뒤 3D 자리에 놓는 CSS3D 층
-│  │  ├─ tvShape.ts            아날로그 텔레비전 모형의 모양 값과 부품 계산
-│  │  ├─ skinning.ts           캐릭터 다리의 CPU 스키닝
-│  │  ├─ moonShape.ts          위성의 충돌구·바위 덩어리 모양 ([analysis/moon.md](analysis/moon.md))
-│  │  ├─ satelliteShape.ts     인공위성 접시 안테나 단면 ([analysis/satellite.md](analysis/satellite.md))
-│  │  ├─ signalArc.ts          인공위성 신호 물결 호의 모양과 굵기 프레임 ([analysis/satellite.md](analysis/satellite.md))
-│  │  ├─ alienShape.ts         문어 외계인의 머리 단면, 눈가리개 구면 조각, 촉수 스킨 메시 ([analysis/alien.md](analysis/alien.md))
-│  │  ├─ dreamShape.ts         지형물(종 모양 언덕, 둥근 기둥)의 회전체 단면
-│  │  ├─ rocketShape.ts        로켓 모형의 달걀 몸통·다리·창·옆문·리벳 자리 ([analysis/surfaceScene.md](analysis/surfaceScene.md))
-│  │  ├─ trackPath.ts          구 표면 닫힌 스플라인 경로와 레일·침목 모양 ([analysis/train.md](analysis/train.md))
-│  │  ├─ starfield.ts          별 배치와 별 얼굴 그림 ([analysis/starfield.md](analysis/starfield.md))
-│  │  ├─ sunRays.ts            해 둘레 삼각형 햇살의 모양 ([analysis/sun.md](analysis/sun.md))
-│  │  └─ input.ts              키보드, 마우스, 포인터 잠금 상태
-│  ├─ physics/
-│  │  ├─ collision.ts          구-땅(높이 함수), 구-상자, 구-캡슐 충돌과 반발
-│  │  └─ fixedStepper.ts       고정 시간 간격과 보간 비율
-│  ├─ game/
-│  │  ├─ world.ts              월드 조립, 게임 규칙, 그리기 목록
-│  │  ├─ planet.ts             행성의 크기, 위도·경도를 방향으로 바꾸는 함수
-│  │  ├─ terrain.ts            땅의 높이 함수와 둥근 파스텔 지형물 ([analysis/terrain.md](analysis/terrain.md))
-│  │  ├─ surfaceScene.ts       표면 장면 파일 읽기·검사, 표면 상자 계산 ([analysis/surfaceScene.md](analysis/surfaceScene.md))
-│  │  ├─ sun.ts                행성을 도는 해, 햇살 빌보드, 궤적 고리, 직사광 방향 ([analysis/sun.md](analysis/sun.md))
-│  │  ├─ sunFace.ts            해 빌보드 축, 캐릭터를 보는 눈(흰자·검은자)
-│  │  ├─ moon.ts               제자리에서 자전하는 위성의 자리와 크기 ([analysis/moon.md](analysis/moon.md))
-│  │  ├─ astronaut.ts          위성 곁에 떠 있는 우주인 스티커 빌보드 ([analysis/astronaut.md](analysis/astronaut.md))
-│  │  ├─ satellite.ts          궤도를 도는 인공위성의 부품과 궤적 고리 ([analysis/satellite.md](analysis/satellite.md))
-│  │  ├─ bubbleBelt.ts         행성을 감싸고 떠다니는 비눗방울 띠 ([analysis/bubbles.md](analysis/bubbles.md))
-│  │  ├─ train.ts              선로 노선과 그 위를 도는 기차 ([analysis/train.md](analysis/train.md))
-│  │  ├─ player.ts             캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
-│  │  ├─ npc.ts                혼자 돌아다니는 NPC, 캐릭터끼리 밀어내기 ([analysis/npc.md](analysis/npc.md))
-│  │  ├─ alien.ts              떠다니는 문어 외계인의 자세, 촉수 흔들림, 광선총 ([analysis/alien.md](analysis/alien.md))
-│  │  ├─ bodyShape.ts          NPC 몸 모양(구, 정육면체, 피라미드)의 크기와 엉덩이 자리
-│  │  ├─ walker.ts             서기·걷기 애니메이션 재생, 발 고정, 다리 IK ([analysis/character.md](analysis/character.md))
-│  │  ├─ characterClips.ts     캐릭터 키프레임 클립 (서기, 걷기, 내딛기)
-│  │  ├─ keyframes.ts          키프레임 트랙 샘플링 (3차 Hermite)
-│  │  ├─ cameraRig.ts          행성 표면을 따라가는 3인칭 궤도 카메라
-│  ├─ assets/character.glb     Blender에서 내보낸 다리 스킨 메시
-│  ├─ assets/astronaut-sticker.png  잡지에서 오린 스티커 꼴의 우주인 그림 ([analysis/astronaut.md](analysis/astronaut.md))
-│  ├─ scenes/surface.json      행성 표면에 놓는 객체(텔레비전·로켓)의 장면 파일
-│  ├─ shaders/                 mesh.vert, toon.frag, billboard.vert, billboard.frag, bubble.vert, bubble.frag
-│  └─ ui/overlay.ts            화면 안내, 일시 정지 버튼, 조이스틱 표시
+│  │  ├─ random.ts             결과가 늘 같은 난수
+│  │  ├─ meshData.ts           three.js 없는 메시 데이터 타입 (단면, 배열, 삼각형 목록)
+│  │  ├─ skinning.ts           CPU 스키닝
+│  │  ├─ input.ts              키보드, 마우스, 포인터 잠금 상태
+│  │  ├─ physics/
+│  │  │  ├─ collision.ts       구-땅(높이 함수), 구-상자, 구-캡슐 충돌과 반발
+│  │  │  └─ fixedStepper.ts    고정 시간 간격과 보간 비율
+│  │  ├─ render/
+│  │  │  ├─ renderer.ts        three.js 렌더러: 그림자 패스, 메인 패스, 콘텐츠 등록(Graphics 구현)
+│  │  │  ├─ graphics.ts        콘텐츠 등록 창구 Graphics와 셰이더 층 RenderLayer
+│  │  │  ├─ geometry.ts        지오메트리 도우미 (회전체, 배열, 밀어낸 구, 부품 합치기)
+│  │  │  ├─ billboard.ts       빌보드 모양, 그림 정의, 아틀라스 배치, 그리기 순서 ([analysis/billboard.md](analysis/billboard.md))
+│  │  │  ├─ billboardAtlas.ts  등록된 빌보드 그림을 한 캔버스에 그림
+│  │  │  ├─ billboardRenderer.ts  빌보드를 인스턴스 한 번으로 그리는 BillboardBatch
+│  │  │  ├─ videoScreenLayer.ts   YouTube iframe을 캔버스 뒤 3D 자리에 놓는 CSS3D 층
+│  │  │  └─ shaders/           mesh.vert, toon.frag, billboard.vert, billboard.frag
+│  │  └─ ui/overlay.ts         화면 안내, 일시 정지 버튼, 조이스틱 표시
+│  └─ content/                 콘텐츠: 월드, GLSL, 월드 오브젝트
+│     ├─ index.ts              씬 목록 SCENES
+│     ├─ common/               여러 씬이 쓰는 월드 오브젝트
+│     │  ├─ cameraRig.ts       구 표면을 따라가는 3인칭 궤도 카메라
+│     │  └─ character/
+│     │     ├─ player.ts       캐릭터 물리 몸체의 이동과 행성 중심을 향하는 중력
+│     │     ├─ walker.ts       서기·걷기 애니메이션 재생, 발 고정, 다리 IK ([analysis/character.md](analysis/character.md))
+│     │     ├─ characterClips.ts  캐릭터 키프레임 클립 (서기, 걷기, 내딛기)
+│     │     ├─ keyframes.ts    키프레임 트랙 샘플링 (3차 Hermite)
+│     │     ├─ bodyShape.ts    NPC 몸 모양(구, 정육면체, 피라미드)의 크기와 엉덩이 자리
+│     │     ├─ npc.ts          혼자 돌아다니는 NPC, 캐릭터끼리 밀어내기 ([analysis/npc.md](analysis/npc.md))
+│     │     ├─ speechBubble.ts NPC 인사말 목록과 말풍선 그림
+│     │     ├─ characterGraphics.ts  다리 모델(glb)과 피라미드 메시 등록
+│     │     └─ character.glb   Blender에서 내보낸 다리 스킨 메시
+│     └─ planet/               행성 씬
+│        ├─ index.ts           planetScene: 그래픽 등록, World·카메라·영상 소리 진행
+│        ├─ world.ts           월드 조립, 게임 규칙, 그리기 목록
+│        ├─ planet.ts          행성의 크기, 위도·경도를 방향으로 바꾸는 함수
+│        ├─ objects/
+│        │  ├─ terrain.ts      땅의 높이 함수와 둥근 파스텔 지형물 ([analysis/terrain.md](analysis/terrain.md))
+│        │  ├─ surfaceScene.ts 표면 장면 파일 읽기·검사, 표면 상자 계산 ([analysis/surfaceScene.md](analysis/surfaceScene.md))
+│        │  ├─ sun.ts          행성을 도는 해, 궤적 고리, 직사광 방향 ([analysis/sun.md](analysis/sun.md))
+│        │  ├─ sunFace.ts      해 빌보드 축, 캐릭터를 보는 눈(흰자·검은자)
+│        │  ├─ moon.ts         제자리에서 자전하는 위성의 자리와 크기 ([analysis/moon.md](analysis/moon.md))
+│        │  ├─ astronaut.ts    위성 곁에 떠 있는 우주인 스티커 빌보드 ([analysis/astronaut.md](analysis/astronaut.md))
+│        │  ├─ satellite.ts    궤도를 도는 인공위성의 부품과 궤적 고리 ([analysis/satellite.md](analysis/satellite.md))
+│        │  ├─ bubbleBelt.ts   행성을 감싸고 떠다니는 비눗방울 띠 ([analysis/bubbles.md](analysis/bubbles.md))
+│        │  ├─ train.ts, smoke.ts  선로 노선과 그 위를 도는 기차, 굴뚝 연기 ([analysis/train.md](analysis/train.md))
+│        │  └─ alien.ts        떠다니는 문어 외계인의 자세, 촉수 흔들림, 광선총 ([analysis/alien.md](analysis/alien.md))
+│        ├─ shapes/            three.js 없이 계산하는 모양
+│        │  ├─ alienShape.ts   문어 외계인의 머리 단면, 눈가리개 구면 조각, 촉수 스킨 메시
+│        │  ├─ moonShape.ts    위성의 충돌구·바위 덩어리 모양
+│        │  ├─ rocketShape.ts  로켓 모형의 달걀 몸통·다리·창·옆문·리벳 자리
+│        │  ├─ tvShape.ts      아날로그 텔레비전 모형의 모양 값과 부품 계산
+│        │  ├─ satelliteShape.ts, signalArc.ts  인공위성 접시 안테나 단면, 신호 물결 호
+│        │  ├─ dreamShape.ts   지형물(종 모양 언덕, 둥근 기둥)의 회전체 단면
+│        │  ├─ trackPath.ts    구 표면 닫힌 스플라인 경로와 레일·침목 모양
+│        │  ├─ starfield.ts    별 배치와 별 얼굴 그림 ([analysis/starfield.md](analysis/starfield.md))
+│        │  ├─ sunRays.ts      해 둘레 삼각형 햇살의 모양
+│        │  └─ skybox.ts       먼 우주 큐브맵 그림 ([analysis/skybox.md](analysis/skybox.md))
+│        ├─ graphics/          three.js로 등록하는 것
+│        │  ├─ meshes.ts       행성 메시(땅, 지형물, 로켓, 텔레비전, 외계인, 선로, 위성 등) 등록
+│        │  ├─ billboardImages.ts  빌보드 그림 목록과 그리기 함수
+│        │  └─ bubbleLayer.ts  비눗방울을 인스턴스 한 번으로 가산 혼합해 그리는 셰이더 층
+│        ├─ shaders/           bubble.vert, bubble.frag
+│        ├─ scenes/surface.json  행성 표면에 놓는 객체(텔레비전·로켓)의 장면 파일
+│        └─ assets/astronaut-sticker.png  잡지에서 오린 스티커 꼴의 우주인 그림
 ├─ README.md                  저장소 소개, 조작, 시작 방법
 ├─ tools/blender/build_character.py  캐릭터 다리 모델(character.glb)을 만드는 Blender 스크립트
 ├─ tools/sticker/                    우주인 원본 사진과 스티커 그림을 만드는 Python 스크립트
@@ -104,29 +126,29 @@ GameBlog/
 ### 의존 방향
 
 ```
-main.ts ─┬─ game/ ─┬─ physics/ ─ engine/math
-         │         └─ engine/
-         ├─ engine/
-         └─ ui/
+main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ ─┐
+         │                                    └───────────────────┴─ engine/ (scene, frame, math, physics, render/graphics)
+         └─ engine/app.ts ─ engine/render/ ─ engine/ui/
 ```
 
-- `engine/`은 게임 규칙을 모른다.
-- `World`는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다.
-- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/renderer.ts`, `engine/billboardRenderer.ts`, `engine/bubbleRenderer.ts`, `engine/videoScreenLayer.ts`, `main.ts`에서만 쓴다.
+- `engine/`은 `content/`를 모른다. 씬은 `Graphics`로 메시·빌보드 그림·배경·셰이더 층을 등록한다.
+- 씬끼리는 서로 가져오지 않는다. 함께 쓰는 것은 `content/common/`에 둔다.
+- `World`와 오브젝트 상태는 GPU와 DOM에 의존하지 않아 브라우저 없이 테스트할 수 있다.
+- `Renderer`는 게임 상태를 들고 있지 않다. three.js는 `engine/render/`, `engine/app.ts`, 콘텐츠의 `graphics/`와 `*Graphics.ts`에서만 쓴다. `src/layers.test.ts`가 검사한다.
 
 ### 프레임 흐름
 
-1. `main.ts`가 입력을 읽어 카메라 기준 이동 방향을 계산한다.
-2. `FixedStepper`가 경과 시간만큼 `World.fixedStep`을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `fixedStep`은 해의 궤도 진행, 위성 자전, 인공위성 공전, 비눗방울 떠다니기, 기차 진행, 캐릭터 물리 몸체의 이동과 충돌, NPC 이동과 캐릭터끼리 밀어내기, 걸음(`Walker`)을 순서대로 처리한다.
-4. 카메라가 보간된 물리 몸체 위치를 따라간다.
-5. `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광)가 그릴 내용을 만들고, `Renderer`가 그림자 패스와 메인 패스를 실행한다.
+1. `App`이 입력을 `Controls`로 모아 씬의 `applyControls`에 넘긴다. 행성 씬은 시점을 돌리고 카메라 기준 이동 방향을 계산한다.
+2. `FixedStepper`가 경과 시간만큼 씬의 `fixedStep`(행성 씬은 `World.fixedStep`)을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
+3. `World.fixedStep`은 해의 궤도 진행, 위성 자전, 인공위성 공전, 비눗방울 떠다니기, 기차 진행, 캐릭터 물리 몸체의 이동과 충돌, NPC 이동과 캐릭터끼리 밀어내기, 걸음(`Walker`)을 순서대로 처리한다.
+4. 씬의 `update`에서 카메라가 보간된 물리 몸체 위치를 따라가고, 텔레비전 영상 소리를 정한다.
+5. 씬의 `frame`이 `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광)로 `FrameData`를 만들고 비눗방울 층에 방울을 넘긴다. `Renderer`가 그림자 패스와 메인 패스를 실행한다.
 
 ### 게임 상태
 
 | 상태 | 진입 | 동작 |
 |---|---|---|
-| `start` | 페이지 로드 | 시작 화면 표시. 물리 정지 |
+| `start` | 페이지 로드, 씬 바꾸기 | 시작 화면 표시. 물리 정지 |
 | `playing` | 시작·계속하기 버튼 | 입력과 물리 진행. 포인터 잠금 요청 |
 | `paused` | Esc, 포인터 잠금 해제, 탭 전환 | 일시 정지 화면 표시. 물리 정지 |
 
@@ -160,8 +182,8 @@ main.ts ─┬─ game/ ─┬─ physics/ ─ engine/math
 
 - 원점이 중심이고 반지름이 18인 행성 하나다 (둘레 약 113). 땅에는 완만한 언덕과 잔물결이 있고, 종 모양 언덕·둥근 기둥·공·막대사탕 같은 파스텔 지형물이 흩어져 있다. 선로·텔레비전·로켓·시작 지점 둘레는 평평하다 (2026-11-22 사용자 요청, [analysis/terrain.md](analysis/terrain.md)). 벽과 가장자리가 없어 떨어질 곳이 없고, 다시 시작하는 처리도 없다.
 - 캐릭터는 꼭대기 `(0, 18.88, 0)`에서 시작해 -Z 쪽을 바라본다.
-- 시작 지점 정면에 다리 넷 달린 나무 상자 아날로그 텔레비전 모형(폭 6.6, 높이 6.0, 깊이 5.0)을 세운다. 처음 크기(폭 3.3)에서 두 배로 키웠다 (2026-11-22 사용자 요청). 처음에는 캐릭터 집이 놓일 자리의 푸른 회색 상자였고(2026-11-21 사용자 요청), 사용자가 보여 준 브라운관 텔레비전 사진을 단순화해 바꿨다 (2026-11-22 사용자 요청). 위치는 위도 66, 경도 180으로, 시작 지점 정면 약 7.5 거리이고 해가 드는 쪽이다. 화면이 시작 지점을 향한다. 충돌은 모형을 감싼 상자로 한다. 화면에서는 YouTube 영상이 음소거로 반복 재생되고, 플레이 중에 가까이 가면 소리가 난다 (2026-11-22 사용자 요청). 위치, 크기, 나무 색, 영상 id는 장면 파일 `scenes/surface.json`의 `tv`에서 바꾼다 ([analysis/surfaceScene.md](analysis/surfaceScene.md)).
-- 로켓이 놓일 자리에 단순화한 주황색 로켓 모형(달걀 몸통, 짧은 다리 넷, 정면의 둥근 창, 옆문, 리벳 줄)을 세운다. 처음에는 붉은 정육면체였고, 사용자가 보여 준 리벳 박힌 달걀 모양 로켓 사진을 단순화해 바꿨다 (2026-11-21 사용자 요청). 충돌은 모형을 감싼 상자(폭 6.5, 높이 7.5)로 한다. 처음 크기(폭 2.6, 높이 3.0)에서 2.5배로 키웠다 (2026-11-21 사용자 요청). 위성으로 향하는 부근이라는 요청에 따라 위성 바로 아래 표면(위도 약 30, 경도 약 207.5)에 두었고, 위쪽이 위성을 향한다. 위치는 `MOON.direction`에서 계산하므로 위성을 옮기면 따라간다. 텔레비전과 같이 충돌체다. 크기와 색은 장면 파일 `scenes/surface.json`의 `rocket`에서 바꾼다.
+- 시작 지점 정면에 다리 넷 달린 나무 상자 아날로그 텔레비전 모형(폭 6.6, 높이 6.0, 깊이 5.0)을 세운다. 처음 크기(폭 3.3)에서 두 배로 키웠다 (2026-11-22 사용자 요청). 처음에는 캐릭터 집이 놓일 자리의 푸른 회색 상자였고(2026-11-21 사용자 요청), 사용자가 보여 준 브라운관 텔레비전 사진을 단순화해 바꿨다 (2026-11-22 사용자 요청). 위치는 위도 66, 경도 180으로, 시작 지점 정면 약 7.5 거리이고 해가 드는 쪽이다. 화면이 시작 지점을 향한다. 충돌은 모형을 감싼 상자로 한다. 화면에서는 YouTube 영상이 음소거로 반복 재생되고, 플레이 중에 가까이 가면 소리가 난다 (2026-11-22 사용자 요청). 위치, 크기, 나무 색, 영상 id는 장면 파일 `content/planet/scenes/surface.json`의 `tv`에서 바꾼다 ([analysis/surfaceScene.md](analysis/surfaceScene.md)).
+- 로켓이 놓일 자리에 단순화한 주황색 로켓 모형(달걀 몸통, 짧은 다리 넷, 정면의 둥근 창, 옆문, 리벳 줄)을 세운다. 처음에는 붉은 정육면체였고, 사용자가 보여 준 리벳 박힌 달걀 모양 로켓 사진을 단순화해 바꿨다 (2026-11-21 사용자 요청). 충돌은 모형을 감싼 상자(폭 6.5, 높이 7.5)로 한다. 처음 크기(폭 2.6, 높이 3.0)에서 2.5배로 키웠다 (2026-11-21 사용자 요청). 위성으로 향하는 부근이라는 요청에 따라 위성 바로 아래 표면(위도 약 30, 경도 약 207.5)에 두었고, 위쪽이 위성을 향한다. 위치는 `MOON.direction`에서 계산하므로 위성을 옮기면 따라간다. 텔레비전과 같이 충돌체다. 크기와 색은 장면 파일 `content/planet/scenes/surface.json`의 `rocket`에서 바꾼다.
 - 시작 지점을 둘러싸고 위도 46~54 사이를 물결치는 닫힌 스플라인 선로에 기관차와 객차 셋이 끝없이 돈다. 차량은 움직이는 충돌 상자라 선로 위의 캐릭터를 밀어낸다 (2026-11-21 사용자 요청, [analysis/train.md](analysis/train.md)).
 - 행성 주변 하늘(시작 시점 왼쪽 위, 거리 40)에 충돌구가 패인 회색 위성이 떠서 제자리에서 자전한다 (2026-11-21 사용자 요청).
 - 사용자가 준 우주인 사진을 3D로 만들지 않고 잡지에서 오린 스티커처럼 다듬어, 위성 오른쪽 가장자리 앞에 둥실거리는 빌보드로 붙였다 (2026-11-22 사용자 요청, [analysis/astronaut.md](analysis/astronaut.md)).
@@ -200,25 +222,27 @@ main.ts ─┬─ game/ ─┬─ physics/ ─ engine/math
 
 ### 자동 테스트
 
-`npm test` 기준 18개 파일, 169개가 모두 통과한다 (2026-11-22). `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 21개 파일, 183개가 모두 통과한다 (2026-11-24, 엔진·콘텐츠 계층 분리 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 12 | 벡터, 쿼터니언, 행렬 |
-| [`billboard.test.ts`](../src/engine/billboard.test.ts) | 5 | 빌보드 아틀라스 배치와 텍스처 좌표, 그리기 순서 |
-| [`moonShape.test.ts`](../src/engine/moonShape.test.ts) | 4 | 위성의 충돌구·바위 덩어리 모양 |
-| [`rocketShape.test.ts`](../src/engine/rocketShape.test.ts) | 4 | 로켓 모형의 몸통, 다리, 창, 리벳 자리 |
-| [`starfield.test.ts`](../src/engine/starfield.test.ts) | 3 | 별 배치와 윤곽 |
-| [`sunRays.test.ts`](../src/engine/sunRays.test.ts) | 4 | 해 햇살 모양 |
-| [`physics.test.ts`](../src/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
-| [`game.test.ts`](../src/game/game.test.ts) | 42 | 구 조작(중력, 한 바퀴 돌기), 카메라, 월드 통합, 텔레비전 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
-| [`bubbleBelt.test.ts`](../src/game/bubbleBelt.test.ts) | 5 | 비눗방울 띠의 기저, 씨앗 재현, 크기 분포, 카메라·위성·해 궤도와의 간격, 떠다니기 |
-| [`npc.test.ts`](../src/game/npc.test.ts) | 12 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기, 인사 말풍선 |
-| [`bodyShape.test.ts`](../src/game/bodyShape.test.ts) | 10 | NPC 몸 모양의 엉덩이 자리, 땅과의 간격, 방향과 기저 |
-| [`terrain.test.ts`](../src/game/terrain.test.ts) | 9 | 땅 높낮이와 평평한 곳, 비탈, 언덕 위에 서기, 땅·캡슐 충돌, 지형물 배치 |
-| [`walker.test.ts`](../src/game/walker.test.ts) | 17 | 캐릭터 다리와 걷기, 키프레임, 스킨 메시 기본 자세 |
+| [`layers.test.ts`](../src/layers.test.ts) | 5 | 계층 가져오기 규칙: 엔진 → 콘텐츠 금지, 씬끼리 금지, three.js를 가져오는 곳 |
+| [`billboard.test.ts`](../src/engine/render/billboard.test.ts) | 4 | 빌보드 아틀라스 배치와 텍스처 좌표, 그리기 순서 (시험용 그림 목록) |
+| [`billboardImages.test.ts`](../src/content/planet/graphics/billboardImages.test.ts) | 2 | 행성 빌보드 그림의 아틀라스 칸, 햇살 그림 범위 |
+| [`moonShape.test.ts`](../src/content/planet/shapes/moonShape.test.ts) | 4 | 위성의 충돌구·바위 덩어리 모양 |
+| [`rocketShape.test.ts`](../src/content/planet/shapes/rocketShape.test.ts) | 4 | 로켓 모형의 몸통, 다리, 창, 리벳 자리 |
+| [`starfield.test.ts`](../src/content/planet/shapes/starfield.test.ts) | 3 | 별 배치와 윤곽 |
+| [`sunRays.test.ts`](../src/content/planet/shapes/sunRays.test.ts) | 4 | 해 햇살 모양 |
+| [`physics.test.ts`](../src/engine/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
+| [`game.test.ts`](../src/content/planet/game.test.ts) | 42 | 구 조작(중력, 한 바퀴 돌기), 카메라, 월드 통합, 텔레비전 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
+| [`bubbleBelt.test.ts`](../src/content/planet/objects/bubbleBelt.test.ts) | 5 | 비눗방울 띠의 기저, 씨앗 재현, 크기 분포, 카메라·위성·해 궤도와의 간격, 떠다니기 |
+| [`npc.test.ts`](../src/content/planet/npc.test.ts) | 12 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기, 인사 말풍선 |
+| [`bodyShape.test.ts`](../src/content/planet/bodyShape.test.ts) | 10 | NPC 몸 모양의 엉덩이 자리, 땅과의 간격, 방향과 기저 |
+| [`terrain.test.ts`](../src/content/planet/objects/terrain.test.ts) | 9 | 땅 높낮이와 평평한 곳, 비탈, 언덕 위에 서기, 땅·캡슐 충돌, 지형물 배치 |
+| [`walker.test.ts`](../src/content/common/character/walker.test.ts) | 17 | 캐릭터 다리와 걷기, 키프레임, 스킨 메시 기본 자세 |
 
-렌더러, 입력, UI, `main.ts`는 단위 테스트가 없다.
+렌더러, 입력, UI, `engine/app.ts`, 씬 정의(`content/planet/index.ts`)와 그래픽 등록(`graphics/`)은 단위 테스트가 없다.
 
 ### 브라우저 확인 (2026-11-15, 행성 변경 후, 개발 서버)
 
