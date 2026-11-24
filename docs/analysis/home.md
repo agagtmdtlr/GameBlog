@@ -58,7 +58,7 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 {
   "cuts": {
     "a": { "title": "행성 산책", "preview": { "image": "planet.jpg" }, "open": { "scene": "planet" } },
-    "b": { "title": "텔레비전 영상", "preview": { "youtube": "aqz-KE-bpKQ" }, "open": { "youtube": "aqz-KE-bpKQ" } }
+    "b": { "title": "플라워 모작 유니티 시연", "preview": { "youtube": "AXhuradE5oo" }, "open": { "youtube": "AXhuradE5oo" } }
   }
 }
 ```
@@ -78,6 +78,8 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 1. 미리 보기 그림을 `src/home/previews/`에 넣는다 (컷 상자 비율에 가깝게, 900px 안팎 JPEG). YouTube 썸네일을 쓰면 필요 없다.
 2. `contents.json`의 `cuts`에 컷 id로 항목을 더한다.
 3. `npm test`로 검사한다.
+
+`b`는 사용자가 게임 "Flower"를 모방해 Unity로 만든 시연 영상이다 (2026-11-24 사용자 요청, 임시로 넣었던 "Big Buck Bunny"를 대체).
 
 `previews/planet.jpg`는 개발 서버의 `?scene=planet` 시작 화면에서 캔버스를 3:2로 잘라 900×600 JPEG로 저장했다.
 
