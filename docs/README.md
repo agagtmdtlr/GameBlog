@@ -6,7 +6,8 @@
 
 | 기능 | 해당 작업 | 규칙 | 분석 |
 |---|---|---|---|
-| 메인 페이지 | 첫 화면 코믹 프레임, 오림 글자 제목, 컷 배치(다각형·여백)와 컷 나누기, 컷에 넣는 콘텐츠(미리 보기 그림·영상·YouTube 썸네일, 씬·YouTube·외부 주소로 가기), 씬에서 메인으로 돌아가기 | [rules/world.md](rules/world.md) | [analysis/home.md](analysis/home.md) |
+| 메인 페이지 | 첫 화면 코믹 프레임, 오림 글자 제목, 컷 배치(다각형·여백)와 컷 나누기, 컷에 넣는 콘텐츠(미리 보기 그림·영상·YouTube 썸네일, 씬·미니 게임·YouTube·외부 주소로 가기), 씬에서 메인으로 돌아가기 | [rules/world.md](rules/world.md) | [analysis/home.md](analysis/home.md) |
+| 색칠 놀이와 미니 게임 | 선으로 나뉜 칸을 눌러 무작위 색을 채우는 색칠 놀이(`games/coloring/`), 그림 짓기·더하기, 영역 나누기, 색 묶음, 클리어 연출, 엔진 없는 미니 게임 계층(`games/`, `?game=<id>`)과 새 게임 추가 | [rules/world.md](rules/world.md) | [analysis/coloring.md](analysis/coloring.md) |
 | 오림 글자 | 종이를 찢어 오린 글자를 이어 붙인 제목(`lib/ransomText/`), 영어만 지원, 글꼴·종이 색·찢긴 가장자리, DOM 캔버스나 빌보드·텍스처에 그리기 | [rules/world.md](rules/world.md) | [analysis/ransomText.md](analysis/ransomText.md) |
 | 월드 컨셉과 구조 | 글 없이 그래픽으로 전달하는 컨셉, 지워진 콘텐츠·작동 영역 시스템의 참고 커밋 | [rules/world.md](rules/world.md) | [analysis/threejs.md](analysis/threejs.md) |
 | 엔진·콘텐츠 계층과 씬 | 코어 엔진(`engine/`)과 콘텐츠(`content/`)의 역할 나누기, 씬 정의(`SceneDefinition`)와 그래픽 등록(`Graphics`), 새 씬·씬 셰이더 추가, 셰이더별 정점 속성(`GeometryData`, `VertexLayout`)과 셰이더 등록(`defineShader`), 씬 바꾸기, 가져오기 규칙 검사 | [rules/world.md](rules/world.md) | [analysis/architecture.md](analysis/architecture.md) |

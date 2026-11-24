@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SCENES } from '../content';
+import { GAMES } from '../games';
 import { loadCutContents, loadPageTitle, targetLink, titleLineOptions } from './comicContents';
 import { COMIC_LAYOUT, insetPolygon, isConvex, MIN_PAGE_ASPECT, naturalAspect, placeCuts, signedArea, type Point } from './comicLayout';
 import contentsData from './contents.json';
@@ -90,12 +91,14 @@ describe('컷 콘텐츠 (contents.json)', () => {
   it('씬으로 들어가는 컷은 있는 씬을 가리키고, 미리 보기 파일이 previews/에 있다', () => {
     for (const [id, content] of contents) {
       if (content.open.kind === 'scene') expect(SCENES.map((s) => s.id), id).toContain(content.open.sceneId);
+      if (content.open.kind === 'game') expect(GAMES.map((g) => g.id), id).toContain(content.open.gameId);
       if (content.preview.kind !== 'youtube') expect(PREVIEW_FILES, id).toContain(content.preview.file);
     }
   });
 
   it('누르면 갈 주소를 만든다', () => {
     expect(targetLink({ kind: 'scene', sceneId: 'planet' })).toEqual({ href: '?scene=planet', external: false });
+    expect(targetLink({ kind: 'game', gameId: 'coloring' })).toEqual({ href: '?game=coloring', external: false });
     expect(targetLink({ kind: 'youtube', videoId: 'aqz-KE-bpKQ' })).toEqual({
       href: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
       external: true,

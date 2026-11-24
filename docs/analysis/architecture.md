@@ -11,6 +11,8 @@
 git log --oneline 02fadc5..HEAD -- src/engine/scene.ts src/engine/app.ts src/engine/render/graphics.ts src/engine/render/renderer.ts src/content/index.ts src/layers.test.ts
 ```
 
+엔진을 쓰지 않는 2D 미니 게임(`src/games/`, `?game=<id>`)은 이 두 계층 밖에 있다. [coloring.md](coloring.md)의 "미니 게임 계층"을 본다.
+
 ## 왜 나눴나
 
 여러 씬(지금의 행성 말고 다른 월드)을 더하려고 나눴다 (2026-11-24 사용자 요청). 그 전에는 `engine/renderer.ts`가 로켓·텔레비전·외계인 같은 행성 지오메트리를 직접 만들고, `engine/billboard.ts`가 별·햇살·말풍선 그림 목록을, `FrameData`가 비눗방울을 알고 있어서 씬을 하나 더하려면 엔진을 고쳐야 했다.

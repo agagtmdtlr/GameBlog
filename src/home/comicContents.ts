@@ -8,7 +8,8 @@
  *
  * - `preview`: `{ "image": "<previews/의 파일>" }`, `{ "video": "<previews/의 파일>" }`(소리 없이 반복),
  *   `{ "youtube": "<영상 id>" }`(YouTube 썸네일) 중 하나
- * - `open`: `{ "scene": "<씬 id>" }`(이 사이트의 씬으로 들어감), `{ "youtube": "<영상 id>" }`, `{ "url": "https://..." }`(새 탭) 중 하나
+ * - `open`: `{ "scene": "<씬 id>" }`(이 사이트의 3D 씬으로 들어감), `{ "game": "<게임 id>" }`(이 사이트의 미니 게임),
+ *   `{ "youtube": "<영상 id>" }`, `{ "url": "https://..." }`(새 탭) 중 하나
  * - `title`: 화면에 글로 쓰지 않고 스크린 리더와 마우스 툴팁에만 쓴다.
  */
 
@@ -19,6 +20,7 @@ export type CutPreview =
 
 export type CutTarget =
   | { readonly kind: 'scene'; readonly sceneId: string }
+  | { readonly kind: 'game'; readonly gameId: string }
   | { readonly kind: 'youtube'; readonly videoId: string }
   | { readonly kind: 'url'; readonly href: string };
 
@@ -29,7 +31,7 @@ export interface CutContent {
 }
 
 const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
-const FILE_NAME = /^[\w.-]+\.(png|jpe?g|webp|gif|mp4|webm)$/i;
+const FILE_NAME = /^[\w.-]+\.(png|jpe?g|webp|gif|svg|mp4|webm)$/i;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -56,8 +58,9 @@ function readPreview(value: unknown, where: string): CutPreview {
 }
 
 function readTarget(value: unknown, where: string): CutTarget {
-  const [key, text] = onlyKey(value, where, ['scene', 'youtube', 'url']);
+  const [key, text] = onlyKey(value, where, ['scene', 'game', 'youtube', 'url']);
   if (key === 'scene') return { kind: 'scene', sceneId: text };
+  if (key === 'game') return { kind: 'game', gameId: text };
   if (key === 'youtube') {
     if (!YOUTUBE_ID.test(text)) throw new Error(`${where}.youtube: 11자 영상 id여야 합니다`);
     return { kind: 'youtube', videoId: text };
@@ -119,6 +122,8 @@ export function targetLink(target: CutTarget): { href: string; external: boolean
   switch (target.kind) {
     case 'scene':
       return { href: `?scene=${encodeURIComponent(target.sceneId)}`, external: false };
+    case 'game':
+      return { href: `?game=${encodeURIComponent(target.gameId)}`, external: false };
     case 'youtube':
       return { href: `https://www.youtube.com/watch?v=${target.videoId}`, external: true };
     case 'url':

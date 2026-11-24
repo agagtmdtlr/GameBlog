@@ -9,7 +9,8 @@
 
 - 내용은 글이 아니라 그래픽과 플레이로만 전달한다. 글 게시물, 읽기 오버레이, 목록을 만들지 않는다.
 - 화면의 글자는 시작·일시 정지 안내와 NPC 말풍선 정도로 제한한다.
-- 첫 화면은 코믹 프레임 메인 페이지다. 컷마다 콘텐츠 미리 보기(그림·영상·YouTube 썸네일)를 보여 주고, 누르면 그 콘텐츠(이 사이트의 씬, YouTube, 외부 주소)로 간다. 컷은 따로 나눠 관리하고 콘텐츠를 넣고 뺄 수 있다 (2026-11-24 사용자 결정). 컷에 제목 글을 쓰지 않고 그림으로만 보여 준다. 코믹 프레임 위에는 오림 글자로 만든 영어 제목을 둔다 (2026-11-24 사용자 요청, [analysis/ransomText.md](../analysis/ransomText.md)). 구조는 [analysis/home.md](../analysis/home.md)에 있다.
+- 첫 화면은 코믹 프레임 메인 페이지다. 컷마다 콘텐츠 미리 보기(그림·영상·YouTube 썸네일)를 보여 주고, 누르면 그 콘텐츠(이 사이트의 씬·미니 게임, YouTube, 외부 주소)로 간다. 컷은 따로 나눠 관리하고 콘텐츠를 넣고 뺄 수 있다 (2026-11-24 사용자 결정). 컷에 제목 글을 쓰지 않고 그림으로만 보여 준다. 코믹 프레임 위에는 오림 글자로 만든 영어 제목을 둔다 (2026-11-24 사용자 요청, [analysis/ransomText.md](../analysis/ransomText.md)). 구조는 [analysis/home.md](../analysis/home.md)에 있다.
+- 색칠 놀이: 선으로 나뉜 칸을 누르면 판마다 무작위로 뽑은 색이 채워지고, 모든 칸을 칠하면 클리어다. 색은 고르지 않는다 (2026-11-24 사용자 요청). 구조는 [analysis/coloring.md](../analysis/coloring.md)에 있다.
 - 렌더링은 three.js로 한다. 그 밖의 런타임 라이브러리는 추가하지 않는다. 사용 규칙은 [threejs.md](threejs.md)에 있다.
 - 행성 표면에 칠한 원(작동 영역)으로 켜지는 그래픽스 콘텐츠 시스템, 콘텐츠 HUD, 콘텐츠 전용 렌더러 확장 구조(`engine/contentRenderers/`)는 등록된 콘텐츠가 없어 지웠다 (2026-11-22 사용자 결정). 참고 구현은 커밋 `ad4cee7`의 `src/content/`, `game/surfaceZone.ts`, `engine/contentRenderers/`에 있다 (당시 경로. 지금의 `src/content/`는 콘텐츠 계층이다).
 
@@ -29,6 +30,7 @@
 - 씬 안에서 three.js와 GLSL은 `graphics/`(와 `shaders/`)에만 둔다. `World`와 상태(`objects/`)·모양(`shapes/`) 코드는 GPU와 DOM에 의존하지 않는다.
 - `Renderer`에 게임 상태를 두지 않는다. 값은 `FrameData`(`engine/frame.ts`)로 받는다.
 - 메인 페이지(`src/home/`)는 `engine/`과 `content/`를 가져오지 않고 씬을 id로만 가리킨다. 씬은 주소 `?scene=<id>`로 연다.
+- 캐릭터 이동이 없는 2D 놀이는 엔진을 거치지 않는 미니 게임(`src/games/<게임>/`)으로 둔다. 주소 `?game=<id>`로 열고, `main.ts`만 게임을 가져온다. 게임은 `engine/`, `content/`, `home/`, 다른 게임을 가져오지 않고, three.js는 게임의 `graphics/`에서만 쓴다 ([analysis/coloring.md](../analysis/coloring.md)).
 - 여러 곳이 함께 쓰는 기능은 `src/lib/<기능>/`에 둔다. `lib/`은 `engine/`, `content/`, `home/`을 가져오지 않고, 누구나 `lib/`을 가져올 수 있다. 오림 글자(`lib/ransomText/`)는 영어만 지원한다 (2026-11-24 사용자 결정).
 - 위 가져오기 규칙은 `src/layers.test.ts`가 검사한다.
 
