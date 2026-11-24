@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SCENES } from '../content';
-import { loadCutContents, targetLink } from './comicContents';
+import { loadCutContents, loadPageTitle, targetLink } from './comicContents';
 import { COMIC_LAYOUT, insetPolygon, isConvex, placeCuts, signedArea, type Point } from './comicLayout';
 import contentsData from './contents.json';
 
@@ -42,6 +42,9 @@ describe('코믹 프레임 배치', () => {
   it('배치한 컷은 종이 안에 있고 넓이가 남아 있다', () => {
     const page = placeCuts(COMIC_LAYOUT);
     expect(page.width).toBe(width + COMIC_LAYOUT.margin * 2);
+    expect(page.height).toBe(height + COMIC_LAYOUT.header + COMIC_LAYOUT.margin * 2);
+    // 제목 띠는 컷 영역 위에 있다
+    expect(page.header.y + page.header.height).toBeLessThanOrEqual(Math.min(...page.cuts.map((c) => c.box.y)));
     for (const cut of page.cuts) {
       expect(isConvex(cut.points), cut.id).toBe(true);
       expect(Math.abs(signedArea(cut.points)), cut.id).toBeGreaterThan(100);
@@ -87,5 +90,12 @@ describe('컷 콘텐츠 (contents.json)', () => {
     expect(() => loadCutContents({ cuts: { a: { ...cut, open: { url: 'javascript:alert(1)' } } } })).toThrow(
       'cuts.a.open.url',
     );
+  });
+
+  it('제목은 영어만 쓴다', () => {
+    expect(loadPageTitle(contentsData)).toMatch(/\S/);
+    expect(loadPageTitle({ title: "Hello, World!" })).toBe('Hello, World!');
+    expect(() => loadPageTitle({ title: '게임 블로그' })).toThrow('contents.title');
+    expect(() => loadPageTitle({})).toThrow('contents.title');
   });
 });

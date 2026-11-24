@@ -22,6 +22,8 @@ export interface ComicLayout {
   readonly margin: number;
   /** 컷 사이 여백 */
   readonly gutter: number;
+  /** 컷 영역 위에 두는 제목 띠의 높이 */
+  readonly header: number;
   readonly cuts: readonly ComicCutShape[];
 }
 
@@ -41,6 +43,7 @@ export const COMIC_LAYOUT: ComicLayout = {
   height: 150,
   margin: 3,
   gutter: 2,
+  header: 20,
   cuts: [
     { id: 'a', points: [[0, 0], [66, 0], [66, 44], [0, 44]] },
     { id: 'b', points: [[66, 0], [100, 0], [100, 44], [66, 44]] },
@@ -59,12 +62,21 @@ export interface PlacedCut {
   /** 종이 전체(여백 포함) 좌표의 컷 다각형. 여백만큼 줄인 뒤다 */
   readonly points: readonly Point[];
   /** `points`를 감싸는 상자 */
-  readonly box: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly box: Box;
+}
+
+export interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
 }
 
 export interface PlacedPage {
   readonly width: number;
   readonly height: number;
+  /** 컷 영역 위의 제목 자리 (종이 좌표) */
+  readonly header: Box;
   readonly cuts: readonly PlacedCut[];
 }
 
@@ -116,10 +128,11 @@ export function insetPolygon(points: readonly Point[], distance: number): Point[
   });
 }
 
-/** 배치를 종이 좌표로 옮기고 컷 사이 여백을 낸다. */
+/** 배치를 종이 좌표로 옮기고 컷 사이 여백을 낸다. 컷 영역은 바깥 여백과 제목 띠 아래에 놓인다. */
 export function placeCuts(layout: ComicLayout): PlacedPage {
+  const top = layout.margin + layout.header;
   const cuts = layout.cuts.map((cut) => {
-    const shifted = cut.points.map(([x, y]) => [x + layout.margin, y + layout.margin] as Point);
+    const shifted = cut.points.map(([x, y]) => [x + layout.margin, y + top] as Point);
     const points = insetPolygon(shifted, layout.gutter / 2);
     const xs = points.map((p) => p[0]);
     const ys = points.map((p) => p[1]);
@@ -127,5 +140,6 @@ export function placeCuts(layout: ComicLayout): PlacedPage {
     const y = Math.min(...ys);
     return { id: cut.id, points, box: { x, y, width: Math.max(...xs) - x, height: Math.max(...ys) - y } };
   });
-  return { width: layout.width + layout.margin * 2, height: layout.height + layout.margin * 2, cuts };
+  const header = { x: layout.margin, y: layout.margin, width: layout.width, height: layout.header };
+  return { width: layout.width + layout.margin * 2, height: top + layout.height + layout.margin, header, cuts };
 }

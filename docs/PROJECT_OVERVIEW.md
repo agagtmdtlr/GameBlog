@@ -18,7 +18,7 @@
 | 개발 도구 | TypeScript, Vite, Vitest, `@types/three` (모두 개발 시에만 사용) |
 | 배포 | `main` 푸시 시 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 배포 |
 | 코드 규모 | TypeScript 7,633줄(엔진 2,343줄, 콘텐츠 5,276줄), 셰이더 413줄, CSS 232줄, 테스트 2,364줄 (2026-11-24) |
-| 빌드 크기 | 메인 페이지 JS 8.58KB (gzip 3.83KB), 씬을 열 때 받는 JS 776.79KB(엔진 `app` 391.88KB, `frame` 267.00KB, 콘텐츠 117.91KB, gzip 합 212.51KB), CSS 5.13KB, 행성 미리 보기 69.41KB, 캐릭터 모델 43.48KB, 우주인 스티커 251.48KB (2026-11-24) |
+| 빌드 크기 | 메인 페이지 JS 14.66KB (gzip 6.45KB, 오림 글자 포함), 씬을 열 때 받는 JS 776.79KB(엔진 `app` 391.88KB, `frame` 267.00KB, 콘텐츠 117.91KB, gzip 합 212.51KB), CSS 5.13KB, 행성 미리 보기 69.41KB, 캐릭터 모델 43.48KB, 우주인 스티커 251.48KB (2026-11-24) |
 
 ### 명령어
 
@@ -38,6 +38,7 @@ GameBlog/
 ├─ index.html                  메인 페이지 자리, 캔버스, 시작·일시 정지 화면(메인으로 링크)의 뼈대
 ├─ src/
 │  ├─ main.ts                  진입점: ?scene= 이 없으면 메인 페이지, 있으면 App과 씬을 동적으로 불러와 올린다
+│  ├─ lib/ransomText/          오림 글자: 찢어 오린 종이 글자로 만든 영어 제목 ([analysis/ransomText.md](analysis/ransomText.md))
 │  ├─ home/                    메인 페이지: 코믹 프레임 컷마다 콘텐츠 미리 보기 ([analysis/home.md](analysis/home.md))
 │  │  ├─ comicLayout.ts        컷 배치(볼록 다각형)와 컷 사이 여백 계산
 │  │  ├─ contents.json         컷마다 넣을 콘텐츠(미리 보기, 누르면 갈 곳)

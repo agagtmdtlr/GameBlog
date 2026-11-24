@@ -1,4 +1,5 @@
-import { type CutContent, type CutPreview, loadCutContents, targetLink, youtubeThumbnails } from './comicContents';
+import { createRansomCanvas } from '../lib/ransomText';
+import { type CutContent, type CutPreview, loadCutContents, loadPageTitle, targetLink, youtubeThumbnails } from './comicContents';
 import { COMIC_LAYOUT, type PlacedCut, placeCuts, type Point } from './comicLayout';
 import contentsData from './contents.json';
 
@@ -82,6 +83,18 @@ export function showComicPage(root: HTMLElement): void {
   sheet.className = 'comic-page';
   sheet.setAttribute('aria-label', '콘텐츠');
   sheet.style.setProperty('--page-aspect', `${page.width} / ${page.height}`);
+
+  // 컷 영역 위의 오림 글자 제목
+  const header = document.createElement('h1');
+  header.className = 'comic-title';
+  Object.assign(header.style, {
+    left: percent(page.header.x, page.width),
+    top: percent(page.header.y, page.height),
+    width: percent(page.header.width, page.width),
+    height: percent(page.header.height, page.height),
+  });
+  header.append(createRansomCanvas(loadPageTitle(contentsData), { letterSize: 72 }));
+  sheet.append(header);
 
   const cuts = page.cuts.map((cut) => cutElement(cut, contents.get(cut.id), page));
   sheet.append(...cuts);

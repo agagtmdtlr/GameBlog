@@ -353,3 +353,21 @@ a.comic-cut.is-youtube::after {
   stroke: #e2552f;
   stroke-width: 5px;
 }
+
+/* 코믹 프레임 위의 오림 글자 제목 (src/lib/ransomText/) */
+.comic-title {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+.comic-title .ransom-text {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: 100%;
+  object-fit: contain;
+}
