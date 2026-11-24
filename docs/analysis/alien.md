@@ -8,21 +8,21 @@
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline -- src/engine/alienShape.ts src/game/alien.ts src/game/alien.test.ts
+git log --oneline -- src/content/planet/shapes/alienShape.ts src/content/planet/objects/alien.ts src/content/planet/objects/alien.test.ts
 ```
 
 ## 흐름
 
 | 단계 | 파일 | 하는 일 |
 |---|---|---|
-| 행동·물리 | `game/npc.ts`의 `Wanderer` | NPC와 똑같이 쉬기와 걷기를 되풀이한다. 몸체는 반지름 `PLAYER_RADIUS`의 구이고 장애물·플레이어·NPC와 부딪힌다 ([analysis/npc.md](npc.md)) |
+| 행동·물리 | `content/common/character/npc.ts`의 `Wanderer` | NPC와 똑같이 쉬기와 걷기를 되풀이한다. 몸체는 반지름 `PLAYER_RADIUS`의 구이고 장애물·플레이어·NPC와 부딪힌다 ([analysis/npc.md](npc.md)) |
 | 방향 | `Wanderer.walker`(`Walker`) | 걸음 계산은 진행 방향(`pose.forward`)을 얻는 데만 쓴다. 다리는 그리지 않는다 |
-| 자세 | `game/alien.ts`의 `Alien` | 물리 몸 중심 위 `ALIEN.hover`(0.55)에 챙 바닥을 두고 1.7라디안/초로 ±0.1 오르내린다. 시간(`time`)을 고정 간격으로 진행해 촉수와 더듬이를 흔든다 |
+| 자세 | `content/planet/objects/alien.ts`의 `Alien` | 물리 몸 중심 위 `ALIEN.hover`(0.55)에 챙 바닥을 두고 1.7라디안/초로 ±0.1 오르내린다. 시간(`time`)을 고정 간격으로 진행해 촉수와 더듬이를 흔든다 |
 | 촉수 | `tentacleJoints` | 뿌리에서 마디(뼈 5개)마다 옆(Z축)·앞뒤(X축)로 굽힌다. 다리 넷은 사인 흔들림에 수평 속도에 비례한 뒤로 끌림(`drag`)을 더하고, 한 팔은 옆으로 뻗어 끝이 위로 말리고, 다른 팔은 앞쪽 위로 들어 광선총을 쥔다 |
 | 그리기 | `World.buildDrawList` | NPC 다음에 외계인마다 `Alien.parts`를 넣는다. 촉수는 다리처럼 `DrawItem.skin`(뼈 5개, 모델 행렬은 단위)으로 CPU 스키닝한다 |
-| 메시 | `engine/renderer.ts` | `alienHead`는 `headProfile()`을 `createLatheGeometry`로 돌린 것, `alienVisor`·`alienSlit`은 구면 조각 배열, `tentacle`은 `tentacleSkin()`의 기본 자세. `skinnedGeometry`가 `leg`과 `tentacle`을 모두 처리한다 |
+| 메시 | `engine/render/renderer.ts` | `alienHead`는 `headProfile()`을 `createLatheGeometry`로 돌린 것, `alienVisor`·`alienSlit`은 구면 조각 배열, `tentacle`은 `tentacleSkin()`의 기본 자세. `skinnedGeometry`가 `leg`과 `tentacle`을 모두 처리한다 |
 
-## 모양 (`engine/alienShape.ts`, 단위는 머리 반구 반지름 1 = 월드 1.1)
+## 모양 (`content/planet/shapes/alienShape.ts`, 단위는 머리 반구 반지름 1 = 월드 1.1)
 
 몸 기준 좌표의 원점은 챙 바닥 가운데, +Y가 위, +Z가 앞이다. +X는 외계인의 왼쪽(마주 보면 오른쪽)이라 [X, 위, 앞]이 오른손 기저가 된다. 그래서 그림처럼 마주 볼 때 광선총이 오른쪽에 있다.
 
@@ -49,7 +49,7 @@ git log --oneline -- src/engine/alienShape.ts src/game/alien.ts src/game/alien.t
 
 ## 테스트
 
-`game/alien.test.ts`: 머리 단면, 구면 조각이 앞쪽 구면 위에 바깥을 보는 면으로 감기는지, 촉수 가중치 합과 면 방향, 시작 자리가 장애물·플레이어·NPC와 겹치지 않는지, 그리기 목록 구성, 30초 동안 땅 위를 떠다니며 움직이는지와 멈췄을 때 다리 끝 높이, 광선총이 앞쪽 손끝 근처에 있는지 확인한다. `game.test.ts`의 상자 개수에 총 손잡이를 더했다.
+`content/planet/objects/alien.test.ts`: 머리 단면, 구면 조각이 앞쪽 구면 위에 바깥을 보는 면으로 감기는지, 촉수 가중치 합과 면 방향, 시작 자리가 장애물·플레이어·NPC와 겹치지 않는지, 그리기 목록 구성, 30초 동안 땅 위를 떠다니며 움직이는지와 멈췄을 때 다리 끝 높이, 광선총이 앞쪽 손끝 근처에 있는지 확인한다. `game.test.ts`의 상자 개수에 총 손잡이를 더했다.
 
 ## 브라우저 확인 (2026-11-22, 작업 폴더의 개발 서버)
 

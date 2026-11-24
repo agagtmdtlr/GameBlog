@@ -8,23 +8,23 @@
 
 ## 동작
 
-- 위성은 회색 바위 구체다. 행성 중심에서 40 떨어진 고정된 자리(`MOON.direction`)에 있고, 기울어진 축(`MOON.spinAxis`)을 중심으로 90초에 한 바퀴 자전만 한다 (`game/moon.ts`).
+- 위성은 회색 바위 구체다. 행성 중심에서 40 떨어진 고정된 자리(`MOON.direction`)에 있고, 기울어진 축(`MOON.spinAxis`)을 중심으로 90초에 한 바퀴 자전만 한다 (`content/planet/objects/moon.ts`).
 - 시작 시점에서 왼쪽 위 하늘에 보인다. 해의 궤도면에서 멀어 해와 겹치지 않는다.
 - 표면에 큰 충돌구 4개와 작은 충돌구 22개가 있다. 큰 충돌구는 가운데에 구덩이가 한 번 더 패여 있다. 바위 덩어리 14개가 가장자리를 울퉁불퉁하게 만든다.
 - 모양은 고정 씨앗(`MOON_SHAPE.seed`)으로 만들어 늘 같다.
 - `World.fixedStep`에서만 자전하므로 시작 화면과 일시 정지 중에는 멈춘다.
 - 충돌이 없다. 플레이어가 닿을 수 없는 거리다.
-- 위성 바로 아래 표면에 로켓 모형이 서 있다 (`scenes/surface.json`의 `rocket`, 자리 `{ "under": "moon" }`). 위치를 `MOON.direction`에서 계산하므로 `MOON.direction`을 바꾸면 함께 옮겨진다.
+- 위성 바로 아래 표면에 로켓 모형이 서 있다 (`content/planet/scenes/surface.json`의 `rocket`, 자리 `{ "under": "moon" }`). 위치를 `MOON.direction`에서 계산하므로 `MOON.direction`을 바꾸면 함께 옮겨진다.
 
 ## 파일
 
 | 파일 | 내용 |
 |---|---|
-| `engine/moonShape.ts` | `MOON_SHAPE` 상수, `generateMoonFeatures`(충돌구·바위 덩어리), `craterProfile`(충돌구 단면), `moonRadiusAt`(방향별 반지름 배율), `displaceToMoon`(정점 밀기). three.js를 쓰지 않는다 |
-| `game/moon.ts` | `MOON` 상수(자리, 거리, 반지름, 자전축, 자전 주기), `MOON_COLOR`, `Moon` 클래스(`step`, `spin(alpha)`, `model(alpha)`) |
-| `game/world.ts` | `World.moon`을 `fixedStep`에서 진행하고, 캐릭터 다음에 `moon` 메시를 그리기 목록에 넣는다 |
+| `content/planet/shapes/moonShape.ts` | `MOON_SHAPE` 상수, `generateMoonFeatures`(충돌구·바위 덩어리), `craterProfile`(충돌구 단면), `moonRadiusAt`(방향별 반지름 배율), `displaceToMoon`(정점 밀기). three.js를 쓰지 않는다 |
+| `content/planet/objects/moon.ts` | `MOON` 상수(자리, 거리, 반지름, 자전축, 자전 주기), `MOON_COLOR`, `Moon` 클래스(`step`, `spin(alpha)`, `model(alpha)`) |
+| `content/planet/world.ts` | `World.moon`을 `fixedStep`에서 진행하고, 캐릭터 다음에 `moon` 메시를 그리기 목록에 넣는다 |
 | `engine/frame.ts` | `MeshKind`에 `moon` |
-| `engine/renderer.ts` | `createMoonGeometry()`: `IcosahedronGeometry(1, 48)`에서 법선·UV를 지우고 `mergeVertices`로 정점을 합친 뒤 `displaceToMoon`으로 밀고 `computeVertexNormals` |
+| `engine/render/renderer.ts` | `createMoonGeometry()`: `IcosahedronGeometry(1, 48)`에서 법선·UV를 지우고 `mergeVertices`로 정점을 합친 뒤 `displaceToMoon`으로 밀고 `computeVertexNormals` |
 
 ## 세부
 
@@ -36,8 +36,8 @@
 
 ## 테스트
 
-- `engine/moonShape.test.ts`: 씨앗 재현성, 충돌구 단면(가운데 패임, 테두리 솟음, 바깥 평평), 큰 충돌구 중심이 패임, 정점 밀기 범위.
-- `game/game.test.ts`의 "위성": 자리 고정과 자전, 행성·해 궤도와의 간격, 그림자 제외.
+- `content/planet/shapes/moonShape.test.ts`: 씨앗 재현성, 충돌구 단면(가운데 패임, 테두리 솟음, 바깥 평평), 큰 충돌구 중심이 패임, 정점 밀기 범위.
+- `content/planet/game.test.ts`의 "위성": 자리 고정과 자전, 행성·해 궤도와의 간격, 그림자 제외.
 
 ## 브라우저 확인 (2026-11-21, 개발 서버)
 

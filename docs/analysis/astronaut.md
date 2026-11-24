@@ -17,7 +17,7 @@
 
 ## 스티커 그림
 
-`src/assets/astronaut-sticker.png`(512×512, 투명 배경)는 `tools/sticker/make_astronaut_sticker.py`가 원본 `tools/sticker/astronaut-source.png`(466×580)에서 만든다. 같은 입력이면 같은 파일이 나온다 (고정 씨앗).
+`src/content/planet/assets/astronaut-sticker.png`(512×512, 투명 배경)는 `tools/sticker/make_astronaut_sticker.py`가 원본 `tools/sticker/astronaut-source.png`(466×580)에서 만든다. 같은 입력이면 같은 파일이 나온다 (고정 씨앗).
 
 1. 균일한 배경색(245, 245, 247)을 가장자리부터 채워 우주인만 남긴다. 닫힌 틈은 남는다.
 2. 둘레를 약 11px 넓히고, 외곽선을 따서 곧은 선분으로 줄인 뒤 조금 흔들어 가위로 오린 종이 테두리를 만든다.
@@ -30,18 +30,18 @@
 
 | 파일 | 내용 |
 |---|---|
-| `game/astronaut.ts` | `ASTRONAUT` 상수(자리, 크기, 둥실거림, 기울기), `FloatingAstronaut`(`step`, `billboard(alpha)`) |
-| `game/world.ts` | `World.astronaut`를 `fixedStep`에서 진행하고, `buildBillboards`에 스티커 빌보드를 넣는다 |
-| `engine/billboard.ts` | 그림 `astronaut`(512px 칸)와 파일에서 불러오는 그림 목록 `FILE_BILLBOARD_IMAGES` |
-| `engine/billboardAtlas.ts` | `astronaut` 칸은 처음에 비워 두고, `drawImageIntoCell`이 불러온 그림을 칸에 그린다 |
-| `engine/billboardRenderer.ts` | `BillboardBatch.loadImage`: 그림을 불러와 아틀라스 캔버스에 그리고 텍스처를 다시 올린다 |
-| `engine/renderer.ts` | `loadBillboardImage`가 `BillboardBatch.loadImage`를 부른다 |
-| `main.ts` | `assets/astronaut-sticker.png?url`을 `loadBillboardImage('astronaut', …)`로 불러온다. 실패하면 콘솔에만 남기고 플레이는 계속한다 |
+| `content/planet/objects/astronaut.ts` | `ASTRONAUT` 상수(자리, 크기, 둥실거림, 기울기), `FloatingAstronaut`(`step`, `billboard(alpha)`) |
+| `content/planet/world.ts` | `World.astronaut`를 `fixedStep`에서 진행하고, `buildBillboards`에 스티커 빌보드를 넣는다 |
+| `content/planet/graphics/billboardImages.ts` | 그림 `astronaut`(512px 칸, `draw` 없음)와 파일에서 불러오는 그림 목록 `FILE_BILLBOARD_IMAGES` |
+| `engine/render/billboardAtlas.ts` | `astronaut` 칸은 처음에 비워 두고, `drawImageIntoCell`이 불러온 그림을 칸에 그린다 |
+| `engine/render/billboardRenderer.ts` | `BillboardBatch.loadImage`: 그림을 불러와 아틀라스 캔버스에 그리고 텍스처를 다시 올린다 |
+| `engine/render/renderer.ts` | `loadBillboardImage`가 `BillboardBatch.loadImage`를 부른다 |
+| `content/planet/index.ts` | `assets/astronaut-sticker.png?url`을 `graphics.loadBillboardImage('astronaut', …)`로 불러온다. 실패하면 콘솔에만 남기고 플레이는 계속한다 |
 | `tools/sticker/` | 원본 사진과 스티커를 만드는 스크립트 |
 
 ## 테스트
 
-`game/game.test.ts`의 "우주인 스티커": 빌보드가 하나이고 위성에 묻히지 않는 거리에 있음, 톤 매핑 꺼짐과 흰 색, 시간이 흐르면 둥실거리고 기울기가 바뀜.
+`content/planet/game.test.ts`의 "우주인 스티커": 빌보드가 하나이고 위성에 묻히지 않는 거리에 있음, 톤 매핑 꺼짐과 흰 색, 시간이 흐르면 둥실거리고 기울기가 바뀜.
 
 ## 브라우저 확인 (2026-11-22, 개발 서버)
 

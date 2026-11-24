@@ -1,4 +1,4 @@
-import type { Billboard } from './billboard';
+import type { Billboard } from './render/billboard';
 import type { Mat3, Mat4, Vec3 } from './math';
 
 /**
@@ -7,25 +7,17 @@ import type { Mat3, Mat4, Vec3 } from './math';
  */
 
 /**
- * `sphere`는 three.js 기본 구, `box`는 한 변 1인 정육면체, `leg`는 `assets/character.glb`의 캐릭터 다리 스킨 메시다.
- * `ring`은 XY 평면에 놓인 반지름 1의 가느다란 고리(토러스)이고, 관의 반지름은 `RING_TUBE_RATIO`다.
- * `moon`은 반지름 1 언저리의 구에 충돌구와 바위 덩어리를 새긴 위성이다 (`moonShape.ts`).
- * `cylinder`는 축이 Z인 지름 1, 길이 1의 원기둥이다(기차 바퀴, 보일러).
- * `rails`와 `sleepers`는 선로의 레일과 침목이고, 월드 좌표로 만든 지오메트리라 단위 행렬로 그린다 (`trackPath.ts`).
- * `terrain`은 높낮이가 있는 행성 땅이고, 역시 월드 좌표라 단위 행렬로 그린다 (`Renderer.setTerrain`).
- * `mound`(종 모양 언덕)와 `pillar`(끝이 둥근 기둥)는 y 0~1, 바닥 반지름 0.5인 회전체다 (`dreamShape.ts`).
- * `alienHead`, `alienVisor`, `alienSlit`은 문어 꼴 외계인의 챙 달린 머리, 눈가리개, 눈가리개 틈이다 (`alienShape.ts`).
- * `tentacle`은 외계인의 촉수 스킨 메시로, `leg`처럼 `DrawItem.skin`으로 그린다.
- * `satelliteDish`는 인공위성의 접시 안테나로, 반지름 1에 오목한 쪽이 -Y를 본다 (`satelliteShape.ts`).
- * 카메라를 보는 평면(별, 햇살, 해 눈)은 메시가 아니라 `FrameData.billboards`로 그린다.
+ * 그릴 메시의 이름. 엔진은 `ENGINE_MESHES`만 기본으로 가지고, 나머지는 콘텐츠가
+ * `Graphics.defineMesh`·`defineSkinnedMesh`로 등록한 이름이다 (`render/graphics.ts`).
+ * 카메라를 보는 평면은 메시가 아니라 `FrameData.billboards`로 그린다.
  */
-export type MeshKind = 'sphere' | 'box' | 'pyramid' | 'leg' | 'ring' | 'moon' | 'rocket' | 'rocketGlass' | 'tv' | 'tvTrim' | 'tvDark' | 'tvScreen' | 'cylinder' | 'rails' | 'sleepers' | 'terrain' | 'mound' | 'pillar' | 'alienHead' | 'alienVisor' | 'alienSlit' | 'tentacle' | 'satelliteDish';
+export type MeshKind = string;
 
-/** `ring` 메시의 관 반지름. 고리 반지름에 대한 비율이라 크기를 키우면 함께 굵어진다. */
-export const RING_TUBE_RATIO = 0.0015;
-
-/** 스킨 메시가 쓰는 뼈 수. `leg` 메시의 뼈 순서는 [허벅지, 정강이, 발]이다. */
-export const LEG_BONE_COUNT = 3;
+/**
+ * 엔진이 기본으로 가진 메시. `sphere`는 반지름 1 구, `box`는 한 변 1 정육면체,
+ * `cylinder`는 축이 Z인 지름 1, 길이 1의 원기둥이다.
+ */
+export const ENGINE_MESHES = ['sphere', 'box', 'cylinder'] as const;
 
 /**
  * `Grid`는 구 메시 전용 격자다. `Dreamy`는 방향에 따라 파스텔 색이 물결치는 땅, `Gradient`는 아래에서 위로
@@ -84,20 +76,10 @@ export interface CameraView {
   far: number;
 }
 
-/** 행성 둘레를 떠다니는 비눗방울 하나 (`game/bubbleBelt.ts`) */
-export interface BubbleFrame {
-  center: Vec3;
-  radius: number;
-  /** 막의 무지개 물결이 흐른 정도. 방울마다 다르게 천천히 바뀐다. */
-  swirl: number;
-}
-
 export interface FrameData {
   items: readonly DrawItem[];
-  /** 카메라를 보는 사각 빌보드. 순서는 상관없고, 렌더러가 한 번에 모아 그린다 (`billboard.ts`). */
+  /** 카메라를 보는 사각 빌보드. 순서는 상관없고, 렌더러가 한 번에 모아 그린다 (`render/billboard.ts`). */
   billboards: readonly Billboard[];
-  /** 반투명 비눗방울. 렌더러가 인스턴스로 한 번에 가산 혼합해 그린다 (`bubbleRenderer.ts`). */
-  bubbles: readonly BubbleFrame[];
   camera: CameraView;
   environment: Environment;
   /** 앰비언트 오클루전을 만드는 구 */

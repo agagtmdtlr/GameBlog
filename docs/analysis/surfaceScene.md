@@ -8,7 +8,7 @@
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline c18fcc8..HEAD -- src/scenes src/game/surfaceScene.ts src/game/world.ts src/engine/tvShape.ts src/engine/rocketShape.ts src/engine/videoScreenLayer.ts src/main.ts
+git log --oneline c18fcc8..HEAD -- src/content/planet/scenes src/content/planet/graphics/meshes.ts src/content/planet/index.ts src/content/planet/objects/surfaceScene.ts src/content/planet/world.ts src/content/planet/shapes/tvShape.ts src/content/planet/shapes/rocketShape.ts src/engine/render/videoScreenLayer.ts src/main.ts
 ```
 
 ## 파일
@@ -17,15 +17,15 @@ git log --oneline c18fcc8..HEAD -- src/scenes src/game/surfaceScene.ts src/game/
 
 | 파일 | 내용 |
 |---|---|
-| `scenes/surface.json` | 장면 파일. 표면 객체 목록 (지금은 `tv`, `rocket`) |
-| `game/surfaceScene.ts` | 장면 파일 검사(`validateSurfaceScene`), 읽기(`loadSurfaceScene`), 표면 상자 계산(`surfaceBox`, `boxModel`), 읽은 결과 `SURFACE_OBJECTS`, 텔레비전 화면 자리(`tvVideoScreen`)와 거리별 소리 크기(`videoVolume`, `VIDEO_SOUND`) |
-| `engine/videoScreenLayer.ts` | `VideoScreenLayer`: `CSS3DRenderer`로 YouTube iframe을 캔버스 뒤 3D 자리에 놓는다. `YouTubeScreen`: 음소거 자동 재생·반복 임베드(youtube-nocookie.com), postMessage로 `mute`·`unMute`·`setVolume` |
-| `main.ts` | 영상이 있는 표면 객체마다 `renderer.addVideoScreen`을 부르고, 매 프레임 플레이 중이면 플레이어와 화면 중심의 거리로, 아니면 0으로 소리 크기를 정한다 |
-| `game/world.ts` | `SURFACE_OBJECTS`를 그리기 목록과 충돌 목록(`collides`가 true인 것)에 넣는다. `surfaceObjectDrawItems`가 `box`는 `box` 메시 하나, `rocket`은 `rocket`(객체 색)과 `rocketGlass`(창 유리 색) 메시 둘, `tv`는 `tv`(객체 색, 나무)·`tvTrim`(은색 테·손잡이)·`tvDark`(조작판·스피커 천)·`tvScreen`(화면 유리) 메시 넷으로 그린다 |
-| `engine/rocketShape.ts` | 로켓 모형의 모양 값(`ROCKET_SHAPE`)과 자리 계산(`bodyProfile`, `bodySurface`, `rocketLegs`, `rocketWindow`, `rocketHatch`, `rocketRivets`). three.js를 쓰지 않는다 |
-| `engine/tvShape.ts` | 아날로그 텔레비전 모형의 모양 값(`TV_SHAPE`)과 부품 계산(`tvLegs`, `tvWoodBoxes`, `tvDarkBoxes`, `tvKnobs`, `tvScreenDepths`, `roundedRect`). three.js를 쓰지 않는다. 검사는 `tvShape.test.ts` |
-| `engine/renderer.ts` | `createRocketGeometry()`: 몸통 `LatheGeometry`, 다리 `CapsuleGeometry`, 창틀 `TorusGeometry`, 옆문·리벳 `SphereGeometry`를 `mergeGeometries`로 합친다. `createRocketGlassGeometry()`: 창 유리 `CircleGeometry`. `createTvGeometry()` 등: 텔레비전 부품을 색마다 `mergeParts`로 합친다(상자 `BoxGeometry`, 다리 `CylinderGeometry`, 화면 테 `ExtrudeGeometry`, 화면 유리 `ShapeGeometry`) |
-| `game/game.test.ts` | `텔레비전 자리`, `로켓 자리`, `표면 장면 파일` 블록. 객체는 id로 찾는다 |
+| `content/planet/scenes/surface.json` | 장면 파일. 표면 객체 목록 (지금은 `tv`, `rocket`) |
+| `content/planet/objects/surfaceScene.ts` | 장면 파일 검사(`validateSurfaceScene`), 읽기(`loadSurfaceScene`), 표면 상자 계산(`surfaceBox`, `boxModel`), 읽은 결과 `SURFACE_OBJECTS`, 텔레비전 화면 자리(`tvVideoScreen`)와 거리별 소리 크기(`videoVolume`, `VIDEO_SOUND`) |
+| `engine/render/videoScreenLayer.ts` | `VideoScreenLayer`: `CSS3DRenderer`로 YouTube iframe을 캔버스 뒤 3D 자리에 놓는다. `YouTubeScreen`: 음소거 자동 재생·반복 임베드(youtube-nocookie.com), postMessage로 `mute`·`unMute`·`setVolume` |
+| `content/planet/index.ts` | 영상이 있는 표면 객체마다 `graphics.addVideoScreen(…, 'tvScreen', …)`을 부르고, 매 프레임 플레이 중이면 플레이어와 화면 중심의 거리로, 아니면 0으로 소리 크기를 정한다 |
+| `content/planet/world.ts` | `SURFACE_OBJECTS`를 그리기 목록과 충돌 목록(`collides`가 true인 것)에 넣는다. `surfaceObjectDrawItems`가 `box`는 `box` 메시 하나, `rocket`은 `rocket`(객체 색)과 `rocketGlass`(창 유리 색) 메시 둘, `tv`는 `tv`(객체 색, 나무)·`tvTrim`(은색 테·손잡이)·`tvDark`(조작판·스피커 천)·`tvScreen`(화면 유리) 메시 넷으로 그린다 |
+| `content/planet/shapes/rocketShape.ts` | 로켓 모형의 모양 값(`ROCKET_SHAPE`)과 자리 계산(`bodyProfile`, `bodySurface`, `rocketLegs`, `rocketWindow`, `rocketHatch`, `rocketRivets`). three.js를 쓰지 않는다 |
+| `content/planet/shapes/tvShape.ts` | 아날로그 텔레비전 모형의 모양 값(`TV_SHAPE`)과 부품 계산(`tvLegs`, `tvWoodBoxes`, `tvDarkBoxes`, `tvKnobs`, `tvScreenDepths`, `roundedRect`). three.js를 쓰지 않는다. 검사는 `tvShape.test.ts` |
+| `content/planet/graphics/meshes.ts` | `createRocketGeometry()`: 몸통 `LatheGeometry`, 다리 `CapsuleGeometry`, 창틀 `TorusGeometry`, 옆문·리벳 `SphereGeometry`를 `mergeGeometries`로 합친다. `createRocketGlassGeometry()`: 창 유리 `CircleGeometry`. `createTvGeometry()` 등: 텔레비전 부품을 색마다 `mergeParts`로 합친다(상자 `BoxGeometry`, 다리 `CylinderGeometry`, 화면 테 `ExtrudeGeometry`, 화면 유리 `ShapeGeometry`) |
+| `content/planet/game.test.ts` | `텔레비전 자리`, `로켓 자리`, `표면 장면 파일` 블록. 객체는 id로 찾는다 |
 
 장면 파일은 Vite의 JSON import로 번들에 들어간다(`tsconfig.json`의 `resolveJsonModule`). 런타임에 따로 내려받지 않는다.
 
@@ -56,7 +56,7 @@ git log --oneline c18fcc8..HEAD -- src/scenes src/game/surfaceScene.ts src/game/
 
 ## 객체 추가 순서
 
-1. `scenes/surface.json`의 `objects`에 한 항목을 더한다. 코드는 고치지 않아도 그리기와 충돌이 따라온다.
+1. `content/planet/scenes/surface.json`의 `objects`에 한 항목을 더한다. 코드는 고치지 않아도 그리기와 충돌이 따라온다.
 2. 다른 객체, 시작 지점, 기차 선로(위도 46~54, [analysis/train.md](train.md))와 겹치지 않게 둔다. 표면 거리는 각도 1도에 약 0.31이다. 해는 시작할 때 위도 약 47, 경도 약 115 쪽에 있고 48초에 한 바퀴 돌아 낮과 밤이 바뀐다 ([analysis/sun.md](sun.md)).
 3. 위치 조건이 중요한 객체면 `game.test.ts`에 id로 찾아 검사하는 블록을 더한다.
 

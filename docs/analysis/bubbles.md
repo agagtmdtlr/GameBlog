@@ -19,13 +19,13 @@
 
 | 파일 | 내용 |
 |---|---|
-| `game/bubbleBelt.ts` | `BUBBLE_BELT` 상수, `beltBasis`(띠 평면 기저), `BubbleBelt` 클래스(`step`, `bubbles(alpha)`). 씨앗 난수는 `engine/starfield.ts`의 `createRandom`을 쓴다 |
-| `game/world.ts` | `World.bubbles`를 `fixedStep`에서 진행하고, `buildBubbles(alpha)`로 프레임 값을 낸다 |
-| `engine/frame.ts` | `BubbleFrame`(중심, 반지름, `swirl`)과 `FrameData.bubbles` |
-| `engine/bubbleRenderer.ts` | `BubbleBatch`. 반지름 1인 `SphereGeometry(1, 40, 24)`의 `InstancedBufferGeometry`와 인스턴스 속성 `iCenter`, `iRadius`, `iSwirl` |
-| `engine/renderer.ts` | `bubbleScene`을 빌보드 뒤에 그린다 |
-| `shaders/bubble.vert`, `shaders/bubble.frag` | 방울 셰이더 |
-| `main.ts` | `world.buildBubbles(alpha)`를 `FrameData.bubbles`로 넘긴다 |
+| `content/planet/objects/bubbleBelt.ts` | `BUBBLE_BELT` 상수, `beltBasis`(띠 평면 기저), `BubbleBelt` 클래스(`step`, `bubbles(alpha)`). 씨앗 난수는 `content/planet/shapes/starfield.ts`의 `createRandom`을 쓴다 |
+| `content/planet/world.ts` | `World.bubbles`를 `fixedStep`에서 진행하고, `buildBubbles(alpha)`로 프레임 값을 낸다 |
+| `content/planet/objects/bubbleBelt.ts` | `BubbleFrame`(중심, 반지름, `swirl`) |
+| `content/planet/graphics/bubbleLayer.ts` | `BubbleLayer`. 엔진의 `RenderLayer`라 씬이 `graphics.addLayer`로 등록한다. 반지름 1인 `SphereGeometry(1, 40, 24)`의 `InstancedBufferGeometry`와 인스턴스 속성 `iCenter`, `iRadius`, `iSwirl` |
+| `engine/render/renderer.ts` | 등록된 콘텐츠 층을 빌보드 뒤에 더한 순서대로 그린다 |
+| `content/planet/shaders/bubble.vert`, `content/planet/shaders/bubble.frag` | 방울 셰이더 |
+| `content/planet/index.ts` | `frame()`에서 `world.buildBubbles(alpha)`를 `BubbleLayer.set`으로 넘긴다 (2026-11-24, 그 전에는 `FrameData.bubbles`였다) |
 
 ## 그리기
 
@@ -37,7 +37,7 @@
 
 ## 테스트
 
-- `game/bubbleBelt.test.ts`: 기저 직교, 씨앗 재현과 개수, 작은 방울이 많은 크기 분포, 2분 동안 카메라 높이·해 궤도·위성과 닿지 않음, 시간에 따라 모든 방울이 움직이고 멈추면 그대로임.
+- `content/planet/objects/bubbleBelt.test.ts`: 기저 직교, 씨앗 재현과 개수, 작은 방울이 많은 크기 분포, 2분 동안 카메라 높이·해 궤도·위성과 닿지 않음, 시간에 따라 모든 방울이 움직이고 멈추면 그대로임.
 
 ## 브라우저 확인 (2026-11-22, 개발 서버)
 

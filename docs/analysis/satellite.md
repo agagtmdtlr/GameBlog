@@ -9,7 +9,7 @@
 ## 동작
 
 - 사용자가 보여 준 통신 위성 사진(은박 몸통, 접시 안테나, 양옆의 파란 태양 전지판)을 단순화했다 (2026-11-22 사용자 요청).
-- 행성 중심에서 57 떨어진 궤도를 36초에 한 바퀴 돈다 (`SATELLITE` in `game/satellite.ts`). 카메라(약 29), 바위 위성(40), 비눗방울 띠(44까지)보다 바깥이고 해(70)보다 안쪽이다. 전지판 끝(몸통에서 약 8.4)까지 쳐도 비눗방울 띠와 해에 닿지 않는다.
+- 행성 중심에서 57 떨어진 궤도를 36초에 한 바퀴 돈다 (`SATELLITE` in `content/planet/objects/satellite.ts`). 카메라(약 29), 바위 위성(40), 비눗방울 띠(44까지)보다 바깥이고 해(70)보다 안쪽이다. 전지판 끝(몸통에서 약 8.4)까지 쳐도 비눗방울 띠와 해에 닿지 않는다.
 - 시작할 때 시작 시점의 앞쪽 위 하늘(`SATELLITE.start`)에 있다. 궤도면은 `start`와 `toward`로 정하며 해의 궤도면과 다르게 비스듬하다.
 - 궤적은 해 궤적과 같은 `ring` 메시로 옅은 하늘색(`SATELLITE_ORBIT_EMISSIVE`) 발광 고리로 그린다. 고리는 인공위성 몸통 가운데를 지난다.
 - 몸 축: x는 궤도면 법선(전지판이 뻗는 쪽), y는 행성 바깥, z는 나아가는 쪽이다. 접시 안테나는 늘 행성을 본다.
@@ -22,13 +22,13 @@
 
 | 파일 | 내용 |
 |---|---|
-| `game/satellite.ts` | `SATELLITE` 상수(궤도, 크기 단위, 부품 치수), `SATELLITE_ORBIT_EMISSIVE`, `Satellite` 클래스(`step`, `direction`, `position`, `orbitModel`, `parts(alpha, 해 방향)`), 부품 색 |
-| `engine/satelliteShape.ts` | 접시 단면 `dishProfile`과 `SATELLITE_DISH`(깊이, 두께). three.js를 쓰지 않는다 |
-| `engine/signalArc.ts` | 신호 물결 호의 모양 `SIGNAL_ARC`, 퍼진 정도별 프레임(`signalArcFrame`)과 굵기(`signalArcThickness`), 외곽선(`signalArcOutline`). three.js를 쓰지 않는다 |
-| `engine/billboard.ts`, `engine/billboardAtlas.ts` | 빌보드 그림 `signalArc`(256px, 8프레임). 프레임마다 외곽선을 흰색으로 칠한다 |
+| `content/planet/objects/satellite.ts` | `SATELLITE` 상수(궤도, 크기 단위, 부품 치수), `SATELLITE_ORBIT_EMISSIVE`, `Satellite` 클래스(`step`, `direction`, `position`, `orbitModel`, `parts(alpha, 해 방향)`), 부품 색 |
+| `content/planet/shapes/satelliteShape.ts` | 접시 단면 `dishProfile`과 `SATELLITE_DISH`(깊이, 두께). three.js를 쓰지 않는다 |
+| `content/planet/shapes/signalArc.ts` | 신호 물결 호의 모양 `SIGNAL_ARC`, 퍼진 정도별 프레임(`signalArcFrame`)과 굵기(`signalArcThickness`), 외곽선(`signalArcOutline`). three.js를 쓰지 않는다 |
+| `engine/render/billboard.ts`, `engine/render/billboardAtlas.ts` | 빌보드 그림 `signalArc`(256px, 8프레임). 프레임마다 외곽선을 흰색으로 칠한다 |
 | `engine/frame.ts` | `MeshKind`에 `satelliteDish` |
-| `engine/renderer.ts` | `satelliteDish`를 `createLatheGeometry(dishProfile())`로 만든다 |
-| `game/world.ts` | `World.satellite`를 `fixedStep`에서 진행하고, 그리기 목록 끝(해 궤적 고리 다음)에 부품과 궤적 고리를, `buildBillboards`에 신호 물결(`signalBillboards(alpha, view)`)을 넣는다 |
+| `engine/render/renderer.ts` | `satelliteDish`를 `createLatheGeometry(dishProfile())`로 만든다 |
+| `content/planet/world.ts` | `World.satellite`를 `fixedStep`에서 진행하고, 그리기 목록 끝(해 궤적 고리 다음)에 부품과 궤적 고리를, `buildBillboards`에 신호 물결(`signalBillboards(alpha, view)`)을 넣는다 |
 
 ## 세부
 
@@ -42,7 +42,7 @@
 
 ## 테스트
 
-`engine/signalArc.test.ts`: 프레임별 굵기 감소, 프레임 고르기, 외곽선 범위와 대칭. `game/game.test.ts`의 "인공위성": 신호 물결 수, 초점 위치, 행성 쪽 회전, 큰 물결일수록 가는 프레임, 정면에서 감춤, 궤도 반지름과 한 주기 뒤 복귀, 궤적 고리와 궤도의 일치, 바위 위성·비눗방울 띠·해 궤도와의 간격, 전지판 법선이 해 투영 방향과 나란함, 접시가 행성 중심을 봄, 그림자 제외. "텔레비전 자리"와 "해"의 개수 검사에 인공위성 상자와 궤적 고리를 더했다.
+`content/planet/shapes/signalArc.test.ts`: 프레임별 굵기 감소, 프레임 고르기, 외곽선 범위와 대칭. `content/planet/game.test.ts`의 "인공위성": 신호 물결 수, 초점 위치, 행성 쪽 회전, 큰 물결일수록 가는 프레임, 정면에서 감춤, 궤도 반지름과 한 주기 뒤 복귀, 궤적 고리와 궤도의 일치, 바위 위성·비눗방울 띠·해 궤도와의 간격, 전지판 법선이 해 투영 방향과 나란함, 접시가 행성 중심을 봄, 그림자 제외. "텔레비전 자리"와 "해"의 개수 검사에 인공위성 상자와 궤적 고리를 더했다.
 
 ## 브라우저 확인 (2026-11-22, 개발 서버)
 

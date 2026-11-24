@@ -25,9 +25,9 @@
 
 | 파일 | 내용 |
 |---|---|
-| `engine/skybox.ts` | `SKYBOX`(면 크기, 씨앗, 바탕색), `SKY_SHAPES`(모양별 개수·크기), 배치(`generateSkyShapes`), 면 투영(`projectToFace`), 캔버스 그리기(`drawSkyboxFaces`). three.js를 가져오지 않는다. 난수는 `starfield.ts`의 `createRandom`을 쓴다 |
-| `engine/renderer.ts` | 캔버스로 `CubeTexture`를 만들어 `skyScene.background`에 넣고, 메인 패스에서 지운 뒤 가장 먼저 그린다 |
-| `engine/skybox.test.ts` | 씨앗 재현성, 모양별 개수·크기, 그리는 순서, 면 축 방향, WebGL 면 좌표 규약, 모서리 이음매 |
+| `content/planet/shapes/skybox.ts` | `SKYBOX`(면 크기, 씨앗, 바탕색), `SKY_SHAPES`(모양별 개수·크기), 배치(`generateSkyShapes`), 면 투영(`projectToFace`), 캔버스 그리기(`drawSkyboxFaces`). three.js를 가져오지 않는다. 난수는 `starfield.ts`의 `createRandom`을 쓴다 |
+| `engine/render/renderer.ts` | 캔버스로 `CubeTexture`를 만들어 `skyScene.background`에 넣고, 메인 패스에서 지운 뒤 가장 먼저 그린다 |
+| `content/planet/shapes/skybox.test.ts` | 씨앗 재현성, 모양별 개수·크기, 그리는 순서, 면 축 방향, WebGL 면 좌표 규약, 모서리 이음매 |
 
 ## 세부
 

@@ -19,10 +19,10 @@
 
 | 파일 | 내용 |
 |---|---|
-| `engine/starfield.ts` | `STARFIELD` 상수, `STAR_FACES`, 배치(`placeStars`), 별 윤곽(`starOutline`), 얼굴 캔버스(`drawStarFace`). three.js를 가져오지 않는다 |
-| `game/world.ts` | 별마다 `Billboard`(`starFace` 그림의 얼굴 프레임, 크기, 기울기, 뒤집기)를 한 번만 만들어 `buildBillboards`에 넣는다 |
-| `engine/billboardAtlas.ts` | 얼굴 네 가지를 빌보드 아틀라스에 그린다. 그리기는 [analysis/billboard.md](billboard.md)의 `BillboardBatch`가 한다 |
-| `engine/starfield.test.ts` | 씨앗 재현성, 거리·크기·기울기 범위, 별 윤곽 |
+| `content/planet/shapes/starfield.ts` | `STARFIELD` 상수, `STAR_FACES`, 배치(`placeStars`), 별 윤곽(`starOutline`), 얼굴 캔버스(`drawStarFace`). three.js를 가져오지 않는다 |
+| `content/planet/world.ts` | 별마다 `Billboard`(`starFace` 그림의 얼굴 프레임, 크기, 기울기, 뒤집기)를 한 번만 만들어 `buildBillboards`에 넣는다 |
+| `engine/render/billboardAtlas.ts` | 얼굴 네 가지를 빌보드 아틀라스에 그린다. 그리기는 [analysis/billboard.md](billboard.md)의 `BillboardBatch`가 한다 |
+| `content/planet/shapes/starfield.test.ts` | 씨앗 재현성, 거리·크기·기울기 범위, 별 윤곽 |
 
 ## 세부
 

@@ -10,13 +10,13 @@
 
 | 하고 싶은 것 | 파일 |
 |---|---|
-| 언덕 수·크기·높이, 잔물결, 평평하게 둘 곳의 폭 | `game/terrain.ts`의 `TERRAIN_SHAPE` |
-| 지형물 수·간격, 시드 | `game/terrain.ts`의 `PROP_LAYOUT` |
-| 지형물 크기 범위와 충돌 캡슐 | `game/terrain.ts`의 `buildProp` |
-| 지형물 색 | `game/terrain.ts`의 `DREAM_PALETTE` (sRGB 16진) |
-| 언덕(`mound`)·기둥(`pillar`) 메시 단면 | `engine/dreamShape.ts` |
-| 땅의 파스텔 물결, 지형물의 아래→위 색 변화, 가장자리 빛, 밤 빛 | `shaders/toon.frag`의 `PATTERN_DREAMY`, `PATTERN_GRADIENT` |
-| 땅 메시의 정점 간격 | `engine/renderer.ts`의 `TERRAIN_DETAIL` |
+| 언덕 수·크기·높이, 잔물결, 평평하게 둘 곳의 폭 | `content/planet/objects/terrain.ts`의 `TERRAIN_SHAPE` |
+| 지형물 수·간격, 시드 | `content/planet/objects/terrain.ts`의 `PROP_LAYOUT` |
+| 지형물 크기 범위와 충돌 캡슐 | `content/planet/objects/terrain.ts`의 `buildProp` |
+| 지형물 색 | `content/planet/objects/terrain.ts`의 `DREAM_PALETTE` (sRGB 16진) |
+| 언덕(`mound`)·기둥(`pillar`) 메시 단면 | `content/planet/shapes/dreamShape.ts` |
+| 땅의 파스텔 물결, 지형물의 아래→위 색 변화, 가장자리 빛, 밤 빛 | `engine/render/shaders/toon.frag`의 `PATTERN_DREAMY`, `PATTERN_GRADIENT` |
+| 땅 메시의 정점 간격 | `content/planet/graphics/meshes.ts`의 `TERRAIN_DETAIL` |
 
 ## 땅의 높이
 
@@ -29,7 +29,7 @@
 
 ## 물리와 다리
 
-- `physics/collision.ts`의 `Ground`는 `Sphere`에 선택적 `heightAt`을 더한 타입이다. 없으면 예전과 같은 구다. 테스트의 `PLANET`은 그대로 구로 쓴다.
+- `engine/physics/collision.ts`의 `Ground`는 `Sphere`에 선택적 `heightAt`을 더한 타입이다. 없으면 예전과 같은 구다. 테스트의 `PLANET`은 그대로 구로 쓴다.
 - `sphereVsGround`는 구 아래 표면을 접평면으로 보고, 구가 평면에 닿는 높이(`반지름 / cos(기울기)`)까지 **위쪽(중심 바깥)으로** 밀어낸다. 법선도 위쪽이라 비탈에서 미끄러지지 않고 가만히 서 있다. 법선은 `groundNormal`이 중앙 차분으로 구한다.
 - `Player.step`, `Walker`(발을 땅 높이에 놓음), `Wanderer`가 `TERRAIN`을 받는다. NPC 시작 높이도 땅 높이를 따른다. 위쪽과 중력은 여전히 행성 중심 방향이다.
 - 카메라(`CameraRig`)에 땅을 주면 땅에서 0.8 아래로 내려가지 않는다. 지형물은 피하지 않는다.
@@ -58,7 +58,7 @@
 
 ## 렌더러
 
-`Renderer.setTerrain(HeightField)`가 정이십면체 구(세분 72, 정점 약 5만 2천 개)를 높이 함수대로 밀어 월드 좌표 지오메트리를 만든다. `main.ts`가 `setTrack` 뒤에 부른다. 메시 종류는 `terrain`이고 단위 행렬로 그린다. 그림자를 드리우므로 언덕이 서로 그림자를 진다.
+`content/planet/graphics/meshes.ts`의 `createTerrainGeometry`가 정이십면체 구(세분 72, 정점 약 5만 2천 개)를 `terrainHeight`대로 밀어 월드 좌표 지오메트리를 만들고 `terrain`으로 등록한다 (엔진의 `displacedSphereGeometry`). 메시 종류는 `terrain`이고 단위 행렬로 그린다. 그림자를 드리우므로 언덕이 서로 그림자를 진다.
 
 ## 한계
 
