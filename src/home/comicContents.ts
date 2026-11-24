@@ -91,6 +91,29 @@ export function loadPageTitle(data: unknown): string {
   return title;
 }
 
+/**
+ * 제목을 줄로 나누는 방법들. 한 줄과, 낱말이 둘 이상이면 글자 수가 가장 고르게 나뉘는 두 줄.
+ * 제목에 줄바꿈이 있으면 그대로 하나만 쓴다. 화면에 따라 더 크게 들어가는 쪽을 고른다.
+ */
+export function titleLineOptions(title: string): string[] {
+  if (title.includes('\n')) return [title];
+  const words = title.trim().split(/\s+/);
+  const options = [words.join(' ')];
+  if (words.length < 2) return options;
+  let best = '';
+  let bestLength = Infinity;
+  for (let i = 1; i < words.length; i++) {
+    const top = words.slice(0, i).join(' ');
+    const bottom = words.slice(i).join(' ');
+    const longest = Math.max(top.length, bottom.length);
+    if (longest < bestLength) {
+      bestLength = longest;
+      best = `${top}\n${bottom}`;
+    }
+  }
+  return [...options, best];
+}
+
 /** 컷을 눌렀을 때 갈 주소와 새 탭으로 열지 여부 */
 export function targetLink(target: CutTarget): { href: string; external: boolean } {
   switch (target.kind) {

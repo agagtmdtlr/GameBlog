@@ -50,8 +50,10 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 | 아래 (y 112~150) | `g`, `h` | (64,112)→(67.4,150) 사선으로 나눈 두 컷 |
 
 - 컷을 바꿀 때 사선 위의 꼭짓점은 그 사선 위에 정확히 놓아야 한다. 테스트가 컷 넓이의 합이 페이지 넓이와 같은지, 모두 볼록한지, id가 겹치지 않는지 검사한다.
-- 컷 영역 위에 높이 `header`(20)의 제목 띠가 있고, `contents.json`의 `title`을 오림 글자([ransomText.md](ransomText.md), `letterSize` 72)로 띠 안에 맞춰 그린다. 제목은 영어만 쓴다 (`loadPageTitle`이 검사).
-- 페이지 비율은 `(width + 2·margin) / (height + header + 2·margin)`이고 CSS `aspect-ratio`로 화면 안에 통째로 맞춘다 (스크롤 없음).
+- 컷 영역 위에 높이 `header`(20)의 제목 띠가 있고, `contents.json`의 `title`을 오림 글자([ransomText.md](ransomText.md), `letterSize` 72)로 띠 안에 맞춰 그린다. 제목은 영어만 쓴다 (`loadPageTitle`이 검사). 한 줄과 고르게 나눈 두 줄(`titleLineOptions`)을 모두 만들어 두고, 두 줄이 글자가 1.3배 넘게 커질 때만 두 줄을 쓴다.
+- 종이는 화면을 꽉 채운다 (2026-11-24 사용자 요청, 모바일에서 위아래가 비어 보여서). 바탕과 종이가 같은 색이라 `#home`의 바깥 여백은 안전 영역만 두고, 여백은 종이 안의 `margin`이 맡는다.
+- 원래 비율은 `(width + 2·margin) / (height + header + 2·margin)`(약 0.6)이다. 화면이 이보다 세로로 길면 `placeCuts(layout, 화면 비율)`이 종이를 그 비율로 늘인다. 늘인 길이의 `HEADER_SHARE`(15%)는 제목 띠가, 나머지는 컷 영역이 가져간다. 컷은 세로로 늘인 뒤에 여백을 내므로 여백 두께는 그대로다. 비율 `MIN_PAGE_ASPECT`(0.42)보다 좁게는 늘이지 않고, 화면이 더 넓으면 원래 비율로 높이에 맞춘다 (스크롤 없음).
+- `comicPage.ts`는 `ResizeObserver`로 화면 크기가 바뀔 때마다 종이 크기(px), 컷 위치·`clip-path`, 테두리, 제목 줄 나눔을 다시 정한다.
 
 ## 컷 콘텐츠 (`contents.json`)
 
@@ -98,6 +100,7 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 |---|---|
 | 800×600 | 종이가 화면 높이에 맞고, 여덟 컷과 사선이 그림과 같은 배치. `a`에 행성 그림, `b`·`c`에 YouTube 썸네일과 재생 표시, 나머지는 망점 빈 컷 |
 | 375×812 (모바일) | 종이가 화면 너비에 맞고 스크롤 없음 |
+| 412×700, 412×880 (모바일, 2026-11-24 늘이기 뒤) | 종이가 화면 위아래까지 차고, 제목이 한 줄로 화면 너비를 채움. 늘인 컷도 여백 두께가 같음 |
 | `a` 마우스 올림 | 테두리 강조, 그림 확대 |
 | `a` 클릭 → `?scene=planet` | 행성 시작 화면, `gl.getError()` 0. "메인으로"를 누르면 메인 페이지로 돌아옴 |
 | 콘솔 오류 | 없음 |
