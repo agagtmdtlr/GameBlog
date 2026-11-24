@@ -58,7 +58,8 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 {
   "cuts": {
     "a": { "title": "행성 산책", "preview": { "image": "planet.jpg" }, "open": { "scene": "planet" } },
-    "b": { "title": "플라워 모작 유니티 시연", "preview": { "youtube": "AXhuradE5oo" }, "open": { "youtube": "AXhuradE5oo" } }
+    "b": { "title": "플라워 모작 유니티 시연", "preview": { "youtube": "AXhuradE5oo" }, "open": { "youtube": "AXhuradE5oo" } },
+    "c": { "title": "치킨차차 보드게임 온라인 이식 시연", "preview": { "youtube": "aUECXWnuohA" }, "open": { "youtube": "aUECXWnuohA" } }
   }
 }
 ```
@@ -81,6 +82,8 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 
 `b`는 사용자가 게임 "Flower"를 모방해 Unity로 만든 시연 영상이다 (2026-11-24 사용자 요청, 임시로 넣었던 "Big Buck Bunny"를 대체).
 
+`c`는 사용자가 보드게임 "치킨차차"를 온라인 게임으로 이식한 프로젝트의 시연 영상이다 (2026-11-24 사용자 요청).
+
 `previews/planet.jpg`는 개발 서버의 `?scene=planet` 시작 화면에서 캔버스를 3:2로 잘라 900×600 JPEG로 저장했다.
 
 ## 화면
@@ -92,7 +95,7 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 
 | 항목 | 결과 |
 |---|---|
-| 800×600 | 종이가 화면 높이에 맞고, 여덟 컷과 사선이 그림과 같은 배치. `a`에 행성 그림, `b`에 YouTube 썸네일과 재생 표시, 나머지는 망점 빈 컷 |
+| 800×600 | 종이가 화면 높이에 맞고, 여덟 컷과 사선이 그림과 같은 배치. `a`에 행성 그림, `b`·`c`에 YouTube 썸네일과 재생 표시, 나머지는 망점 빈 컷 |
 | 375×812 (모바일) | 종이가 화면 너비에 맞고 스크롤 없음 |
 | `a` 마우스 올림 | 테두리 강조, 그림 확대 |
 | `a` 클릭 → `?scene=planet` | 행성 시작 화면, `gl.getError()` 0. "메인으로"를 누르면 메인 페이지로 돌아옴 |
