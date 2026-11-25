@@ -18,7 +18,7 @@
     },
     "d": {
       "title": "색칠 놀이",
-      "preview": { "image": "coloring.svg" },
+      "preview": { "image": "coloring.jpg" },
       "open": { "game": "coloring" }
     }
   }

@@ -11,7 +11,7 @@
 git log --oneline 02fadc5..HEAD -- src/engine/scene.ts src/engine/app.ts src/engine/render/graphics.ts src/engine/render/renderer.ts src/content/index.ts src/layers.test.ts
 ```
 
-엔진을 쓰지 않는 2D 미니 게임(`src/games/`, `?game=<id>`)은 이 두 계층 밖에 있다. [coloring.md](coloring.md)의 "미니 게임 계층"을 본다.
+엔진을 쓰지 않는 미니 게임(`src/games/`, `?game=<id>`, three.js를 직접 쓴다)은 이 두 계층 밖에 있다. [coloring.md](coloring.md)의 "미니 게임 계층"을 본다.
 
 ## 왜 나눴나
 
