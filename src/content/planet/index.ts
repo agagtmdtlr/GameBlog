@@ -6,7 +6,6 @@ import { defineCharacterMeshes } from '../common/character/characterGraphics';
 import astronautStickerUrl from './assets/astronaut-sticker.png?url';
 import { PLANET_BILLBOARD_IMAGES } from './graphics/billboardImages';
 import { BubbleLayer } from './graphics/bubbleLayer';
-import { GrassLayer } from './graphics/grassLayer';
 import { definePlanetMeshes } from './graphics/meshes';
 import { SURFACE_OBJECTS, tvVideoScreen, videoVolume } from './objects/surfaceScene';
 import { TERRAIN } from './objects/terrain';
@@ -29,7 +28,6 @@ class PlanetScene implements SceneInstance {
   private readonly world = new World();
   private readonly camera = new CameraRig(this.world.player.position, PLANET.center, TERRAIN);
   private readonly bubbles = new BubbleLayer();
-  private readonly grass = new GrassLayer();
   private readonly videoScreens: { center: Vec3; player: { setVolume(volume: number): void } }[];
   private direction: Vec3 = [0, 0, 0];
 
@@ -43,8 +41,6 @@ class PlanetScene implements SceneInstance {
     graphics.setBillboardImages(PLANET_BILLBOARD_IMAGES);
     // 우주인 스티커 그림도 비동기로 불러온다. 실패해도 스티커만 빠지므로 플레이는 계속한다.
     graphics.loadBillboardImage('astronaut', astronautStickerUrl).catch((error: unknown) => console.error(error));
-    // 잔디는 불투명해 깊이를 쓰므로 투명한 비눗방울보다 먼저 그린다.
-    graphics.addLayer(this.grass);
     graphics.addLayer(this.bubbles);
 
     // 텔레비전 화면의 YouTube 영상. 음소거로 재생하다가 플레이 중에 가까이 가면 소리가 난다.
@@ -76,7 +72,6 @@ class PlanetScene implements SceneInstance {
   frame(alpha: number) {
     const world = this.world;
     this.bubbles.set(world.buildBubbles(alpha));
-    this.grass.set(world.windFrame(alpha), world.grassPushers(alpha));
     return {
       items: world.buildDrawList(alpha),
       billboards: world.buildBillboards(alpha, this.camera.view),

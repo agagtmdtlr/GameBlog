@@ -49,6 +49,7 @@ export const FRAME_UNIFORMS = {
   uGroundColor: 'vec3. 땅 앰비언트',
   uMoonColor: 'vec3. 달빛',
   uNightAmbient: 'vec3. 밤 앰비언트',
+  uWorldCenter: 'vec3. 중력이 향하는 땅의 중심 (`Environment.worldCenter`)',
   uOccluder: 'vec4. 앰비언트 오클루전 구 (중심, 반지름)',
   uHalftoneCell: 'float. 하프톤 점 한 칸의 픽셀 크기',
 } as const;

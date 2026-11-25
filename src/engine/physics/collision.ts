@@ -87,8 +87,8 @@ export function groundRadius(ground: Ground, dir: Vec3): number {
   return ground.radius + (ground.heightAt ? ground.heightAt(dir) : 0);
 }
 
-/** 법선을 차분으로 구할 때 옮기는 각도 (라디안) */
-const NORMAL_STEP = 0.004;
+/** 법선을 차분으로 구할 때 옮기는 표면 거리. 반지름 18인 행성에서 0.004 라디안이다. 땅이 크면 각도가 작아진다. */
+const NORMAL_STEP_DISTANCE = 0.072;
 
 /** 방향 `dir`의 표면에서 바깥을 향하는 단위 법선. 높이의 기울기를 중앙 차분으로 구한다. */
 export function groundNormal(ground: Ground, dir: Vec3): Vec3 {
@@ -97,10 +97,11 @@ export function groundNormal(ground: Ground, dir: Vec3): Vec3 {
   const t1 = normalize(cross(helper, dir));
   const t2 = cross(dir, t1);
   const r = groundRadius(ground, dir);
+  const step = NORMAL_STEP_DISTANCE / ground.radius;
   const slope = (t: Vec3): number => {
-    const ahead = groundRadius(ground, normalize(add(dir, scale(t, NORMAL_STEP))));
-    const behind = groundRadius(ground, normalize(add(dir, scale(t, -NORMAL_STEP))));
-    return (ahead - behind) / (2 * NORMAL_STEP * r);
+    const ahead = groundRadius(ground, normalize(add(dir, scale(t, step))));
+    const behind = groundRadius(ground, normalize(add(dir, scale(t, -step))));
+    return (ahead - behind) / (2 * step * r);
   };
   return normalize(sub(dir, add(scale(t1, slope(t1)), scale(t2, slope(t2)))));
 }

@@ -19,6 +19,7 @@ uniform vec3 uSkyColor;
 uniform vec3 uGroundColor;
 uniform vec3 uMoonColor;
 uniform vec3 uNightAmbient;
+uniform vec3 uWorldCenter;
 uniform vec4 uOccluder;
 uniform bool uReceiveOccluder;
 
@@ -160,9 +161,9 @@ void main() {
   vec3 highlightColor = mix(vec3(1.0), albedo, uMetallic);
   direct += highlightColor * uLightColor * highlight * (1.0 - roughness) * 0.25;
 
-  // 밤의 정도. 행성 중심(원점)에서 이 점을 향하는 방향과 해 방향으로 정하므로,
+  // 밤의 정도. 땅의 중심(uWorldCenter, 행성이면 원점)에서 이 점을 향하는 방향과 해 방향으로 정하므로,
   // 물체가 어느 쪽을 보든 행성에서 서 있는 자리가 밤이면 같이 밤이 된다. 해 질 녘에 걸쳐 넘어간다.
-  float sunHeight = dot(normalize(vWorldPos), L);
+  float sunHeight = dot(normalize(vWorldPos - uWorldCenter), L);
   float night = smoothstep(0.05, -0.2, sunHeight);
 
   // 달빛은 해 반대쪽에서 비춘다. 해처럼 단계로 나누지만 그림자는 없다.

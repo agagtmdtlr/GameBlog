@@ -1,12 +1,9 @@
 import {
   add,
-  cross,
   lerp,
   mat4FromBasis,
   mat4FromTRS,
   mat4Identity,
-  mat4Multiply,
-  mat4RigidInverse,
   normalize,
   normalMatrix,
   scale,
@@ -32,7 +29,6 @@ import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './objects/moon';
 import { FloatingAstronaut } from './objects/astronaut';
 import { Satellite, SATELLITE_ORBIT_EMISSIVE, type SatellitePart } from './objects/satellite';
 import { BubbleBelt, type BubbleFrame } from './objects/bubbleBelt';
-import { Wind, type WindFrame } from './objects/wind';
 import { PLANET, surfaceDirection } from './planet';
 import { DREAM_PROPS, PROP_COLLIDERS, TERRAIN, type DreamProp } from './objects/terrain';
 import { groundRadius, type Obstacle } from '../../engine/physics/collision';
@@ -54,7 +50,8 @@ import {
   type BillboardView,
 } from './objects/sunFace';
 import { BODY_FORMS, type BodyShape } from '../common/character/bodyShape';
-import { BODY_RADIUS, CHARACTER_SCALE, LEG_BONE_COUNT, restBones, Walker, type BoneTransform } from '../common/character/walker';
+import { characterDrawItems } from '../common/character/characterDraw';
+import { BODY_RADIUS, CHARACTER_SCALE, Walker } from '../common/character/walker';
 
 /** 행성 씬은 모두 엔진 툰 재질로 그린다. */
 type DrawItem = EngineDrawItem<Material>;
@@ -68,7 +65,6 @@ const PLANET_COLOR: Vec3 = [0.95, 0.95, 0.95];
 const PROP_ROUGHNESS = 0.6;
 /** 캐릭터의 색 (선형 RGB, sRGB #FCC812) */
 const PLAYER_COLOR: Vec3 = [0.973, 0.578, 0.006];
-const PLAYER_ROUGHNESS = 0.45;
 export interface NpcSpec {
   /** 시작 위치 (행성 표면 위 몸 중심) */
   spawn: Vec3;
@@ -112,13 +108,6 @@ const SURFACE_OBSTACLES: readonly Obstacle[] = [
   ...SURFACE_OBJECTS.filter((o) => o.collides).map((o) => o.box),
   ...PROP_COLLIDERS,
 ];
-
-const boneMatrix = ({ origin, x, y, z }: BoneTransform): Mat4 => mat4FromBasis(origin, x, y, z);
-/** 다리 메시의 기본 자세 뼈를 원점으로 되돌리는 행렬. 지금 뼈와 곱하면 스키닝 행렬이 된다. */
-const REST_BONE_INVERSES = restBones().map((bone) => mat4RigidInverse(boneMatrix(bone)));
-/** 지금 뼈의 행렬. 설계 치수의 다리 메시를 `CHARACTER_SCALE`만큼 키운다. */
-const posedBoneMatrix = ({ origin, x, y, z }: BoneTransform): Mat4 =>
-  mat4FromBasis(origin, scale(x, CHARACTER_SCALE), scale(y, CHARACTER_SCALE), scale(z, CHARACTER_SCALE));
 
 /** 조명 환경. `lightDirection`은 시작할 때의 해 방향이고, 플레이 중에는 `World.environment`가 해를 따라 바꾼다. */
 export const STUDIO_ENVIRONMENT: Environment = {
@@ -238,7 +227,6 @@ export class World {
   readonly satellite = new Satellite();
   readonly bubbles = new BubbleBelt();
   readonly train = new Train();
-  readonly wind = new Wind();
   readonly npcs: readonly Wanderer[];
   readonly aliens: readonly Alien[];
   /** 서로 통과하지 못하는 캐릭터 몸체들. 플레이어가 먼저다. */
@@ -257,7 +245,6 @@ export class World {
     this.satellite.step(dt);
     this.bubbles.step(dt);
     this.train.step(dt);
-    this.wind.step(dt);
     // 기차는 움직이는 벽이다. 이번 걸음의 자리로 캐릭터를 밀어낸다.
     const obstacles: Obstacle[] = [...SURFACE_OBSTACLES, ...this.train.obstacles()];
     this.player.step(dt, command, TERRAIN, obstacles);
@@ -351,19 +338,6 @@ export class World {
     ];
   }
 
-  /** 잔디를 흔드는 바람 */
-  windFrame(alpha: number): WindFrame {
-    return this.wind.frame(alpha);
-  }
-
-  /** 잔디를 밀어 눕히는 몸: 플레이어와 NPC. 가운데는 몸 중심이다. */
-  grassPushers(alpha: number): { center: Vec3; radius: number }[] {
-    return [
-      { center: this.interpolatedPlayerPosition(alpha), radius: PLAYER_RADIUS },
-      ...this.npcs.map((npc) => ({ center: lerp(npc.body.previousPosition, npc.body.position, alpha), radius: PLAYER_RADIUS })),
-    ];
-  }
-
   /** 행성을 감싸고 떠다니는 비눗방울 띠 */
   buildBubbles(alpha: number): BubbleFrame[] {
     return this.bubbles.bubbles(alpha);
@@ -385,31 +359,6 @@ export class World {
   occluder(alpha: number): { center: Vec3; radius: number } {
     return { center: this.walker.pose(alpha).body, radius: BODY_RADIUS };
   }
-}
-
-/**
- * 캐릭터 하나의 몸, 왼다리, 오른다리 순서. 플레이어와 NPC가 같은 다리를 쓰고 몸 모양과 색만 다르다.
- * 모난 몸(정육면체, 피라미드)은 진행 방향을 보고 엉덩이와 함께 기운다. 구는 대칭이라 돌리지 않는다.
- */
-function characterDrawItems(walker: Walker, alpha: number, color: Vec3, shape: BodyShape): DrawItem[] {
-  const pose = walker.pose(alpha);
-  const mat = material(color, PLAYER_ROUGHNESS);
-  const bones = walker.solveLegs(pose).map(posedBoneMatrix);
-  const leg = (first: number): DrawItem => ({
-    ...drawItemFromModel('leg', mat4Identity(), mat),
-    skin: bones.slice(first, first + LEG_BONE_COUNT).map((bone, i) => mat4Multiply(bone, REST_BONE_INVERSES[i])),
-  });
-  const form = BODY_FORMS[shape];
-  const { right, up } = walker.hipAxes(pose);
-  // 오른쪽 × 위 = 뒤쪽. 오른손 기저여야 면의 감김 방향이 뒤집히지 않는다. 모양이 앞뒤 대칭이라 뒤쪽을 Z로 쓴다.
-  const back = cross(right, up);
-  const [sx, sy, sz] = form.size;
-  const body = drawItemFromModel(
-    form.mesh,
-    mat4FromBasis(add(pose.body, scale(up, form.lift)), scale(right, sx), scale(up, sy), scale(back, sz)),
-    mat,
-  );
-  return [body, leg(0), leg(LEG_BONE_COUNT)];
 }
 
 /** 말풍선 빌보드의 한 변 (정사각 그림. 풍선은 그 가운데 줄에 그려져 있다) */
