@@ -455,6 +455,20 @@ a.comic-cut.is-youtube::after {
   right: 12px;
 }
 
+.coloring-pause {
+  right: 66px;
+}
+
+/* 멈춘 동안 재생 버튼을 노랗게 칠해 멈춤 상태를 알린다. */
+.coloring.is-paused .coloring-pause {
+  background: #ffe27a;
+}
+
+.coloring.is-paused .coloring-pause svg path {
+  /* 재생 삼각형은 채워 그린다. */
+  fill: currentColor;
+}
+
 /* 다 칠하면 다시 하기 버튼이 통통 튄다. */
 .coloring.is-clear .coloring-again {
   background: #ffe27a;
