@@ -1,8 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import {
+  BUILDINGS,
+  CARS,
+  carPose,
+  cityParts,
+  LOOP,
+  lampPoses,
+  loopLength,
+  loopPose,
+  outward,
+  partNeighbors,
+  ROAD_HALF_WIDTH,
+  SIDEWALK_WIDTH,
+  walkerPose,
+  WALKERS,
+} from './city';
 import { ColoringState } from './coloringState';
+import { CAMERA_BOUNDS, FreeCamera } from './freeCamera';
 import { hslToRgb, PALETTE_SIZE, randomPalette } from './palette';
-import { PICTURES } from './pictures';
-import { labelRegions, regionAt } from './regions';
 
 /** 같은 씨앗이면 같은 수를 내는 난수 */
 function seeded(seed: number): () => number {
@@ -16,64 +31,144 @@ function seeded(seed: number): () => number {
   };
 }
 
-/** 글자 그림으로 선 마스크를 만든다. `#`이 선이다. */
-function mask(rows: string[]): { ink: Uint8Array; width: number; height: number } {
-  const width = rows[0].length;
-  const ink = new Uint8Array(width * rows.length);
-  rows.forEach((row, y) => [...row].forEach((c, x) => (ink[y * width + x] = c === '#' ? 1 : 0)));
-  return { ink, width, height: rows.length };
-}
+describe('순환 도로', () => {
+  const length = loopLength();
 
-describe('영역 나누기', () => {
-  // 바깥 테두리 안에 세로선으로 나뉜 두 칸, 오른쪽 칸 안에 1픽셀 틈
-  const picture = mask([
-    '..........',
-    '.########.',
-    '.#...#...#',
-    '.#...#.#.#',
-    '.#...#...#',
-    '.########.',
-    '..........',
-  ]);
-  const map = labelRegions(picture.ink, picture.width, picture.height, { minArea: 2, neighborReach: 2 });
-
-  it('액자 바깥은 영역이 아니고, 닫힌 칸마다 영역이 하나다', () => {
-    expect(map.regions.length).toBe(2);
-    expect(regionAt(map, 0, 0)).toBe(0);
-    expect(regionAt(map, 2, 3)).not.toBe(regionAt(map, 6, 3));
-    expect(regionAt(map, 2, 3)).toBeGreaterThan(0);
+  it('한 바퀴 돌면 제자리이고, 길을 따라 끊기지 않는다', () => {
+    const start = loopPose(0, 2);
+    const end = loopPose(length, 2);
+    expect(end.x).toBeCloseTo(start.x, 6);
+    expect(end.z).toBeCloseTo(start.z, 6);
+    const steps = 2000;
+    for (let i = 0; i < steps; i++) {
+      const a = loopPose((i / steps) * length);
+      const b = loopPose(((i + 1) / steps) * length);
+      expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeCloseTo(length / steps, 4);
+    }
   });
 
-  it('작은 틈은 선으로 합친다', () => {
-    // 오른쪽 칸은 가운데 선(7,3)이 있지만 둘레로 이어져 한 영역이다. 넓이는 3 × 3 - 1
-    const right = map.regions[regionAt(map, 6, 2) - 1];
-    expect(right.area).toBe(8);
-    const tiny = mask(['#####', '#.#.#', '#####', '#...#', '#####']);
-    const tinyMap = labelRegions(tiny.ink, 5, 5, { minArea: 2, neighborReach: 2 });
-    expect(tinyMap.regions.length).toBe(1);
-    expect(tinyMap.ink[1 * 5 + 1]).toBe(1);
+  it('나아가는 방향은 다음 자리를 가리키고, 바깥쪽은 그 오른쪽이다', () => {
+    for (let s = 0; s < length; s += 7.3) {
+      const a = loopPose(s);
+      const b = loopPose(s + 0.01);
+      const heading = Math.atan2(-(b.z - a.z), b.x - a.x);
+      expect(Math.cos(heading - a.heading)).toBeCloseTo(1, 4);
+      // 바깥쪽 자리는 가운데(원점)에서 더 멀다.
+      const [ox, oz] = outward(a.heading);
+      expect(Math.hypot(a.x + ox, a.z + oz)).toBeGreaterThan(Math.hypot(a.x, a.z));
+    }
   });
 
-  it('선 너머의 칸을 이웃으로 찾는다', () => {
-    const left = regionAt(map, 2, 3);
-    const right = regionAt(map, 6, 3);
-    expect(map.regions[left - 1].neighbors).toEqual([right]);
-    expect(map.regions[right - 1].neighbors).toEqual([left]);
+  it('위에서 보면 반시계로 돈다 (+x → -z)', () => {
+    expect(loopPose(0).x).toBeCloseTo(0);
+    expect(loopPose(0).z).toBeCloseTo(LOOP.halfZ);
+    const quarter = loopPose(length / 4);
+    expect(quarter.x).toBeGreaterThan(0);
+    expect(quarter.z).toBeLessThan(0);
+  });
+});
+
+describe('도시 배치', () => {
+  const parts = cityParts();
+
+  it('칠할 조각에 하늘, 해, 차, 가로등, 사람이 모두 있다', () => {
+    const shapes = new Set(parts.map((p) => p.shape));
+    for (const shape of ['sky', 'sun', 'road', 'carBody', 'lampHead', 'personBody'] as const) expect(shapes).toContain(shape);
+    expect(parts.filter((p) => p.shape === 'carBody')).toHaveLength(CARS.length);
+    expect(parts.filter((p) => p.shape === 'personHead')).toHaveLength(WALKERS.length);
   });
 
-  it('선 픽셀은 가까운 영역 번호를 가지고, 바깥에는 번지지 않는다', () => {
-    expect(regionAt(map, 1, 3)).toBe(regionAt(map, 2, 3));
-    expect(regionAt(map, 7, 3)).toBe(regionAt(map, 6, 3));
-    expect(regionAt(map, 0, 3)).toBe(0);
-    expect(regionAt(map, -1, 3)).toBe(0);
+  it('같은 무리의 조각끼리만 이웃이다', () => {
+    const neighbors = partNeighbors(parts);
+    parts.forEach((part, i) => {
+      for (const n of neighbors[i]) expect(parts[n - 1].group).toBe(part.group);
+    });
+    const body = parts.findIndex((p) => p.shape === 'carBody');
+    expect(neighbors[body]).toContain(body + 2);
+  });
+
+  it('차는 도로 위, 사람은 인도 위에 있다', () => {
+    for (let t = 0; t < 60; t += 1.7) {
+      for (const car of CARS) {
+        const lane = car.lane;
+        expect(Math.abs(lane)).toBeLessThan(ROAD_HALF_WIDTH - 1);
+        expect(Number.isFinite(carPose(car, t).x)).toBe(true);
+      }
+      for (const walker of WALKERS) {
+        const edge = Math.abs(walker.offset);
+        expect(edge).toBeGreaterThan(ROAD_HALF_WIDTH + 0.3);
+        expect(edge).toBeLessThan(ROAD_HALF_WIDTH + SIDEWALK_WIDTH - 0.3);
+        expect(walkerPose(walker, t).bob).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('같은 차선의 차는 서로 떨어져 달린다', () => {
+    for (let t = 0; t < 40; t += 0.5) {
+      for (let i = 0; i < CARS.length; i++) {
+        for (let j = i + 1; j < CARS.length; j++) {
+          if (CARS[i].lane !== CARS[j].lane) continue;
+          const a = carPose(CARS[i], t);
+          const b = carPose(CARS[j], t);
+          expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(8);
+        }
+      }
+    }
+  });
+
+  it('건물은 인도 바깥에 있다', () => {
+    const length = loopLength();
+    const outer = ROAD_HALF_WIDTH + SIDEWALK_WIDTH;
+    for (const { position, size } of BUILDINGS) {
+      for (let s = 0; s < length; s += 1) {
+        const edge = loopPose(s, outer);
+        const inX = Math.abs(edge.x - position[0]) < size[0] / 2;
+        const inZ = Math.abs(edge.z - position[2]) < size[2] / 2;
+        expect(inX && inZ, `건물 ${position}`).toBe(false);
+      }
+    }
+  });
+
+  it('가로등은 고르게 놓인다', () => {
+    const lamps = lampPoses();
+    expect(lamps.length).toBeGreaterThan(3);
+    for (const lamp of lamps) expect(Number.isFinite(lamp.heading)).toBe(true);
+  });
+});
+
+describe('자유 시점 카메라', () => {
+  it('처음에는 해 쪽(-z)을 본다', () => {
+    const camera = new FreeCamera();
+    expect(camera.forward[2]).toBeLessThan(-0.9);
+  });
+
+  it('왼쪽으로 돌면 -x 쪽을 보고, 고개는 거의 수직까지만 든다', () => {
+    const camera = new FreeCamera({ position: [0, 5, 0], yaw: 0, pitch: 0 });
+    camera.look(Math.PI / 2, 0);
+    expect(camera.forward[0]).toBeCloseTo(-1);
+    camera.look(0, 10);
+    expect(camera.forward[1]).toBeLessThan(1);
+    expect(camera.forward[1]).toBeGreaterThan(0.99);
+  });
+
+  it('보는 방향으로 움직이고, 범위 밖으로는 나가지 못한다', () => {
+    const camera = new FreeCamera({ position: [0, 5, 0], yaw: 0, pitch: 0 });
+    camera.move(10, 0, 0);
+    expect(camera.position[2]).toBeCloseTo(-10);
+    camera.move(0, 3, 0);
+    expect(camera.position[0]).toBeCloseTo(3);
+    camera.move(0, 0, -100);
+    expect(camera.position[1]).toBe(CAMERA_BOUNDS.minY);
+    camera.move(1000, 0, 0);
+    expect(Math.hypot(camera.position[0], camera.position[2])).toBeCloseTo(CAMERA_BOUNDS.radius);
   });
 });
 
 describe('색칠 상태', () => {
-  // 1-2-3 이 줄로 이웃한 세 영역
+  // 1-2-3 이 줄로 이웃한 세 조각
   const neighbors = [[2], [1, 3], [2]];
 
-  it('모든 영역을 칠하면 완성이다', () => {
+  it('모든 조각을 칠하면 완성이다', () => {
     const state = new ColoringState(neighbors, 4, seeded(1));
     expect(state.isComplete).toBe(false);
     state.paint(1);
@@ -124,16 +219,5 @@ describe('색 묶음', () => {
     expect(hslToRgb(0, 1, 0.5).map((c) => +c.toFixed(3))).toEqual([1, 0, 0]);
     expect(hslToRgb(120, 1, 0.5).map((c) => +c.toFixed(3))).toEqual([0, 1, 0]);
     expect(hslToRgb(240, 0, 1).map((c) => +c.toFixed(3))).toEqual([1, 1, 1]);
-  });
-});
-
-describe('색칠 그림', () => {
-  it('그림 id가 겹치지 않고, 1000칸 SVG 문서다', () => {
-    expect(new Set(PICTURES.map((p) => p.id)).size).toBe(PICTURES.length);
-    for (const picture of PICTURES) {
-      expect(picture.svg.startsWith('<svg'), picture.id).toBe(true);
-      expect(picture.svg, picture.id).toContain('viewBox="0 0 1000 1000"');
-      expect(picture.svg, picture.id).not.toMatch(/NaN|undefined/);
-    }
   });
 });
