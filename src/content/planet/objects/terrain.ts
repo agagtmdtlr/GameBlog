@@ -77,6 +77,8 @@ interface FlatSpot {
   inner: number;
   /** 이 밖은 원래 높이 (현 길이) */
   outer: number;
+  /** 선로·표면 객체 자리라 잔디를 심지 않는 곳. 시작 지점은 평평해도 잔디가 자란다. */
+  bare: boolean;
 }
 
 const R = PLANET.radius;
@@ -98,11 +100,12 @@ function makeFlatSpots(): FlatSpot[] {
     direction: frame.up,
     inner: trackFlat[0] / R,
     outer: trackFlat[1] / R,
+    bare: true,
   }));
-  spots.push({ direction: [0, 1, 0], inner: spawnFlat[0] / R, outer: spawnFlat[1] / R });
+  spots.push({ direction: [0, 1, 0], inner: spawnFlat[0] / R, outer: spawnFlat[1] / R, bare: false });
   for (const o of SURFACE_OBJECTS) {
     const half = Math.hypot(o.size[0], o.size[2]) / 2 + objectFlatMargin;
-    spots.push({ direction: normalize(o.box.center), inner: half / R, outer: (half + objectBlend) / R });
+    spots.push({ direction: normalize(o.box.center), inner: half / R, outer: (half + objectBlend) / R, bare: true });
   }
   return spots;
 }
@@ -110,6 +113,11 @@ function makeFlatSpots(): FlatSpot[] {
 const random = seededRandom(TERRAIN_SHAPE.seed);
 const HILLS = makeHills(random);
 const FLAT_SPOTS = makeFlatSpots();
+
+/** 잔디를 심지 않는 곳(선로, 표면 객체)의 중심 방향과 높이가 0인 안쪽 반지름 (표면 거리) */
+export const BARE_SPOTS: readonly { direction: Vec3; radius: number }[] = FLAT_SPOTS.filter((spot) => spot.bare).map(
+  (spot) => ({ direction: spot.direction, radius: spot.inner * R }),
+);
 
 /** 0이면 완전히 평평해야 하는 곳, 1이면 원래 높이 */
 function flatness(dir: Vec3): number {
