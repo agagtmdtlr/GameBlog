@@ -31,6 +31,9 @@ git log --oneline e8b0285..HEAD -- src/games src/main.ts
 | 두 손가락 끌기 | 옆·위아래로 가기 |
 | 마우스 휠 | 앞뒤로 가기 |
 | W A S D, 화살표 / E, Space / Q, Shift | 걷기 / 오르기 / 내리기 / 세 배 빠르게 |
+| 일시 정지 버튼(오른쪽 위, 다시 하기 왼쪽), P, Esc | 일시 정지·재생 |
+
+일시 정지는 차와 사람의 움직임만 멈춘다 (2026-11-25 사용자 요청). 멈춘 동안에도 둘러보기, 움직이기, 칠하기는 그대로 되고, 칠하기 번짐·힌트·색종이 연출도 계속 움직인다. 멈춘 동안 버튼은 노란 재생 삼각형이 된다. 새 판(다시 하기)을 해도 멈춤 상태는 그대로다.
 
 카메라는 반지름 140m, 높이 1.2~70m 안에서만 움직인다 (`CAMERA_BOUNDS`). 세로로 긴 화면에서는 가로 시야가 62도 아래로 좁아지지 않게 세로 시야를 최대 95도까지 넓힌다.
 
@@ -60,7 +63,7 @@ git log --oneline e8b0285..HEAD -- src/games src/main.ts
 
 | 파일 | 내용 | DOM·GPU |
 |---|---|---|
-| `index.ts` | `coloringGame`. 화면 만들기, 입력(누르기·끌기·두 손가락·휠·키), 진행·클리어, 힌트, 개발용 `window.__coloring` | DOM |
+| `index.ts` | `coloringGame`. 화면 만들기, 입력(누르기·끌기·두 손가락·휠·키), 일시 정지, 진행·클리어, 힌트, 개발용 `window.__coloring` | DOM |
 | `city.ts` | 도시 배치: 순환 도로 경로(`loopPose`), 차(`CARS`, `carPose`), 사람(`WALKERS`, `walkerPose`), 가로등(`lampPoses`), 건물(`BUILDINGS`), 나무(`TREES`), 해 방향, 칠할 조각 목록(`cityParts`)과 이웃(`partNeighbors`) | 없음 |
 | `freeCamera.ts` | 자유 시점 카메라 상태(위치, yaw, pitch), 돌리기·움직이기·범위 | 없음 |
 | `palette.ts` | 판마다의 색 묶음(`randomPalette`), HSL → sRGB | 없음 |
@@ -109,6 +112,7 @@ git log --oneline e8b0285..HEAD -- src/games src/main.ts
 | 끌기, `camera.move` | 시점이 돌고 움직임 |
 | `__coloring.fillAll()` | 완성: 색종이, `CLEAR!`, 다시 하기 버튼 흔들림 |
 | 375×812 (모바일) | 세로 시야 95도로 넓어짐, 누르기로 칠해짐 |
+| 일시 정지 버튼 / P 키 (2026-11-25) | 차·사람 시간이 멈췄다가 다시 흐름, 멈춘 동안 칠하기 됨, 버튼이 노란 재생 표시로 바뀜 |
 | 셰이더 프로그램 오류, `gl.getError()` | 없음 |
 
 확인하지 않은 것: 실제 터치 기기의 두 손가락 조작, 키보드 걷기(코드만 확인), WebGL2가 없는 브라우저(시작하지 못했다는 글만 뜬다).

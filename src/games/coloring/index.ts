@@ -22,6 +22,10 @@ const PAN_SPEED = 0.06;
 
 const ICON_HOME =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-5.5h3V20h5V9.5"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg>';
+const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>';
+/** 일시 정지·재생을 바꾸는 키 */
+const PAUSE_KEYS = new Set(['KeyP', 'Escape']);
 const ICON_AGAIN =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>';
 
@@ -65,6 +69,9 @@ function startColoring(root: HTMLElement): void {
   home.href = './';
   home.setAttribute('aria-label', '메인으로');
   home.innerHTML = ICON_HOME;
+  // 일시 정지: 차와 사람이 멈춘다. 둘러보기와 칠하기는 그대로 할 수 있다.
+  const pauseButton = element('button', 'coloring-button coloring-pause', shell);
+  pauseButton.type = 'button';
   const again = element('button', 'coloring-button coloring-again', shell);
   again.type = 'button';
   again.setAttribute('aria-label', '새 색으로 처음부터');
@@ -176,8 +183,23 @@ function startColoring(root: HTMLElement): void {
     { passive: false },
   );
 
+  let paused = false;
+  const setPaused = (value: boolean) => {
+    paused = value;
+    pauseButton.innerHTML = paused ? ICON_PLAY : ICON_PAUSE;
+    pauseButton.setAttribute('aria-label', paused ? '움직임 다시 재생' : '움직임 일시 정지');
+    pauseButton.setAttribute('aria-pressed', String(paused));
+    shell.classList.toggle('is-paused', paused);
+  };
+  setPaused(false);
+  pauseButton.addEventListener('click', () => setPaused(!paused));
+
   const keys = new Set<string>();
   window.addEventListener('keydown', (event) => {
+    if (PAUSE_KEYS.has(event.code) && !event.repeat) {
+      setPaused(!paused);
+      return;
+    }
     const shift = event.code === 'ShiftLeft' || event.code === 'ShiftRight';
     if (!(event.code in MOVE_KEYS) && !shift) return;
     if (event.code.startsWith('Arrow') || event.code === 'Space') event.preventDefault();
@@ -214,7 +236,7 @@ function startColoring(root: HTMLElement): void {
     const seconds = Math.min((now - last) / 1000, 0.1);
     last = now;
     walk(seconds);
-    view.update(seconds);
+    if (!paused) view.update(seconds);
     const idle = view.time - lastPaint - HINT_AFTER_SECONDS;
     view.setHint(state.isComplete ? 0 : Math.max(0, Math.min(1, idle)));
     view.render(camera, seconds);
@@ -232,6 +254,10 @@ function startColoring(root: HTMLElement): void {
           return state;
         },
         paintAt,
+        setPaused,
+        get paused() {
+          return paused;
+        },
         /** 개발 확인용: 남은 조각을 칠한다. 앞의 `leave`개는 남긴다. */
         fillAll: (leave = 0) => {
           const wasComplete = state.isComplete;
