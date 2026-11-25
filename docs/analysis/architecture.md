@@ -83,7 +83,11 @@ main.ts ── content/index.ts (SCENES) ── content/<씬>/index.ts (SceneDef
 
 - 툰 셰이더(`engine/render/shaders/toon.frag`, `engine/render/toonShader.ts`)는 모든 씬이 함께 쓰는 기본 셰이더다. 재질 입력은 `Material`(`frame.ts`)이다. 콘텐츠가 툰 셰이더를 바탕으로 제 셰이더를 만들 때는 `MESH_VERTEX_SHADER`, `TOON_FRAGMENT_SHADER` 원문을 가져다 고친다.
 - 툰 셰이더의 땅 무늬 `SurfacePattern.Dreamy`, `Gradient`는 행성 씬 전용이지만 툰 셰이더 안에 있어서 엔진에 남겼다. 씬마다 무늬를 바꾸려면 툰 셰이더에 조각을 끼우는 방법(`onBeforeCompile` 같은)이 필요하다.
-- 조명 모델(`Environment`: 해·달빛·하늘·땅 앰비언트, 그림자 반경)과 캐릭터 오클루전(`occluder`)도 엔진의 약속이다.
+- 조명 모델(`Environment`: 해·달빛·하늘·땅 앰비언트, 그림자 반경)과 캐릭터 오클루전(`occluder`)도 엔진의 약속이다. 그림자 맵의 가운데(`shadowCenter`)와 밤을 정하는 땅의 중심(`worldCenter`)은 씬이 줄 수 있고, 없으면 원점이다 (초원 씬이 쓴다, [meadow.md](meadow.md)).
+
+## 초원 씬 (`content/meadow/`)
+
+바람 부는 넓은 초원. 캐릭터와 카메라는 공용(`content/common/`)을 쓰고, 땅은 반지름 4000인 구의 꼭대기다. 잔디는 `RenderLayer`로 그린다. 자세한 것은 [meadow.md](meadow.md)에 있다.
 
 ## 행성 씬 (`content/planet/`)
 

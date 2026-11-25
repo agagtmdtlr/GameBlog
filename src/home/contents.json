@@ -6,6 +6,11 @@
       "preview": { "image": "planet.jpg" },
       "open": { "scene": "planet" }
     },
+    "b": {
+      "title": "바람 부는 초원",
+      "preview": { "image": "meadow.jpg" },
+      "open": { "scene": "meadow" }
+    },
     "d": {
       "title": "색칠 놀이",
       "preview": { "image": "coloring.jpg" },

@@ -75,8 +75,12 @@ export interface Environment {
   nightAmbient: Vec3;
   /** 화면 출력값(sRGB) 기준 배경색 */
   background: Vec3;
-  /** 그림자 맵이 덮는 원점 기준 반경 */
+  /** 그림자 맵이 덮는 반경. 가운데는 `shadowCenter`다. */
   shadowRadius: number;
+  /** 그림자 맵이 덮는 가운데. 없으면 원점. 넓은 땅에서는 캐릭터를 따라가게 한다. */
+  shadowCenter?: Vec3;
+  /** 중력이 향하는 땅의 중심. 이 점에서 바깥이 위쪽이고, 해가 그 위쪽 아래로 지면 밤이다. 없으면 원점. */
+  worldCenter?: Vec3;
 }
 
 export interface CameraView {

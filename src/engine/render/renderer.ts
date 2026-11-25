@@ -103,6 +103,7 @@ export class Renderer implements Graphics {
 
   private readonly clearColor = new Color();
   private readonly bufferSize = new Vector2();
+  private readonly shadowCenter = new Vector3();
   /** 모든 셰이더 재질이 같은 객체를 참조하는 프레임 단위 uniform (`shader.ts`의 `FRAME_UNIFORMS`) */
   private readonly shared = {
     uLightViewProj: { value: new Matrix4() },
@@ -113,6 +114,7 @@ export class Renderer implements Graphics {
     uGroundColor: { value: new Vector3() },
     uMoonColor: { value: new Vector3() },
     uNightAmbient: { value: new Vector3() },
+    uWorldCenter: { value: new Vector3() },
     uHalftoneCell: { value: HALFTONE_CELL_CSS_PX },
   };
   private readonly frameUniforms: Uniforms;
@@ -394,11 +396,12 @@ export class Renderer implements Graphics {
     light.near = 1;
     light.far = radius * 4;
     light.updateProjectionMatrix();
-    light.position.fromArray(env.lightDirection).multiplyScalar(radius * 2);
+    const [cx, cy, cz] = env.shadowCenter ?? [0, 0, 0];
+    light.position.fromArray(env.lightDirection).multiplyScalar(radius * 2).add(this.shadowCenter.set(cx, cy, cz));
     // 광원이 +Y 위를 지날 수 있으므로, 광원 방향과 거의 나란하면 다른 축을 위쪽으로 쓴다.
     if (Math.abs(env.lightDirection[1]) > 0.99) light.up.set(0, 0, 1);
     else light.up.set(0, 1, 0);
-    light.lookAt(0, 0, 0);
+    light.lookAt(cx, cy, cz);
     light.updateMatrixWorld();
     this.shared.uLightViewProj.value.multiplyMatrices(light.projectionMatrix, light.matrixWorldInverse);
   }
@@ -413,6 +416,7 @@ export class Renderer implements Graphics {
     shared.uGroundColor.value.fromArray(env.groundColor);
     shared.uMoonColor.value.fromArray(env.moonColor);
     shared.uNightAmbient.value.fromArray(env.nightAmbient);
+    shared.uWorldCenter.value.fromArray(env.worldCenter ?? [0, 0, 0]);
 
     const { center, radius } = frame.occluder;
     this.frameUniforms.uOccluder.value.set(center[0], center[1], center[2], radius);

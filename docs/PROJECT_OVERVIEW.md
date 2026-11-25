@@ -90,7 +90,9 @@ GameBlog/
 │     │     ├─ npc.ts          혼자 돌아다니는 NPC, 캐릭터끼리 밀어내기 ([analysis/npc.md](analysis/npc.md))
 │     │     ├─ speechBubble.ts NPC 인사말 목록과 말풍선 그림
 │     │     ├─ characterGraphics.ts  다리 모델(glb)과 피라미드 메시 등록
+│     │     ├─ characterDraw.ts  캐릭터 몸·다리 그리기 항목 (행성·초원 씬이 함께 씀)
 │     │     └─ character.glb   Blender에서 내보낸 다리 스킨 메시
+│     ├─ meadow/               바람 부는 초원 씬: 큰 분지 땅, GPU로 만드는 잔디 격자, 바람 ([analysis/meadow.md](analysis/meadow.md))
 │     └─ planet/               행성 씬
 │        ├─ index.ts           planetScene: 그래픽 등록, World·카메라·영상 소리 진행
 │        ├─ world.ts           월드 조립, 게임 규칙, 그리기 목록
@@ -104,7 +106,6 @@ GameBlog/
 │        │  ├─ astronaut.ts    위성 곁에 떠 있는 우주인 스티커 빌보드 ([analysis/astronaut.md](analysis/astronaut.md))
 │        │  ├─ satellite.ts    궤도를 도는 인공위성의 부품과 궤적 고리 ([analysis/satellite.md](analysis/satellite.md))
 │        │  ├─ bubbleBelt.ts   행성을 감싸고 떠다니는 비눗방울 띠 ([analysis/bubbles.md](analysis/bubbles.md))
-│        │  ├─ grass.ts, wind.ts  행성 잔디밭 배치(셀 단위)와 행성을 감도는 바람 ([analysis/grass.md](analysis/grass.md))
 │        │  ├─ train.ts, smoke.ts  선로 노선과 그 위를 도는 기차, 굴뚝 연기 ([analysis/train.md](analysis/train.md))
 │        │  └─ alien.ts        떠다니는 문어 외계인의 자세, 촉수 흔들림, 광선총 ([analysis/alien.md](analysis/alien.md))
 │        ├─ shapes/            three.js 없이 계산하는 모양
@@ -121,9 +122,8 @@ GameBlog/
 │        ├─ graphics/          three.js로 등록하는 것
 │        │  ├─ meshes.ts       행성 메시(땅, 지형물, 로켓, 텔레비전, 외계인, 선로, 위성 등) 등록
 │        │  ├─ billboardImages.ts  빌보드 그림 목록과 그리기 함수
-│        │  ├─ bubbleLayer.ts  비눗방울을 인스턴스 한 번으로 가산 혼합해 그리는 셰이더 층
-│        │  └─ grassLayer.ts   카메라 둘레 셀의 잔디를 인스턴스 한 번으로 그리는 셰이더 층
-│        ├─ shaders/           bubble.vert, bubble.frag, grass.vert, grass.frag
+│        │  └─ bubbleLayer.ts  비눗방울을 인스턴스 한 번으로 가산 혼합해 그리는 셰이더 층
+│        ├─ shaders/           bubble.vert, bubble.frag
 │        ├─ scenes/surface.json  행성 표면에 놓는 객체(텔레비전·로켓)의 장면 파일
 │        └─ assets/astronaut-sticker.png  잡지에서 오린 스티커 꼴의 우주인 그림
 ├─ README.md                  저장소 소개, 조작, 시작 방법
@@ -158,9 +158,9 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 
 1. `App`이 입력을 `Controls`로 모아 씬의 `applyControls`에 넘긴다. 행성 씬은 시점을 돌리고 카메라 기준 이동 방향을 계산한다.
 2. `FixedStepper`가 경과 시간만큼 씬의 `fixedStep`(행성 씬은 `World.fixedStep`)을 120Hz 간격으로 실행한다. 프레임 시간은 최대 0.1초로 제한한다.
-3. `World.fixedStep`은 해의 궤도 진행, 위성 자전, 인공위성 공전, 비눗방울 떠다니기, 기차 진행, 바람, 캐릭터 물리 몸체의 이동과 충돌, NPC 이동과 캐릭터끼리 밀어내기, 걸음(`Walker`)을 순서대로 처리한다.
+3. `World.fixedStep`은 해의 궤도 진행, 위성 자전, 인공위성 공전, 비눗방울 떠다니기, 기차 진행, 캐릭터 물리 몸체의 이동과 충돌, NPC 이동과 캐릭터끼리 밀어내기, 걸음(`Walker`)을 순서대로 처리한다.
 4. 씬의 `update`에서 카메라가 보간된 물리 몸체 위치를 따라가고, 텔레비전 영상 소리를 정한다.
-5. 씬의 `frame`이 `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광)로 `FrameData`를 만들고 비눗방울 층에 방울을, 잔디 층에 바람과 잔디를 미는 몸(플레이어·NPC)을 넘긴다. `Renderer`가 그림자 패스와 메인 패스를 실행한다.
+5. 씬의 `frame`이 `World.buildDrawList`, `buildBillboards`(별·햇살·해 눈, [analysis/billboard.md](analysis/billboard.md)), `environment`(해 방향의 직사광)로 `FrameData`를 만들고 비눗방울 층에 방울을 넘긴다. `Renderer`가 그림자 패스와 메인 패스를 실행한다.
 
 ### 게임 상태
 
@@ -207,7 +207,6 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 - 사용자가 준 우주인 사진을 3D로 만들지 않고 잡지에서 오린 스티커처럼 다듬어, 위성 오른쪽 가장자리 앞에 둥실거리는 빌보드로 붙였다 (2026-11-22 사용자 요청, [analysis/astronaut.md](analysis/astronaut.md)).
 - 인공위성(은색 몸통, 행성을 보는 접시 안테나, 해를 따라 도는 파란 태양 전지판 두 장)이 거리 57의 비스듬한 궤도를 36초에 한 바퀴 돌고, 궤도는 옅은 하늘색 고리로 그린다. 접시 안테나에서는 행성 쪽으로 신호 물결(퍼질수록 가늘어지는 초승달 호 여러 겹)이 계속 퍼져 나간다 (2026-11-22 사용자 요청, [analysis/satellite.md](analysis/satellite.md)).
 - 비눗방울 240개가 소행성대처럼 행성을 감싼 띠(행성 중심에서 32~44, 적도에서 조금 기운 평면)를 이루어 천천히 공전하며 둥실거린다. 가장자리가 무지개빛이고 가운데는 비친 창과 반짝임만 보인다 (2026-11-22 사용자 요청, [analysis/bubbles.md](analysis/bubbles.md)).
-- 땅을 약 21만 포기의 잔디가 빽빽하게 덮는다(선로·텔레비전·로켓 자리와 지형물 아래는 비움). 행성을 감도는 바람이 불었다 잦아들기를 되풀이하고, 센 바람의 물결이 땅을 훑으며 잔디를 눕히고 반짝이게 한다. 플레이어와 NPC가 지나가면 잔디가 바깥으로 눕는다 (2026-11-25 사용자 요청, [analysis/grass.md](analysis/grass.md)).
 - 주황색 해가 행성 중심에서 70 떨어진 궤도를 48초에 한 바퀴 돈다. 직사광이 해를 따라 움직여 낮과 밤이 바뀌고, 밤 쪽은 간접광으로만 보인다. 해는 둘레의 햇살과 캐릭터를 바라보는 눈을 가지며, 궤적이 가는 고리로 보인다 ([analysis/sun.md](analysis/sun.md)).
 - 행성 중심에서 110~200 떨어진 곳에 얼굴이 있는 별 48개가 카메라를 보며 떠 있다 ([analysis/starfield.md](analysis/starfield.md)).
 - 카메라의 위쪽은 캐릭터가 있는 곳의 표면 바깥 방향이다. 좌우 각도 대신 표면에 접하는 진행 방향을 들고 다녀 극점에서도 뒤집히지 않는다.
@@ -259,7 +258,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 | [`physics.test.ts`](../src/engine/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
 | [`game.test.ts`](../src/content/planet/game.test.ts) | 42 | 구 조작(중력, 한 바퀴 돌기), 카메라, 월드 통합, 텔레비전 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
 | [`bubbleBelt.test.ts`](../src/content/planet/objects/bubbleBelt.test.ts) | 5 | 비눗방울 띠의 기저, 씨앗 재현, 크기 분포, 카메라·위성·해 궤도와의 간격, 떠다니기 |
-| [`grass.test.ts`](../src/content/planet/objects/grass.test.ts) | 10 | 잔디밭 밀도, 시드 재현, 셀 나누기, 뿌리 높이, 잔디 없는 곳, 키·폭 범위, 셀 고르기, 바람 세기·축·보간 |
+| [`meadow.test.ts`](../src/content/meadow/meadow.test.ts) | 10 | 초원 땅 높이와 땅 위의 점, 비탈, 분지 가장자리, 분지 밖으로 못 나가기, 시작 지점, 그림자·밤 중심, 바람 세기·방향·돌풍 띠 |
 | [`npc.test.ts`](../src/content/planet/npc.test.ts) | 12 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기, 인사 말풍선 |
 | [`bodyShape.test.ts`](../src/content/planet/bodyShape.test.ts) | 10 | NPC 몸 모양의 엉덩이 자리, 땅과의 간격, 방향과 기저 |
 | [`terrain.test.ts`](../src/content/planet/objects/terrain.test.ts) | 9 | 땅 높낮이와 평평한 곳, 비탈, 언덕 위에 서기, 땅·캡슐 충돌, 지형물 배치 |
@@ -310,6 +309,6 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 | 프레임 비용 | 그림자 패스를 매 프레임 전부 다시 그린다. 실제 부담은 측정하지 않았다 |
 | 시야 | 행성이 작아 지평선이 가깝다. 구 앞쪽으로 약 7 거리까지만 보인다 |
 | 낮과 밤 | 해가 48초에 한 바퀴 돌아 어느 곳이든 한동안 밤이 된다. 밤에는 간접광만 남는다 |
-| 잔디 | 그림자를 받지도 드리우지도 않고 하프톤 점이 없다. 잔디밭 생성(약 240ms)은 씬을 처음 열 때 한다 ([analysis/grass.md](analysis/grass.md)) |
+| 초원 잔디 | 그림자를 받지도 드리우지도 않고 하프톤 점이 없다 ([analysis/meadow.md](analysis/meadow.md)) |
 | 모바일 | 터치로 플레이할 수 있지만 그림자 해상도와 픽셀 비율은 PC와 같다. 성능을 측정하지 않았다 |
 | 문서 | 저장소 루트 `README.md`는 소개, 조작, 시작 방법을 담고, 문서 색인은 `docs/README.md`다. 개발 계획서는 첫 버전 계획이며, 이후 바뀐 결정은 규칙 문서와 이 문서에 있다 |
