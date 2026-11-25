@@ -15,6 +15,12 @@
 - 렌더링은 three.js로 한다. 그 밖의 런타임 라이브러리는 추가하지 않는다. 사용 규칙은 [threejs.md](threejs.md)에 있다.
 - 행성 표면에 칠한 원(작동 영역)으로 켜지는 그래픽스 콘텐츠 시스템, 콘텐츠 HUD, 콘텐츠 전용 렌더러 확장 구조(`engine/contentRenderers/`)는 등록된 콘텐츠가 없어 지웠다 (2026-11-22 사용자 결정). 참고 구현은 커밋 `ad4cee7`의 `src/content/`, `game/surfaceZone.ts`, `engine/contentRenderers/`에 있다 (당시 경로. 지금의 `src/content/`는 콘텐츠 계층이다).
 
+## 플레이 기록
+
+- 다시 와도 기록이 남고 판마다 쌓인다. 단순 수치와 복합 데이터를 함께 남긴다 (2026-11-25 사용자 요청).
+- 기록은 이 기기의 브라우저(IndexedDB)에만 둔다. Firebase 같은 서버 연동은 보류했다 (2026-11-25 사용자 결정). 서버, 키, 외부 저장소를 더하지 않는다.
+- 미니 게임은 공용 기록장(`lib/save/`)으로 저장한다. 구조와 붙이는 방법은 [analysis/saveRecords.md](../analysis/saveRecords.md)에 있다.
+
 ## 행성 표면
 
 - 행성 표면은 파스텔 색이 물결치는 몽환적인 땅이고, 완만한 언덕과 둥근 파스텔 지형물로 굴곡을 준다 (2026-11-22 사용자 결정, 흰색 무채색 고정을 대체). 구조는 [analysis/terrain.md](../analysis/terrain.md)에 있다.

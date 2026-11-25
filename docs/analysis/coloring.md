@@ -67,12 +67,13 @@ git log --oneline e8b0285..HEAD -- src/games src/main.ts
 | `city.ts` | 도시 배치: 순환 도로 경로(`loopPose`), 차(`CARS`, `carPose`), 사람(`WALKERS`, `walkerPose`), 가로등(`lampPoses`), 건물(`BUILDINGS`), 나무(`TREES`), 해 방향, 칠할 조각 목록(`cityParts`)과 이웃(`partNeighbors`) | 없음 |
 | `freeCamera.ts` | 자유 시점 카메라 상태(위치, yaw, pitch), 돌리기·움직이기·범위 | 없음 |
 | `palette.ts` | 판마다의 색 묶음(`randomPalette`), HSL → sRGB | 없음 |
-| `coloringState.ts` | 한 판의 상태: 칠하기(`paint`)와 색 고르기, 진행, 완성 | 없음 |
+| `coloringState.ts` | 한 판의 상태: 칠하기(`paint`)와 색 고르기, 진행, 완성, 저장·되돌리기(`snapshot`, `restore`) | 없음 |
+| `records.ts` | 기록 모양(누적 수치·판 기록·하다 만 판), 누적 계산, 저장된 값 검사(`COLORING_RECORDS`) | 없음 |
 | `graphics/cityView.ts` | three.js 그리기: 조각 지오메트리, 칠하기·하늘·테두리 재질, 차·사람 움직이기, 누르기(광선), 색종이 | GPU |
 | `shaders/paint.*` | 칠하는 메시: 번지는 칠하기, 3단 툰 음영, 빛나는 조각, 힌트 반짝임 | GPU |
 | `shaders/sky.*` | 하늘 구: 종이색 ↔ 칠한 색의 노을 그라데이션, 해 쪽 노을빛, 방향으로 번지기 | GPU |
 | `shaders/outline.*` | 선 테두리: 뒷면 껍데기를 화면에서 법선 쪽으로 2.2px 밀어 그린다 | GPU |
-| `coloring.test.ts` | 도로 경로, 도시 배치, 카메라, 색 고르기와 완성, 색 묶음 | |
+| `coloring.test.ts` | 도로 경로, 도시 배치, 카메라, 색 고르기와 완성, 색 묶음, 기록 누적·검사, 저장·되돌리기 | |
 
 ## 도시 (`city.ts`)
 
@@ -98,6 +99,16 @@ git log --oneline e8b0285..HEAD -- src/games src/main.ts
 - 누르기: 화면 좌표에서 광선을 쏘아 칠할 메시들(테두리 제외) 가운데 가장 가까운 것을 고른다. 움직이는 차·사람도 그 순간의 자리로 맞는다.
 - 색은 sRGB 값을 셰이더에서 그대로 쓴다. `MeshBasicMaterial`(바퀴, 창, 점선, 색종이)은 `SRGBColorSpace`로 넣어 three.js가 변환한다.
 - 색종이: 화면 위 정사영 장면에 `InstancedMesh` 180장. 장면을 그린 뒤 깊이만 지우고 겹쳐 그린다.
+
+## 기록 (2026-11-25)
+
+공용 기록장([saveRecords.md](saveRecords.md))에 `coloring`으로 남긴다.
+
+- 칠할 때마다 하다 만 판(색 묶음, 조각마다의 색 번호, 누른 횟수, 논 시간, 시작 시각)을 저장하고, 화면이 가려지거나 페이지를 떠날 때도 저장한다. 다시 열면 같은 색 묶음과 칠한 그림으로 이어 한다. 칠해 둔 조각은 가운데에서 다시 번지며 나타난다. 카메라 자리와 일시 정지는 남기지 않는다.
+- 도시 조각 수가 바뀌어 저장한 색 번호 수가 맞지 않으면 이어 하지 않고 하다 만 판을 지운다. 기록장을 여는 동안 이미 칠하기 시작했으면 새 판을 그대로 둔다.
+- 다 칠하면 클리어 판 기록을 쌓고 하다 만 판을 지운다. 도중에 다시 하기를 누르면 클리어하지 않은 판 기록을 쌓는다. 한 번도 칠하지 않은 판은 쌓지 않는다.
+- 논 시간은 첫 칠하기부터 클리어까지 프레임 시간을 더한다. 화면이 가려지면 프레임이 멈춰 세지 않는다.
+- 개발용: `__coloring.book()`.
 
 ## 메인 페이지 미리 보기
 

@@ -18,6 +18,7 @@ import {
 import { ColoringState } from './coloringState';
 import { CAMERA_BOUNDS, FreeCamera } from './freeCamera';
 import { hslToRgb, PALETTE_SIZE, randomPalette } from './palette';
+import { COLORING_RECORDS, emptyColoringStats, type ColoringPlay } from './records';
 
 /** 같은 씨앗이면 같은 수를 내는 난수 */
 function seeded(seed: number): () => number {
@@ -219,5 +220,51 @@ describe('색 묶음', () => {
     expect(hslToRgb(0, 1, 0.5).map((c) => +c.toFixed(3))).toEqual([1, 0, 0]);
     expect(hslToRgb(120, 1, 0.5).map((c) => +c.toFixed(3))).toEqual([0, 1, 0]);
     expect(hslToRgb(240, 0, 1).map((c) => +c.toFixed(3))).toEqual([1, 1, 1]);
+  });
+});
+
+describe('색칠 기록', () => {
+  const play = (extra: Partial<ColoringPlay> = {}): ColoringPlay => ({
+    cleared: true,
+    paints: 80,
+    seconds: 120,
+    palette: [
+      [1, 0, 0],
+      [0, 1, 0],
+    ],
+    colors: [0, 1, 0],
+    ...extra,
+  });
+  const times = { startedAt: 0, endedAt: 1 };
+
+  it('끝난 판을 누적 수치에 더하고 가장 빠른 시간을 고른다', () => {
+    let stats = emptyColoringStats();
+    stats = COLORING_RECORDS.accumulate(stats, play(), times);
+    stats = COLORING_RECORDS.accumulate(stats, play({ cleared: false, seconds: 10, paints: 3 }), times);
+    stats = COLORING_RECORDS.accumulate(stats, play({ seconds: 90 }), times);
+    expect(stats).toEqual({ plays: 3, clears: 2, paints: 163, fastestClear: 90, totalSeconds: 220 });
+  });
+
+  it('색 번호가 색 묶음 밖인 기록은 버린다', () => {
+    const migrate = COLORING_RECORDS.migrate!;
+    expect(migrate('play', 1, play())).toEqual(play());
+    expect(migrate('play', 1, play({ colors: [0, 2] }))).toBeUndefined();
+    expect(migrate('progress', 1, { palette: play().palette, colors: [-1, 1], paints: 1, seconds: 2, startedAt: 3 })).toBeTruthy();
+    expect(migrate('progress', 1, { palette: [[2, 0, 0]], colors: [0], paints: 1, seconds: 2, startedAt: 3 })).toBeUndefined();
+    expect(migrate('stats', 1, { ...emptyColoringStats(), fastestClear: -1 })).toBeUndefined();
+  });
+
+  it('칠한 상태를 저장하고 되돌린다', () => {
+    const neighbors = [[2], [1, 3], [2]];
+    const state = new ColoringState(neighbors, 4, () => 0.3);
+    state.paint(2);
+    const saved = state.snapshot();
+    const again = new ColoringState(neighbors, 4, () => 0.3);
+    expect(again.restore(saved)).toBe(true);
+    expect(again.filledCount).toBe(1);
+    expect(again.colorOf(2)).toBe(state.colorOf(2));
+    expect(again.restore([0, 0])).toBe(false);
+    expect(again.restore([0, 9, 0])).toBe(false);
+    expect(again.filledCount).toBe(1);
   });
 });

@@ -1,10 +1,17 @@
 import { createRansomCanvas } from '../../lib/ransomText';
+import { openRecordBook, type RecordBook } from '../../lib/save';
 import type { GameDefinition } from '../game';
 import { cityParts, partNeighbors } from './city';
 import { ColoringState } from './coloringState';
 import { FreeCamera } from './freeCamera';
 import { CityView } from './graphics/cityView';
 import { randomPalette, type Rgb } from './palette';
+import { COLORING_RECORDS, type ColoringPlay, type ColoringProgress, type ColoringStats } from './records';
+
+type ColoringBook = RecordBook<ColoringStats, ColoringPlay, ColoringProgress>;
+
+/** 저장에 실패해도 놀이는 계속한다. */
+const warn = (error: unknown) => console.warn('색칠 기록을 저장하지 못했습니다.', error);
 
 /** 이 시간(초) 동안 칠하지 않으면 안 칠한 조각을 반짝여 알려 준다. */
 const HINT_AFTER_SECONDS = 7;
@@ -91,6 +98,27 @@ function startColoring(root: HTMLElement): void {
   let palette: Rgb[] = [];
   let state: ColoringState;
   let lastPaint = view.time;
+  // 기록: 이번 판의 누른 횟수, 논 시간(초, 화면이 보일 때만 늘어남), 시작 시각
+  let book: ColoringBook | null = null;
+  let paints = 0;
+  let playSeconds = 0;
+  let startedAt = Date.now();
+  /** 이번 판을 이미 판 기록으로 남겼는지 */
+  let recorded = false;
+
+  const saveProgress = () => {
+    if (!book || recorded || paints === 0) return;
+    book.saveProgress({ palette, colors: state.snapshot(), paints, seconds: playSeconds, startedAt }).catch(warn);
+  };
+
+  /** 이번 판을 판 기록으로 남기고 하다 만 판을 지운다. 한 번도 칠하지 않은 판은 남기지 않는다. */
+  const finishPlay = () => {
+    if (!book || recorded || paints === 0) return;
+    recorded = true;
+    const play: ColoringPlay = { cleared: state.isComplete, paints, seconds: playSeconds, palette, colors: state.snapshot() };
+    book.record(play, { startedAt, endedAt: Date.now() }).catch(warn);
+    book.clearProgress().catch(warn);
+  };
 
   const showProgress = () => {
     const share = state.filledCount / state.regionCount;
@@ -100,6 +128,7 @@ function startColoring(root: HTMLElement): void {
 
   const finishIfComplete = (wasComplete: boolean) => {
     if (!state.isComplete || wasComplete) return;
+    finishPlay();
     view.celebrate(palette);
     banner.hidden = false;
     shell.classList.add('is-clear');
@@ -114,7 +143,28 @@ function startColoring(root: HTMLElement): void {
     shell.classList.remove('is-clear');
     progressFill.style.background = `linear-gradient(90deg, ${palette.map(cssColor).join(', ')})`;
     lastPaint = view.time;
+    paints = 0;
+    playSeconds = 0;
+    startedAt = Date.now();
+    recorded = false;
     showProgress();
+  };
+
+  /** 지난 방문에 칠하던 그림으로 이어 한다. 도시 조각 수가 바뀌었으면 새로 시작한다. */
+  const resume = (saved: ColoringProgress) => {
+    const next = new ColoringState(neighbors, saved.palette.length, Math.random);
+    if (!next.restore(saved.colors) || next.isComplete) return false;
+    newGame();
+    palette = saved.palette;
+    state = next;
+    progressFill.style.background = `linear-gradient(90deg, ${palette.map(cssColor).join(', ')})`;
+    // 칠해 둔 조각은 가운데에서 다시 번지며 나타난다.
+    saved.colors.forEach((color, i) => color >= 0 && view.paintRegion(i + 1, palette[color]));
+    paints = saved.paints;
+    playSeconds = saved.seconds;
+    startedAt = saved.startedAt;
+    showProgress();
+    return true;
   };
 
   const paintAt = (x: number, y: number) => {
@@ -122,9 +172,11 @@ function startColoring(root: HTMLElement): void {
     if (!hit) return;
     const wasComplete = state.isComplete;
     view.paintRegion(hit.region, palette[state.paint(hit.region)], hit.point);
+    paints++;
     lastPaint = view.time;
     showProgress();
     finishIfComplete(wasComplete);
+    saveProgress();
   };
 
   // ── 입력: 끌어서 둘러보기, 두 손가락으로 움직이기, 짧게 눌러 칠하기 ──
@@ -225,17 +277,37 @@ function startColoring(root: HTMLElement): void {
     camera.move(forward * step, strafe * step, up * step);
   };
 
-  again.addEventListener('click', newGame);
+  again.addEventListener('click', () => {
+    finishPlay();
+    newGame();
+  });
+  // 논 시간을 남기려고 화면을 떠날 때도 하다 만 판을 저장한다.
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && saveProgress());
+  window.addEventListener('pagehide', saveProgress);
   const resize = () => view.resize(shell.clientWidth, shell.clientHeight);
   new ResizeObserver(resize).observe(shell);
   resize();
   newGame();
+
+  // 기록장을 열고, 하다 만 판이 있으면 이어 한다. 그 사이에 칠하기 시작했으면 새 판을 그대로 둔다.
+  void (async () => {
+    const opened = await openRecordBook<ColoringStats, ColoringPlay, ColoringProgress>(COLORING_RECORDS);
+    let saved: ColoringProgress | undefined;
+    try {
+      saved = await opened.progress();
+    } catch (error) {
+      warn(error);
+    }
+    book = opened;
+    if (saved && paints === 0 && !resume(saved)) opened.clearProgress().catch(warn);
+  })();
 
   let last = performance.now();
   const frame = (now: number) => {
     const seconds = Math.min((now - last) / 1000, 0.1);
     last = now;
     walk(seconds);
+    if (!state.isComplete && paints > 0) playSeconds += seconds;
     if (!paused) view.update(seconds);
     const idle = view.time - lastPaint - HINT_AFTER_SECONDS;
     view.setHint(state.isComplete ? 0 : Math.max(0, Math.min(1, idle)));
@@ -255,15 +327,20 @@ function startColoring(root: HTMLElement): void {
         },
         paintAt,
         setPaused,
+        book: () => book,
         get paused() {
           return paused;
         },
         /** 개발 확인용: 남은 조각을 칠한다. 앞의 `leave`개는 남긴다. */
         fillAll: (leave = 0) => {
           const wasComplete = state.isComplete;
-          for (const region of state.unfilledRegions().slice(leave)) view.paintRegion(region, palette[state.paint(region)]);
+          for (const region of state.unfilledRegions().slice(leave)) {
+            view.paintRegion(region, palette[state.paint(region)]);
+            paints++;
+          }
           showProgress();
           finishIfComplete(wasComplete);
+          saveProgress();
         },
       },
     });
