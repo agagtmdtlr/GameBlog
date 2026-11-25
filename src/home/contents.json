@@ -20,6 +20,11 @@
       "title": "색칠 놀이",
       "preview": { "image": "coloring.jpg" },
       "open": { "game": "coloring" }
+    },
+    "e": {
+      "title": "2048",
+      "preview": { "image": "2048.svg" },
+      "open": { "game": "2048" }
     }
   }
 }

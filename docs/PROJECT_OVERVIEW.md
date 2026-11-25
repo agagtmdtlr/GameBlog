@@ -8,7 +8,7 @@
 
 ## 1. 컨셉
 
-첫 화면은 코믹 프레임 메인 페이지로, 컷마다 콘텐츠 미리 보기를 보여 주고 누르면 그 콘텐츠(3D 씬, 미니 게임, YouTube 등)로 간다 ([analysis/home.md](analysis/home.md)). 미니 게임으로 해 질 녘 3D 도시를 자유 시점으로 돌아다니며 차·가로등·사람·하늘·해 같은 물체를 눌러 무작위 색을 채우는 색칠 놀이가 있다 ([analysis/coloring.md](analysis/coloring.md)). 콘텐츠의 중심은 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다닌다. 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
+첫 화면은 코믹 프레임 메인 페이지로, 컷마다 콘텐츠 미리 보기를 보여 주고 누르면 그 콘텐츠(3D 씬, 미니 게임, YouTube 등)로 간다 ([analysis/home.md](analysis/home.md)). 미니 게임으로 해 질 녘 3D 도시를 자유 시점으로 돌아다니며 차·가로등·사람·하늘·해 같은 물체를 눌러 무작위 색을 채우는 색칠 놀이([analysis/coloring.md](analysis/coloring.md))와 판을 밀어 같은 숫자 타일을 합치는 2048([analysis/game2048.md](analysis/game2048.md))이 있다. 콘텐츠의 중심은 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다닌다. 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
 
 ## 2. 기술 구성
 
@@ -40,7 +40,8 @@ GameBlog/
 │  ├─ main.ts                  진입점: ?game= 이면 미니 게임, ?scene= 이면 App과 씬을 동적으로 불러와 올리고, 둘 다 없으면 메인 페이지
 │  ├─ games/                   엔진 없는 미니 게임 (?game=<id>, [analysis/coloring.md](analysis/coloring.md))
 │  │  ├─ game.ts, index.ts     GameDefinition, GAMES
-│  │  └─ coloring/             색칠 놀이: 도시 배치·움직임(city.ts), 자유 시점(freeCamera.ts), 색 묶음, 판 상태, three.js 그리기(graphics/, shaders/)
+│  │  ├─ coloring/             색칠 놀이: 도시 배치·움직임(city.ts), 자유 시점(freeCamera.ts), 색 묶음, 판 상태, three.js 그리기(graphics/, shaders/)
+│  │  └─ game2048/             2048: 판 상태(board.ts), 타일 색, DOM 화면 ([analysis/game2048.md](analysis/game2048.md))
 │  ├─ lib/ransomText/          오림 글자: 찢어 오린 종이 글자로 만든 영어 제목 ([analysis/ransomText.md](analysis/ransomText.md))
 │  ├─ home/                    메인 페이지: 코믹 프레임 컷마다 콘텐츠 미리 보기 ([analysis/home.md](analysis/home.md))
 │  │  ├─ comicLayout.ts        컷 배치(볼록 다각형)와 컷 사이 여백 계산
@@ -237,13 +238,14 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 
 ### 자동 테스트
 
-`npm test` 기준 25개 파일, 233개가 모두 통과한다 (2026-11-25, 색칠 놀이 3D 전환 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 26개 파일, 242개가 모두 통과한다 (2026-11-25, 2048 추가 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 12 | 벡터, 쿼터니언, 행렬 |
 | [`layers.test.ts`](../src/layers.test.ts) | 9 | 계층 가져오기 규칙: 엔진 → 콘텐츠 금지, 씬끼리 금지, three.js를 가져오는 곳, 메인 페이지·lib·미니 게임의 가져오기 |
 | [`coloring.test.ts`](../src/games/coloring/coloring.test.ts) | 18 | 색칠 놀이의 순환 도로 경로, 도시 배치(조각 목록, 이웃, 차·사람 자리, 차 간격, 건물 자리), 자유 시점 카메라, 색 고르기와 완성, 색 묶음 |
+| [`game2048.test.ts`](../src/games/game2048/game2048.test.ts) | 9 | 2048의 밀기·합치기 순서, 새 타일, 끝, 이김, 타일 id, 타일 색 |
 | [`vertexLayout.test.ts`](../src/engine/render/vertexLayout.test.ts) | 8 | 셰이더 정점 속성 맞추기, 속성 정점 수 검사, 사용자 속성을 가진 GeometryData 변환, 엔진 기본 메시 속성, uniform 변환, 툰 재질 uniform |
 | [`billboard.test.ts`](../src/engine/render/billboard.test.ts) | 4 | 빌보드 아틀라스 배치와 텍스처 좌표, 그리기 순서 (시험용 그림 목록) |
 | [`billboardImages.test.ts`](../src/content/planet/graphics/billboardImages.test.ts) | 2 | 행성 빌보드 그림의 아틀라스 칸, 햇살 그림 범위 |
