@@ -62,8 +62,7 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 {
   "cuts": {
     "a": { "title": "행성 산책", "preview": { "image": "planet.jpg" }, "open": { "scene": "planet" } },
-    "b": { "title": "플라워 모작 유니티 시연", "preview": { "youtube": "AXhuradE5oo" }, "open": { "youtube": "AXhuradE5oo" } },
-    "c": { "title": "치킨차차 보드게임 온라인 이식 시연", "preview": { "youtube": "aUECXWnuohA" }, "open": { "youtube": "aUECXWnuohA" } }
+    "d": { "title": "색칠 놀이", "preview": { "image": "coloring.jpg" }, "open": { "game": "coloring" } }
   }
 }
 ```
@@ -103,7 +102,7 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 
 | 항목 | 결과 |
 |---|---|
-| 800×600 | 종이가 화면 높이에 맞고, 여덟 컷과 사선이 그림과 같은 배치. `a`에 행성 그림, `b`·`c`에 YouTube 썸네일과 재생 표시, 나머지는 망점 빈 컷 |
+| 800×600 | 종이가 화면 높이에 맞고, 여덟 컷과 사선이 그림과 같은 배치. `a`에 행성 그림, `b`·`c`에 YouTube 썸네일과 재생 표시, 나머지는 망점 빈 컷 (당시. 2026-11-25에 사용자 요청으로 YouTube 컷 `b`·`c`를 비웠다) |
 | 375×812 (모바일) | 종이가 화면 너비에 맞고 스크롤 없음 |
 | 412×700, 412×880 (모바일, 2026-11-24 늘이기 뒤) | 종이가 화면 위아래까지 차고, 제목이 한 줄로 화면 너비를 채움. 늘인 컷도 여백 두께가 같음 |
 | `a` 마우스 올림 | 테두리 강조, 그림 확대 |

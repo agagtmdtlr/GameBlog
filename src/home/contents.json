@@ -6,16 +6,6 @@
       "preview": { "image": "planet.jpg" },
       "open": { "scene": "planet" }
     },
-    "b": {
-      "title": "플라워 모작 유니티 시연",
-      "preview": { "youtube": "AXhuradE5oo" },
-      "open": { "youtube": "AXhuradE5oo" }
-    },
-    "c": {
-      "title": "치킨차차 보드게임 온라인 이식 시연",
-      "preview": { "youtube": "aUECXWnuohA" },
-      "open": { "youtube": "aUECXWnuohA" }
-    },
     "d": {
       "title": "색칠 놀이",
       "preview": { "image": "coloring.jpg" },
