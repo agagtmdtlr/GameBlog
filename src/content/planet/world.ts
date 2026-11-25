@@ -32,6 +32,7 @@ import { Moon, MOON_COLOR, MOON_ROUGHNESS } from './objects/moon';
 import { FloatingAstronaut } from './objects/astronaut';
 import { Satellite, SATELLITE_ORBIT_EMISSIVE, type SatellitePart } from './objects/satellite';
 import { BubbleBelt, type BubbleFrame } from './objects/bubbleBelt';
+import { Wind, type WindFrame } from './objects/wind';
 import { PLANET, surfaceDirection } from './planet';
 import { DREAM_PROPS, PROP_COLLIDERS, TERRAIN, type DreamProp } from './objects/terrain';
 import { groundRadius, type Obstacle } from '../../engine/physics/collision';
@@ -237,6 +238,7 @@ export class World {
   readonly satellite = new Satellite();
   readonly bubbles = new BubbleBelt();
   readonly train = new Train();
+  readonly wind = new Wind();
   readonly npcs: readonly Wanderer[];
   readonly aliens: readonly Alien[];
   /** 서로 통과하지 못하는 캐릭터 몸체들. 플레이어가 먼저다. */
@@ -255,6 +257,7 @@ export class World {
     this.satellite.step(dt);
     this.bubbles.step(dt);
     this.train.step(dt);
+    this.wind.step(dt);
     // 기차는 움직이는 벽이다. 이번 걸음의 자리로 캐릭터를 밀어낸다.
     const obstacles: Obstacle[] = [...SURFACE_OBSTACLES, ...this.train.obstacles()];
     this.player.step(dt, command, TERRAIN, obstacles);
@@ -345,6 +348,19 @@ export class World {
         { image: 'disk', position: eye.white, size: [rx * 2 * r, ry * 2 * r], color: SUN_EYE_WHITE_EMISSIVE, toneMapped: true },
         { image: 'disk', position: eye.pupil, size: [pupil, pupil], color: SUN_PUPIL_COLOR, toneMapped: true },
       ]),
+    ];
+  }
+
+  /** 잔디를 흔드는 바람 */
+  windFrame(alpha: number): WindFrame {
+    return this.wind.frame(alpha);
+  }
+
+  /** 잔디를 밀어 눕히는 몸: 플레이어와 NPC. 가운데는 몸 중심이다. */
+  grassPushers(alpha: number): { center: Vec3; radius: number }[] {
+    return [
+      { center: this.interpolatedPlayerPosition(alpha), radius: PLAYER_RADIUS },
+      ...this.npcs.map((npc) => ({ center: lerp(npc.body.previousPosition, npc.body.position, alpha), radius: PLAYER_RADIUS })),
     ];
   }
 
