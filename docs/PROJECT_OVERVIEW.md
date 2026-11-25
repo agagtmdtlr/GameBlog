@@ -40,9 +40,10 @@ GameBlog/
 │  ├─ main.ts                  진입점: ?game= 이면 미니 게임, ?scene= 이면 App과 씬을 동적으로 불러와 올리고, 둘 다 없으면 메인 페이지
 │  ├─ games/                   엔진 없는 미니 게임 (?game=<id>, [analysis/coloring.md](analysis/coloring.md))
 │  │  ├─ game.ts, index.ts     GameDefinition, GAMES
-│  │  ├─ coloring/             색칠 놀이: 도시 배치·움직임(city.ts), 자유 시점(freeCamera.ts), 색 묶음, 판 상태, three.js 그리기(graphics/, shaders/)
-│  │  └─ game2048/             2048: 판 상태(board.ts), 타일 색, DOM 화면 ([analysis/game2048.md](analysis/game2048.md))
+│  │  ├─ coloring/             색칠 놀이: 도시 배치·움직임(city.ts), 자유 시점(freeCamera.ts), 색 묶음, 판 상태, 기록(records.ts), three.js 그리기(graphics/, shaders/)
+│  │  └─ game2048/             2048: 판 상태(board.ts), 타일 색, 기록(records.ts), DOM 화면 ([analysis/game2048.md](analysis/game2048.md))
 │  ├─ lib/ransomText/          오림 글자: 찢어 오린 종이 글자로 만든 영어 제목 ([analysis/ransomText.md](analysis/ransomText.md))
+│  ├─ lib/save/                플레이 기록: 이 기기의 IndexedDB에 누적 수치·판 기록·하다 만 판 ([analysis/saveRecords.md](analysis/saveRecords.md))
 │  ├─ home/                    메인 페이지: 코믹 프레임 컷마다 콘텐츠 미리 보기 ([analysis/home.md](analysis/home.md))
 │  │  ├─ comicLayout.ts        컷 배치(볼록 다각형)와 컷 사이 여백 계산
 │  │  ├─ contents.json         컷마다 넣을 콘텐츠(미리 보기, 누르면 갈 곳)
@@ -241,14 +242,15 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 
 ### 자동 테스트
 
-`npm test` 기준 26개 파일, 242개가 모두 통과한다 (2026-11-25, 2048 추가 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 27개 파일, 265개가 모두 통과한다 (2026-11-25, 플레이 기록 추가 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 12 | 벡터, 쿼터니언, 행렬 |
 | [`layers.test.ts`](../src/layers.test.ts) | 9 | 계층 가져오기 규칙: 엔진 → 콘텐츠 금지, 씬끼리 금지, three.js를 가져오는 곳, 메인 페이지·lib·미니 게임의 가져오기 |
-| [`coloring.test.ts`](../src/games/coloring/coloring.test.ts) | 18 | 색칠 놀이의 순환 도로 경로, 도시 배치(조각 목록, 이웃, 차·사람 자리, 차 간격, 건물 자리), 자유 시점 카메라, 색 고르기와 완성, 색 묶음 |
-| [`game2048.test.ts`](../src/games/game2048/game2048.test.ts) | 9 | 2048의 밀기·합치기 순서, 새 타일, 끝, 이김, 타일 id, 타일 색 |
+| [`coloring.test.ts`](../src/games/coloring/coloring.test.ts) | 21 | 색칠 놀이의 순환 도로 경로, 도시 배치(조각 목록, 이웃, 차·사람 자리, 차 간격, 건물 자리), 자유 시점 카메라, 색 고르기와 완성, 색 묶음, 기록 누적·검사, 저장·되돌리기 |
+| [`game2048.test.ts`](../src/games/game2048/game2048.test.ts) | 11 | 2048의 밀기·합치기 순서, 새 타일, 끝, 이김, 타일 id, 타일 색, 기록 누적·검사 |
+| [`save.test.ts`](../src/lib/save/save.test.ts) | 18 | 플레이 기록장: IndexedDB·메모리 저장소의 쌓기, 누적, 최근 순서, 게임별 분리, 하다 만 판, 거래 실패, 형식 버전, 다시 열기, 동시 쓰기 |
 | [`vertexLayout.test.ts`](../src/engine/render/vertexLayout.test.ts) | 8 | 셰이더 정점 속성 맞추기, 속성 정점 수 검사, 사용자 속성을 가진 GeometryData 변환, 엔진 기본 메시 속성, uniform 변환, 툰 재질 uniform |
 | [`billboard.test.ts`](../src/engine/render/billboard.test.ts) | 4 | 빌보드 아틀라스 배치와 텍스처 좌표, 그리기 순서 (시험용 그림 목록) |
 | [`billboardImages.test.ts`](../src/content/planet/graphics/billboardImages.test.ts) | 2 | 행성 빌보드 그림의 아틀라스 칸, 햇살 그림 범위 |

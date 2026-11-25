@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Board, GOAL, SIZE } from './board';
 import { tileStyle } from './tileStyle';
+import { emptyStats2048, RECORDS_2048, type Play2048 } from './records';
 
 const board = (grid: number[][]) => {
   const b = new Board(() => 0);
@@ -129,5 +130,42 @@ describe('2048 판', () => {
     const colors = values.map((value) => tileStyle(value).background);
     expect(new Set(colors.slice(0, 11)).size).toBe(11);
     expect(colors.every((color) => /^#[0-9a-f]{6}$/.test(color))).toBe(true);
+  });
+});
+
+describe('2048 기록', () => {
+  const play = (score: number, extra: Partial<Play2048> = {}): Play2048 => ({
+    score,
+    highest: 64,
+    moves: 10,
+    won: false,
+    end: 'over',
+    grid: [
+      [2, 4, 8, 16],
+      [4, 8, 16, 32],
+      [8, 16, 32, 64],
+      [16, 32, 64, 2],
+    ],
+    ...extra,
+  });
+  const times = { startedAt: 0, endedAt: 1 };
+
+  it('끝난 판을 누적 수치에 더한다', () => {
+    let stats = emptyStats2048();
+    stats = RECORDS_2048.accumulate(stats, play(300), times);
+    stats = RECORDS_2048.accumulate(stats, play(120, { end: 'restart', won: true, highest: 2048, moves: 5 }), times);
+    expect(stats).toEqual({ plays: 2, finished: 1, wins: 1, best: 300, bestTile: 2048, totalScore: 420, totalMoves: 15 });
+  });
+
+  it('저장된 값을 검사한다', () => {
+    const migrate = RECORDS_2048.migrate!;
+    expect(migrate('play', 1, play(8))).toEqual(play(8));
+    expect(migrate('play', 1, { ...play(8), grid: [[3]] })).toBeUndefined();
+    expect(migrate('play', 2, play(8))).toBeUndefined();
+    expect(migrate('stats', 1, { best: 40 })).toEqual({ ...emptyStats2048(), best: 40 });
+    expect(migrate('stats', 1, { best: -1 })).toBeUndefined();
+    const progress = { grid: play(0).grid, score: 4, won: false, moves: 2, startedAt: 5 };
+    expect(migrate('progress', 1, progress)).toEqual(progress);
+    expect(migrate('progress', 1, { ...progress, grid: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]] })).toBeUndefined();
   });
 });

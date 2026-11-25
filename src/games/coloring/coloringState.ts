@@ -54,6 +54,22 @@ export class ColoringState {
     return color;
   }
 
+  /** 영역마다의 색 번호 (`[n - 1]`, 칠하지 않았으면 -1). 저장용 */
+  snapshot(): number[] {
+    return Array.from(this.colors);
+  }
+
+  /**
+   * 저장해 둔 색 번호로 되돌린다. 영역 수가 다르거나 색 번호가 묶음 밖이면 아무것도 바꾸지 않고 `false`
+   */
+  restore(colors: readonly number[]): boolean {
+    if (colors.length !== this.colors.length) return false;
+    if (!colors.every((color) => Number.isInteger(color) && color >= -1 && color < this.paletteSize)) return false;
+    this.colors.set(colors);
+    this.filled = colors.filter((color) => color >= 0).length;
+    return true;
+  }
+
   /** 칠하지 않은 영역 번호 */
   unfilledRegions(): number[] {
     const regions: number[] = [];

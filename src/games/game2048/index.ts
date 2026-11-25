@@ -1,6 +1,8 @@
 import { createRansomCanvas } from '../../lib/ransomText';
+import { openRecordBook, type RecordBook } from '../../lib/save';
 import type { GameDefinition } from '../game';
 import { Board, SIZE, type Direction, type Tile } from './board';
+import { emptyStats2048, LEGACY_BEST_KEY, RECORDS_2048, type Play2048, type Progress2048, type Stats2048 } from './records';
 import { tileStyle } from './tileStyle';
 
 /** 버튼 줄 높이 (CSS px) */
@@ -13,8 +15,6 @@ const GAP_SHARE = 0.12;
 const SLIDE_MS = 110;
 /** 이 거리(CSS px)보다 길게 끌면 민 것으로 본다. */
 const SWIPE_MIN = 24;
-/** 가장 높은 점수를 남겨 두는 localStorage 열쇠 */
-const BEST_KEY = 'gameblog.2048.best';
 
 const ICON_HOME =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-5.5h3V20h5V9.5"/></svg>';
@@ -43,21 +43,23 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: strin
   return node;
 }
 
-function readBest(): number {
+type Book2048 = RecordBook<Stats2048, Play2048, Progress2048>;
+
+/** 예전 방식(localStorage)으로 남긴 가장 높은 점수를 누적 수치로 옮기고 지운다. */
+async function moveLegacyBest(book: Book2048): Promise<void> {
+  let legacy = 0;
   try {
-    return Number(localStorage.getItem(BEST_KEY)) || 0;
+    legacy = Number(localStorage.getItem(LEGACY_BEST_KEY)) || 0;
   } catch {
-    return 0;
+    return;
   }
+  if (legacy > 0) await book.adjustStats((stats) => ({ ...stats, best: Math.max(stats.best, legacy) }));
+  // 이 기기에 오래 남는 저장소로 옮겼을 때만 지운다.
+  if (book.lasting) localStorage.removeItem(LEGACY_BEST_KEY);
 }
 
-function writeBest(value: number): void {
-  try {
-    localStorage.setItem(BEST_KEY, String(value));
-  } catch {
-    // 저장할 수 없는 브라우저면 이번 방문에서만 기억한다.
-  }
-}
+/** 저장에 실패해도 게임은 계속한다. */
+const warn = (error: unknown) => console.warn('2048 기록을 저장하지 못했습니다.', error);
 
 /** 타일마다 조금씩 다른 기울기 (도). 종이를 오려 붙인 느낌을 준다. */
 const tilt = (id: number) => (((id * 37) % 7) - 3) * 0.7;
@@ -99,7 +101,13 @@ function start2048(root: HTMLElement): void {
 
   const board = new Board();
   const nodes = new Map<number, HTMLElement>();
-  let best = readBest();
+  // 기록: 누적 수치와 이번 판. 기록장을 열기 전에는 밀지 않는다.
+  let book: Book2048 | null = null;
+  let stats = emptyStats2048();
+  let moves = 0;
+  let startedAt = Date.now();
+  /** 이번 판을 이미 판 기록으로 남겼는지 */
+  let recorded = false;
   let cell = 0;
   let gap = 0;
 
@@ -131,11 +139,7 @@ function start2048(root: HTMLElement): void {
 
   const showScore = (gained = 0) => {
     scoreValue.textContent = String(board.score);
-    if (board.score > best) {
-      best = board.score;
-      writeBest(best);
-    }
-    bestValue.textContent = String(best);
+    bestValue.textContent = String(Math.max(stats.best, board.score));
     if (gained > 0) {
       const pop = element('span', 'g2048-gain', scoreTag);
       pop.textContent = `+${gained}`;
@@ -143,20 +147,60 @@ function start2048(root: HTMLElement): void {
     }
   };
 
-  const newGame = () => {
-    board.reset();
+  const saveProgress = () => {
+    book?.saveProgress({ grid: board.grid(), score: board.score, won: board.won, moves, startedAt }).catch(warn);
+  };
+
+  /** 이번 판을 판 기록으로 남긴다. 한 번도 밀지 않은 판은 남기지 않는다. */
+  const finishPlay = (end: Play2048['end']) => {
+    if (recorded || moves === 0 || !book) return;
+    recorded = true;
+    const play: Play2048 = { score: board.score, highest: board.highest, moves, won: board.won, end, grid: board.grid() };
+    book
+      .record(play, { startedAt, endedAt: Date.now() })
+      .then((next) => {
+        stats = next;
+        showScore();
+      })
+      .catch(warn);
+    if (end === 'over') book.clearProgress().catch(warn);
+  };
+
+  const showBoard = () => {
     tileLayer.replaceChildren();
     nodes.clear();
     for (const tile of board.all) makeTile(tile, 'new');
+  };
+
+  const newGame = () => {
+    board.reset();
+    moves = 0;
+    startedAt = Date.now();
+    recorded = false;
+    showBoard();
     winBanner.hidden = true;
     overBanner.hidden = true;
     shell.classList.remove('is-over', 'is-won');
+    showScore();
+    saveProgress();
+  };
+
+  /** 지난 방문에 하다 만 판을 이어 한다. */
+  const resume = (progress: Progress2048) => {
+    board.load(progress.grid);
+    board.score = progress.score;
+    board.won = progress.won;
+    moves = progress.moves;
+    startedAt = progress.startedAt;
+    recorded = false;
+    wonShown = progress.won;
+    showBoard();
     showScore();
   };
 
   let wonShown = false;
   const move = (direction: Direction) => {
-    if (!board.canMove()) return;
+    if (!book || !board.canMove()) return;
     winBanner.hidden = true;
     shell.classList.remove('is-won');
     const wasWon = board.won;
@@ -167,6 +211,7 @@ function start2048(root: HTMLElement): void {
       boardNode.classList.add(`is-bump-${direction}`);
       return;
     }
+    moves++;
     // 합쳐진 두 타일은 합쳐진 자리로 미끄러진 뒤 사라진다.
     for (const gone of result.removed) {
       const node = nodes.get(gone.id);
@@ -194,7 +239,9 @@ function start2048(root: HTMLElement): void {
         shell.classList.add('is-won');
       }, SLIDE_MS * 2);
     }
-    if (!board.canMove()) {
+    if (board.canMove()) saveProgress();
+    else {
+      finishPlay('over');
       window.setTimeout(() => {
         overBanner.hidden = false;
         shell.classList.add('is-over');
@@ -265,19 +312,40 @@ function start2048(root: HTMLElement): void {
   shell.addEventListener('pointercancel', () => (swipe = null));
 
   again.addEventListener('click', () => {
+    if (!book) return;
+    finishPlay('restart');
     wonShown = false;
     newGame();
   });
 
   layout();
   new ResizeObserver(layout).observe(shell);
-  newGame();
+
+  // 기록장을 열고, 하다 만 판이 있으면 이어 한다.
+  void (async () => {
+    const opened = await openRecordBook<Stats2048, Play2048, Progress2048>(RECORDS_2048);
+    let progress: Progress2048 | undefined;
+    try {
+      await moveLegacyBest(opened);
+      stats = await opened.stats();
+      progress = await opened.progress();
+    } catch (error) {
+      warn(error);
+    }
+    book = opened;
+    if (progress) resume(progress);
+    else newGame();
+  })();
 
   if (import.meta.env.DEV) {
     Object.assign(window, {
       __game2048: {
         board,
         move,
+        get stats() {
+          return stats;
+        },
+        book: () => book,
         /** 개발 확인용: 판을 칸 값으로 채운다. */
         load: (grid: number[][]) => {
           board.load(grid);
