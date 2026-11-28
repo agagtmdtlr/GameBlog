@@ -40,7 +40,8 @@ npm run dev
 | 명령 | 하는 일 |
 |---|---|
 | `npm run dev` | 개발 서버 실행 |
-| `npm test` | 단위 테스트 (Vitest) |
+| `npm test` | 단위 테스트 전부 (Vitest) |
+| `npm run test:only <이름>` | 게임·콘텐츠 하나의 테스트만 (아래 "테스트" 참고) |
 | `npm run build` | 타입 검사 후 `dist/`에 빌드 |
 | `npm run preview` | 빌드 결과 미리 보기 |
 
@@ -52,6 +53,25 @@ npm run dev
 3D 공간에서는 브라우저 콘솔에 `window.__game`을 입력해 월드, 카메라, 입력, WebGL 컨텍스트를 살펴볼 수 있습니다.
 
 메인 화면에 콘텐츠를 추가하려면 `src/home/contents.json`에 항목을 하나 추가하고, 미리 보기 그림을 `src/home/previews/`에 넣으면 됩니다. 자세한 방법은 [docs/analysis/home.md](docs/analysis/home.md)를 참고하세요.
+
+### 테스트
+
+게임과 콘텐츠는 서로 독립적으로 만들어지므로, 테스트도 폴더별로 나뉘어 있습니다. 고친 곳의 테스트만 돌리면 됩니다.
+
+```bash
+npm run test:only chess
+```
+
+| 이름 | 돌리는 테스트 |
+|---|---|
+| 게임 폴더 이름 (`chess`, `snake` 등) | `src/games/<이름>/`의 테스트 |
+| 콘텐츠 폴더 이름 (`planet`, `meadow`) | `src/content/<이름>/`의 테스트 |
+| `shared` | 여러 곳이 함께 쓰는 코드: `engine/`, `lib/`, `home/`, `content/common/` |
+
+- 어떤 이름을 골라도 구조 규칙 테스트(`src/layers.test.ts`, 게임끼리 서로 가져다 쓰지 않는지 등)가 함께 돕니다.
+- 이름은 여러 개를 줄 수 있습니다 (`npm run test:only snake game2048`). 이름 없이 실행하거나 없는 이름을 주면 쓸 수 있는 목록을 보여 줍니다.
+- 게임 폴더를 새로 만들면 같은 이름의 테스트 묶음이 저절로 생깁니다.
+- 여러 곳에 걸친 변경이나 테스트 설정을 바꿨을 때는 `npm test`로 전부 돌립니다. 배포 워크플로도 전부 돌립니다.
 
 ## 폴더 구조
 
@@ -90,5 +110,5 @@ docs/             구조 분석과 규칙 문서
 
 1. 최신 `main`에서 `feature/<주제>`, `fix/<주제>`, `docs/<주제>` 브랜치를 별도 worktree로 만듭니다.
 2. 바꾼 파일만 골라서 커밋합니다.
-3. `npm test`와 `npm run build`를 통과시킨 뒤 `main`에 `--no-ff`로 병합하고 푸시합니다.
+3. 고친 곳의 테스트(`npm run test:only <이름>`, 여러 곳이면 `npm test`)와 `npm run build`를 통과시킨 뒤 `main`에 `--no-ff`로 병합하고 푸시합니다.
 4. worktree와 작업 브랜치를 지웁니다.
