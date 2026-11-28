@@ -9,19 +9,19 @@ import { BOSS_SECONDS, BOSS_SPLIT, GROUP_SPREAD, MAX_ENEMIES, enemyGrowth, NO_GR
 export type { Cell, Direction } from '../../lib/gridSnake';
 
 /** 판 한 변의 칸 수 (D1: 큰 판) */
-export const BOARD = 41;
+export const BOARD = 29;
 /** 처음 타워 마디 수 (머리 빼고) */
-export const START_SEGMENTS = 3;
+export const START_SEGMENTS = 4;
 /** 타워 마디 수 한계 (머리 빼고, D4) */
 export const MAX_SEGMENTS = 40;
 /** 뱀이 나아가는 빠르기 (초당 칸, 일정) */
-export const SPEED = 5;
+export const SPEED = 6.5;
 /** 피해를 받은 뒤 무적 시간 (초) */
 export const INVULNERABLE_SECONDS = 1;
 /** 판에 늘 있는 타워 상자 수 */
-export const BOX_COUNT = 4;
+export const BOX_COUNT = 5;
 /** 새 상자는 머리에서 이 칸 수보다 멀리 생긴다 (가로·세로 중 먼 쪽) */
-export const BOX_MIN_DISTANCE = 6;
+export const BOX_MIN_DISTANCE = 4;
 /** 적이 움직이는 고정 간격 (초) */
 export const ENEMY_STEP = 1 / 60;
 /** 머리에 부딪힌 적이 받는 피해 (적 최대 체력의 비율) */

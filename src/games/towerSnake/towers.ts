@@ -17,7 +17,7 @@ export interface TowerSpec {
 
 export const TOWER_SPECS: Readonly<Record<TowerType, TowerSpec>> = {
   /** 한 적에게 빠른 화살. 시작 마디 */
-  arrow: { range: 4, damage: 12, cooldown: 0.5, weight: 0.4 },
+  arrow: { range: 4, damage: 12, cooldown: 0.4, weight: 0.4 },
   /** 떨어진 자리 둘레 1칸에 폭발 */
   cannon: { range: 3.5, damage: 18, cooldown: 1.6, weight: 0.2 },
   /** 한 적을 2초 동안 50% 느리게 */

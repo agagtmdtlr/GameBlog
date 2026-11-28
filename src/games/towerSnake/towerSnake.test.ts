@@ -197,14 +197,18 @@ describe('타워 상자와 타워 (단계 2)', () => {
     expect(world.boxes.some((b) => b.cell.x === 11 && b.cell.y === 10)).toBe(false);
     expect(event.eat?.spawned).not.toBeNull();
     expect(world.eaten.cannon).toBe(1);
-    expect(world.longest).toBe(3);
+    expect(world.longest).toBe(Math.max(START_SEGMENTS, 3));
   });
 
   it('마디가 40개면 늘지 않고 꼬리 끝 타워만 먹은 것으로 바뀐다', () => {
     const world = new TowerSnakeWorld(seededRandom(5));
-    const body = Array.from({ length: MAX_SEGMENTS + 1 }, (_, i) => ({ x: 40 - i, y: 3 }));
+    // 41칸 몸: 윗줄을 판 끝까지, 한 칸 내려와 아랫줄로 (판이 41칸보다 좁다)
+    const top = BOARD - 1;
+    const body = Array.from({ length: MAX_SEGMENTS + 1 }, (_, i) =>
+      i <= top ? { x: top - i, y: 3 } : i === top + 1 ? { x: 0, y: 4 } : { x: i - top - 2, y: 5 },
+    );
     const towers = Array.from({ length: MAX_SEGMENTS }, () => 'arrow' as TowerType);
-    world.load(body, 'down', towers, [{ cell: { x: 40, y: 4 }, type: 'lightning' }]);
+    world.load(body, 'down', towers, [{ cell: { x: top, y: 4 }, type: 'lightning' }]);
     const event = world.tick();
     expect(event.eat?.replaced).toBe(true);
     expect(world.segments).toBe(MAX_SEGMENTS);
@@ -285,10 +289,10 @@ describe('적 (단계 3)', () => {
   });
 
   it('무리 크기는 분마다 2씩 늘고, 종류는 때가 되어야 나온다', () => {
-    expect(waveSize(0)).toBe(2);
-    expect(waveSize(59)).toBe(2);
-    expect(waveSize(60)).toBe(4);
-    expect(waveSize(150)).toBe(6);
+    expect(waveSize(0)).toBe(1);
+    expect(waveSize(59)).toBe(1);
+    expect(waveSize(60)).toBe(3);
+    expect(waveSize(150)).toBe(5);
     for (let roll = 0; roll < 1; roll += 0.05) expect(pickEnemy(30, roll)).toBe('jelly');
     const after1 = new Set(Array.from({ length: 20 }, (_, i) => pickEnemy(90, i / 20)));
     expect([...after1].sort()).toEqual(['dart', 'jelly']);
@@ -566,14 +570,14 @@ describe('자동 공격 (단계 4)', () => {
     const world = new TowerSnakeWorld(seededRandom(1));
     world.boxes = [];
     world.load([{ x: 5, y: 5 }], 'right', [], []);
-    const fast = world.spawnEnemy('rock', 30, 20);
-    const slow = world.spawnEnemy('rock', 30, 30);
+    const fast = world.spawnEnemy('rock', 24, 14);
+    const slow = world.spawnEnemy('rock', 24, 24);
     slow.slow = SLOW_SECONDS;
     const fx = fast.x;
     const sx = slow.x;
     world.update(0.5);
-    const fastMoved = Math.hypot(fast.x - fx, fast.y - 20);
-    const slowMoved = Math.hypot(slow.x - sx, slow.y - 30);
+    const fastMoved = Math.hypot(fast.x - fx, fast.y - 14);
+    const slowMoved = Math.hypot(slow.x - sx, slow.y - 24);
     expect(slowMoved / fastMoved).toBeCloseTo(0.5, 1);
   });
 
@@ -644,11 +648,12 @@ describe('자동 공격 (단계 4)', () => {
   it('판에서 타워가 다가온 적을 쏘아 처치 수가 오른다', () => {
     const world = new TowerSnakeWorld(seededRandom(6));
     world.boxes = [];
-    world.load(row(20, 20, 19, 18, 17, 16, 15, 14), 'right', ['arrow', 'arrow', 'cannon', 'lightning', 'ice', 'arrow'], []);
-    world.spawnEnemy('jelly', 24, 16);
-    world.spawnEnemy('jelly', 24, 24);
-    world.spawnEnemy('dart', 16, 24);
-    const events = world.update(1.5);
+    world.load(row(14, 10, 9, 8, 7, 6, 5, 4), 'right', ['arrow', 'arrow', 'cannon', 'lightning', 'ice', 'arrow'], []);
+    world.spawnEnemy('jelly', 14, 10);
+    world.spawnEnemy('jelly', 14, 18);
+    world.spawnEnemy('dart', 6, 18);
+    // 첫 무리(WAVE_SECONDS)가 나오기 전까지
+    const events = world.update(WAVE_SECONDS - 0.05);
     expect(world.killed).toBe(3);
     expect(world.enemies).toHaveLength(0);
     expect(world.segments).toBe(6);
@@ -773,7 +778,7 @@ describe('타워 뱀 기록 (단계 6)', () => {
     world.load(row(20, 20, 19, 18), 'right', ['arrow', 'arrow'], [{ cell: { x: 21, y: 20 }, type: 'ice' }]);
     world.update(STEP_SECONDS * 1.5);
     expect(world.eaten.ice).toBe(1);
-    expect(world.longest).toBe(3);
+    expect(world.longest).toBe(Math.max(START_SEGMENTS, 3));
     expect(world.time).toBeCloseTo(STEP_SECONDS * 1.5);
     expect(TOWER_SNAKE_RECORDS.migrate!('play', 1, play({ seconds: world.time, longest: world.longest, eaten: { ...world.eaten }, towers: [...world.towers] }))).toBeDefined();
   });

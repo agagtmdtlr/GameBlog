@@ -8,8 +8,8 @@ import { BOARD, SPEED, TowerSnakeWorld, type Cell, type DamageCause } from './wo
  * 칸마다 갈 수 있는 세 방향을 점수로 견줘 고른다: 울타리·제 몸은 피하고, 가까운 적은 멀리하고, 가까운 상자 쪽으로 간다.
  */
 export interface BotSkill {
-  /** 몇 칸마다 한 번 방향을 정하는지 (클수록 늦게 반응한다) */
-  readonly every: number;
+  /** 방향을 다시 정하기까지 걸리는 시간 (초, 클수록 늦게 반응한다). 뱀이 빨라져도 사람의 반응은 그대로라 초로 둔다. */
+  readonly reaction: number;
   /** 정할 때마다 가장 좋은 쪽 대신 아무 안전한 쪽을 고를 확률 */
   readonly slip: number;
   /** 적을 피하려고 보는 거리 (칸) */
@@ -17,9 +17,9 @@ export interface BotSkill {
 }
 
 /** 처음 하는 사람: 조금 늦게 반응하고 가끔 엉뚱한 쪽으로 꺾는다. 적은 가까이 와야 본다. */
-export const NEWCOMER: BotSkill = { every: 2, slip: 0.12, sight: 3 };
+export const NEWCOMER: BotSkill = { reaction: 0.4, slip: 0.12, sight: 3 };
 /** 익숙한 사람: 칸마다 정하고 실수가 없다. */
-export const EXPERT: BotSkill = { every: 1, slip: 0, sight: 5 };
+export const EXPERT: BotSkill = { reaction: 0.2, slip: 0, sight: 5 };
 
 const DIRECTIONS: readonly Direction[] = ['up', 'down', 'left', 'right'];
 
@@ -79,7 +79,7 @@ export function playGame(seed: number, skill: BotSkill, limit = 600): BotResult 
   let ticks = 0;
   const losses: Record<DamageCause, number> = { enemy: 0, wall: 0, self: 0 };
   while (world.alive && world.time < limit) {
-    if (ticks % skill.every === 0) {
+    if (ticks % Math.max(1, Math.round(skill.reaction * SPEED)) === 0) {
       const direction = choose(world, skill, random);
       if (direction !== world.snake.nextDirection) world.turn(direction);
     }
