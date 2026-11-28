@@ -7,7 +7,7 @@
 | 기능 | 해당 작업 | 규칙 | 분석 |
 |---|---|---|---|
 | 메인 페이지 | 첫 화면 코믹 프레임, 오림 글자 제목, 컷 배치(다각형·여백)와 컷 나누기, 컷에 넣는 콘텐츠(미리 보기 그림·영상·YouTube 썸네일, 씬·미니 게임·YouTube·외부 주소로 가기), 씬에서 메인으로 돌아가기 | [rules/world.md](rules/world.md) | [analysis/home.md](analysis/home.md) |
-| 색칠 놀이와 미니 게임 | 3D 해 질 녘 도시를 자유 시점으로 돌아다니며 메시를 눌러 무작위 색을 채우는 색칠 놀이(`games/coloring/`), 도시 배치(도로·차·가로등·사람·건물·나무·하늘·해), 자유 시점 카메라와 조작, 칠하기 셰이더·선 테두리, 색 묶음, 클리어 연출, 엔진 없는 미니 게임 계층(`games/`, `?game=<id>`)과 새 게임 추가 | [rules/world.md](rules/world.md) | [analysis/coloring.md](analysis/coloring.md) |
+| 색칠 놀이와 미니 게임 | 해 질 녘 집 한 채와 방 안을 자유 시점으로 돌아다니며 메시를 눌러 무작위 색을 채우는 색칠 놀이(`games/coloring/`), 집 배치(겉벽·문·창·가로등·나무·사람·하늘·해, 방 안 가구), 문 칠하면 열리기와 드나들기, 벽 충돌, 자유 시점 카메라와 조작, 칠하기 셰이더·선 테두리, 색 묶음, 클리어 연출, 엔진 없는 미니 게임 계층(`games/`, `?game=<id>`)과 새 게임 추가 | [rules/world.md](rules/world.md) | [analysis/coloring.md](analysis/coloring.md) |
 | 2048 | 판을 밀어 같은 숫자 타일을 합치는 미니 게임(`games/game2048/`), 밀기·합치기 규칙, 타일 색, 애니메이션, 점수와 최고 점수, 이김·끝 표시 | [rules/world.md](rules/world.md) | [analysis/game2048.md](analysis/game2048.md) |
 | 뱀 | 판 위를 나아가며 열매를 먹고 길어지는 3D 미니 게임(`games/snake/`), 여러 게임이 함께 쓰는 칸 위의 몸 움직임(`lib/gridSnake/`), 방향 받기·부딪힘·빠르기 규칙, 몸·머리·열매 그리기, 칸 사이 매끄러운 움직임, 카메라 맞추기, 끌기 입력, 멈추기, 기록 | [rules/world.md](rules/world.md) | [analysis/snake.md](analysis/snake.md) |
 | 룰렛 체스 | 3D 판에서 컴퓨터와 두는 미니 게임(`games/chess/`), 수마다 다음 수를 둘 사람(나·컴퓨터)을 정하는 룰렛, 차례인 사람의 바탕색과 판 돌리기, 번갈아 두는 백·흑, 체크메이트·되돌리기 금지 규칙, 규칙 엔진(캐슬링·앙파상·승진·무승부), 컴퓨터 상대의 메이트 우선·알파-베타 탐색·세기·웹 워커, 판·기물 모양과 움직임, 기록 | [rules/world.md](rules/world.md) | [analysis/chess.md](analysis/chess.md) |
