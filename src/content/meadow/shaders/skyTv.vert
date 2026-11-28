@@ -1,5 +1,5 @@
 // three.js의 RawShaderMaterial(GLSL3)로 쓴다. #version은 three.js가 붙인다.
-// 텔레비전 하나(한 변 1인 상자 안, 부품마다 색 color와 번호 aPart: 0 나무, 1 은색, 2 검은 판, 3 화면)를 하늘 텔레비전마다 인스턴스로 그린다.
+// 텔레비전 하나(한 변 1인 상자 안, 부품마다 색 color와 번호 aPart: 0 몸통, 1 테·손잡이, 2 조작판, 3 화면)를 하늘 텔레비전마다 인스턴스로 그린다.
 // 텔레비전은 제자리에서 천천히 둥실거린다.
 
 in vec3 position;
@@ -33,7 +33,7 @@ void main() {
   vec3 world = iPosition + rotate(iRotation, position * iScale) + vec3(0.0, bob, 0.0);
   vWorldPos = world;
   vNormal = rotate(iRotation, normal);
-  // 나무 색만 텔레비전마다 조금씩 다르다.
+  // 몸통 색만 텔레비전마다 조금씩 다르다.
   vColor = color * (aPart < 0.5 ? iTint : 1.0);
   vScreen = step(2.5, aPart);
   vScreenUv = position.xy;

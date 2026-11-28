@@ -3,6 +3,7 @@ import { dot, length, normalize, sub } from '../../engine/math';
 import { groundNormal, groundRadius } from '../../engine/physics/collision';
 import { PLAYER_RADIUS } from '../common/character/player';
 import { keepInside, MEADOW, MEADOW_CENTER, MEADOW_GROUND, meadowHeight, meadowPoint } from './objects/meadowTerrain';
+import { RAIN, rainVelocity } from './objects/rain';
 import { growScale, SKY_TVS, SkyTvField, skyTvAt } from './objects/skyTvs';
 import { Wind, windDirection, windStrength, WIND } from './objects/wind';
 import { MEADOW_SPAWN, MeadowWorld } from './world';
@@ -174,5 +175,18 @@ describe('하늘 텔레비전', () => {
     const world = new MeadowWorld();
     expect(world.skyTvs.count).toBeGreaterThan(300);
     for (const tv of world.skyTvList()) expect(growScale(world.time - tv.spawnedAt)).toBe(1);
+  });
+});
+
+describe('비', () => {
+  it('빗줄기가 아래로 떨어지고 바람 방향으로 밀리며, 바람이 셀수록 더 비스듬하다', () => {
+    const calm = rainVelocity({ direction: [0.6, -0.8], strength: 0, gustTravel: 0, time: 0 });
+    const gusty = rainVelocity({ direction: [0.6, -0.8], strength: 1, gustTravel: 0, time: 0 });
+    expect(calm[1]).toBe(-RAIN.fallSpeed);
+    expect(Math.hypot(calm[0], calm[2])).toBeCloseTo(RAIN.drift[0], 6);
+    expect(Math.hypot(gusty[0], gusty[2])).toBeCloseTo(RAIN.drift[1], 6);
+    expect(gusty[0] / gusty[2]).toBeCloseTo(0.6 / -0.8, 6);
+    // 가장 거센 바람에도 빗줄기는 수직에서 45도보다 덜 기운다.
+    expect(Math.hypot(gusty[0], gusty[2])).toBeLessThan(RAIN.fallSpeed);
   });
 });

@@ -1,6 +1,6 @@
 precision highp float;
 
-// 하늘 텔레비전. 흐린 날의 빛을 받는 툰 음영이고, 꺼진 화면에는 희미한 잡음(지지직)이 흐른다.
+// 하늘 텔레비전. 흐린 날의 빛을 받는 툰 음영의 검은 플라스틱이고, 꺼진 화면에는 희미한 잡음(지지직)이 흐른다.
 // 멀수록 안개(하늘색)로 사라져, 「골콩드」처럼 겹겹이 멀어지는 깊이가 생긴다. 그림자 맵은 받지 않는다.
 
 uniform vec3 uCameraPos;
@@ -57,8 +57,15 @@ void main() {
   float NoL = max(dot(N, L), 0.0);
   vec3 color = albedo / PI * uLightColor * toonDiffuse(NoL);
   color += albedo * mix(uGroundColor, uSkyColor, 0.6);
-  // 가장자리를 하늘빛으로 살짝 밝혀 흐린 하늘에 실루엣이 묻히지 않게 한다.
-  color += uSkyColor * pow(1.0 - max(dot(N, V), 0.0), 3.0) * 0.08;
+  // 검은 플라스틱의 광택. 흐린 하늘을 비추는 반사(비스듬할수록 강하다)와, 빛 쪽의 또렷한 하이라이트.
+  // 몸통이 거의 검으므로 이 광택이 모서리와 면을 드러낸다. 하이라이트는 툰 음영처럼 경계를 끊는다.
+  float NoV = max(dot(N, V), 0.0);
+  float fresnel = 0.04 + 0.96 * pow(1.0 - NoV, 5.0);
+  float gloss = vScreen > 0.5 ? 0.6 : 1.0;
+  color += uSkyColor * fresnel * 0.55 * gloss;
+  vec3 H = normalize(L + V);
+  float highlight = toonStep(0.5, pow(max(dot(N, H), 0.0), 48.0));
+  color += uLightColor * highlight * 0.05 * gloss;
 
   if (vScreen > 0.5) {
     // 꺼진 브라운관의 잡음: 화면 위 칸마다 무작위 밝기가 빠르게 바뀌고, 가로 띠가 천천히 흘러내린다.
