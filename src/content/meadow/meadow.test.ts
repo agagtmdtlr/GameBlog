@@ -3,6 +3,7 @@ import { dot, length, normalize, sub } from '../../engine/math';
 import { groundNormal, groundRadius } from '../../engine/physics/collision';
 import { PLAYER_RADIUS } from '../common/character/player';
 import { keepInside, MEADOW, MEADOW_CENTER, MEADOW_GROUND, meadowHeight, meadowPoint } from './objects/meadowTerrain';
+import { growScale, SKY_TVS, SkyTvField, skyTvAt } from './objects/skyTvs';
 import { Wind, windDirection, windStrength, WIND } from './objects/wind';
 import { MEADOW_SPAWN, MeadowWorld } from './world';
 
@@ -96,5 +97,82 @@ describe('초원 바람', () => {
     expect(after.gustTravel).toBeGreaterThan(WIND.gustSpeed[0] * 0.99);
     expect(after.time).toBeCloseTo(WIND.startTime + 1, 6);
     expect(wind.frame(0.5).gustTravel).toBeLessThan(after.gustTravel);
+  });
+});
+
+describe('하늘 텔레비전', () => {
+  const at = (x: number, z: number) => meadowPoint(x, z, PLAYER_RADIUS);
+  const horizontal = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0] - b[0], a[2] - b[2]);
+
+  it('같은 칸은 늘 같은 텔레비전이다', () => {
+    expect(skyTvAt(1, 3, -7)).toEqual(skyTvAt(1, 3, -7));
+    expect(skyTvAt(0, 3, -7)).not.toEqual(skyTvAt(0, 4, -7));
+  });
+
+  it('크기·높이·회전이 정한 범위 안이다', () => {
+    let filled = 0;
+    for (let layer = 0; layer < SKY_TVS.layers.length; layer++) {
+      for (let ix = -10; ix < 10; ix++) {
+        for (let iz = -10; iz < 10; iz++) {
+          const tv = skyTvAt(layer, ix, iz);
+          if (!tv) continue;
+          filled++;
+          expect(tv.size).toBeGreaterThanOrEqual(SKY_TVS.size[0]);
+          expect(tv.size).toBeLessThanOrEqual(SKY_TVS.size[1]);
+          expect(Math.hypot(...tv.rotation)).toBeCloseTo(1, 6);
+          // 높이를 더하면 수평 자리도 h/R만큼 바깥으로 밀리므로 비탈에서 조금 어긋난다.
+          const ground = meadowPoint(tv.position[0], tv.position[2]);
+          const altitude = length(sub(tv.position, MEADOW_CENTER)) - length(sub(ground, MEADOW_CENTER));
+          expect(altitude).toBeGreaterThan(SKY_TVS.layers[layer].altitude[0] - 1.5);
+          expect(altitude).toBeLessThan(SKY_TVS.layers[layer].altitude[1] + 1.5);
+        }
+      }
+    }
+    const total = SKY_TVS.layers.length * 400;
+    expect(filled / total).toBeGreaterThan(SKY_TVS.fill - 0.08);
+    expect(filled / total).toBeLessThan(SKY_TVS.fill + 0.08);
+  });
+
+  it('플레이어 둘레에 스폰하고, 멀어지면 없앤다', () => {
+    const field = new SkyTvField();
+    const first = field.update(at(0, 0), 0);
+    expect(first.spawned).toBeGreaterThan(300);
+    for (const tv of field.tvs) expect(horizontal(tv.position, [0, 0, 0])).toBeLessThan(SKY_TVS.despawnRadius);
+
+    const keysBefore = new Set([...field.tvs].map((tv) => tv.key));
+    const player = at(120, -60);
+    const moved = field.update(player, 10);
+    expect(moved.spawned).toBeGreaterThan(0);
+    expect(moved.despawned).toBeGreaterThan(0);
+    for (const tv of field.tvs) {
+      expect(horizontal(tv.position, player)).toBeLessThanOrEqual(SKY_TVS.despawnRadius);
+      // 새로 스폰한 것만 새 시각을 갖는다.
+      expect(tv.spawnedAt).toBe(keysBefore.has(tv.key) ? 0 : 10);
+    }
+    // 같은 자리에서 다시 불러도 바뀌지 않는다.
+    expect(field.update(player, 11)).toEqual({ spawned: 0, despawned: 0 });
+  });
+
+  it('돌아오면 같은 자리에 같은 텔레비전이 있다', () => {
+    const field = new SkyTvField();
+    field.update(at(0, 0), 0);
+    const original = new Map([...field.tvs].map((tv) => [tv.key, tv.position]));
+    field.update(at(400, 0), 1);
+    field.update(at(0, 0), 2);
+    for (const tv of field.tvs) if (original.has(tv.key)) expect(tv.position).toEqual(original.get(tv.key));
+    expect(field.count).toBe(original.size);
+  });
+
+  it('스폰되면 커지며 나타난다', () => {
+    expect(growScale(0)).toBeCloseTo(0, 6);
+    expect(growScale(SKY_TVS.growSeconds)).toBeCloseTo(1, 6);
+    expect(growScale(Infinity)).toBeCloseTo(1, 6);
+    expect(Math.max(...[0.5, 0.6, 0.7, 0.8].map((k) => growScale(k * SKY_TVS.growSeconds)))).toBeGreaterThan(1);
+  });
+
+  it('월드가 플레이어를 따라 하늘 텔레비전을 스폰한다', () => {
+    const world = new MeadowWorld();
+    expect(world.skyTvs.count).toBeGreaterThan(300);
+    for (const tv of world.skyTvList()) expect(growScale(world.time - tv.spawnedAt)).toBe(1);
   });
 });

@@ -8,7 +8,7 @@
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline c18fcc8..HEAD -- src/content/planet/scenes src/content/planet/graphics/meshes.ts src/content/planet/index.ts src/content/planet/objects/surfaceScene.ts src/content/planet/world.ts src/content/planet/shapes/tvShape.ts src/content/planet/shapes/rocketShape.ts src/engine/render/videoScreenLayer.ts src/main.ts
+git log --oneline c18fcc8..HEAD -- src/content/planet/scenes src/content/planet/graphics/meshes.ts src/content/planet/index.ts src/content/planet/objects/surfaceScene.ts src/content/planet/world.ts src/content/common/tv/tvShape.ts src/content/common/tv/tvGraphics.ts src/content/planet/shapes/rocketShape.ts src/engine/render/videoScreenLayer.ts src/main.ts
 ```
 
 ## 파일
@@ -23,7 +23,8 @@ git log --oneline c18fcc8..HEAD -- src/content/planet/scenes src/content/planet/
 | `content/planet/index.ts` | 영상이 있는 표면 객체마다 `graphics.addVideoScreen(…, 'tvScreen', …)`을 부르고, 매 프레임 플레이 중이면 플레이어와 화면 중심의 거리로, 아니면 0으로 소리 크기를 정한다 |
 | `content/planet/world.ts` | `SURFACE_OBJECTS`를 그리기 목록과 충돌 목록(`collides`가 true인 것)에 넣는다. `surfaceObjectDrawItems`가 `box`는 `box` 메시 하나, `rocket`은 `rocket`(객체 색)과 `rocketGlass`(창 유리 색) 메시 둘, `tv`는 `tv`(객체 색, 나무)·`tvTrim`(은색 테·손잡이)·`tvDark`(조작판·스피커 천)·`tvScreen`(화면 유리) 메시 넷으로 그린다 |
 | `content/planet/shapes/rocketShape.ts` | 로켓 모형의 모양 값(`ROCKET_SHAPE`)과 자리 계산(`bodyProfile`, `bodySurface`, `rocketLegs`, `rocketWindow`, `rocketHatch`, `rocketRivets`). three.js를 쓰지 않는다 |
-| `content/planet/shapes/tvShape.ts` | 아날로그 텔레비전 모형의 모양 값(`TV_SHAPE`)과 부품 계산(`tvLegs`, `tvWoodBoxes`, `tvDarkBoxes`, `tvKnobs`, `tvScreenDepths`, `roundedRect`). three.js를 쓰지 않는다. 검사는 `tvShape.test.ts` |
+| `content/common/tv/tvShape.ts` | 아날로그 텔레비전 모형의 모양 값(`TV_SHAPE`)과 부품 계산(`tvLegs`, `tvWoodBoxes`, `tvDarkBoxes`, `tvKnobs`, `tvScreenDepths`, `roundedRect`). three.js를 쓰지 않는다. 검사는 `tvShape.test.ts`. 초원 씬의 하늘 텔레비전도 쓰므로 공용 폴더에 있다 (2026-11-28 `content/planet/shapes/`에서 옮김) |
+| `content/common/tv/tvGraphics.ts` | 텔레비전 부품 지오메트리(`createTvPartGeometries`)와 메시 `tv`, `tvTrim`, `tvDark`, `tvScreen` 등록(`defineTvMeshes`). 행성 `graphics/meshes.ts`가 부른다 |
 | `content/planet/graphics/meshes.ts` | `createRocketGeometry()`: 몸통 `LatheGeometry`, 다리 `CapsuleGeometry`, 창틀 `TorusGeometry`, 옆문·리벳 `SphereGeometry`를 `mergeGeometries`로 합친다. `createRocketGlassGeometry()`: 창 유리 `CircleGeometry`. `createTvGeometry()` 등: 텔레비전 부품을 색마다 `mergeParts`로 합친다(상자 `BoxGeometry`, 다리 `CylinderGeometry`, 화면 테 `ExtrudeGeometry`, 화면 유리 `ShapeGeometry`) |
 | `content/planet/game.test.ts` | `텔레비전 자리`, `로켓 자리`, `표면 장면 파일` 블록. 객체는 id로 찾는다 |
 

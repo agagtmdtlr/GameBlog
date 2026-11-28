@@ -36,7 +36,7 @@ import { separateBodies, Wanderer, type Random } from '../common/character/npc';
 import { PLAYER_RADIUS, Player, type MoveCommand } from '../common/character/player';
 import { SURFACE_OBJECTS, type SurfaceObject } from './objects/surfaceScene';
 import { ROCKET_SHAPE } from './shapes/rocketShape';
-import { TV_SHAPE } from './shapes/tvShape';
+import { TV_SHAPE } from '../common/tv/tvShape';
 import { Train, type TrainPartModel } from './objects/train';
 import { SMOKE } from './objects/smoke';
 import { TRACK_SHAPE } from './shapes/trackPath';

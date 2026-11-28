@@ -4,6 +4,7 @@ import { characterDrawItems } from '../common/character/characterDraw';
 import { PLAYER_RADIUS, Player, type MoveCommand } from '../common/character/player';
 import { BODY_RADIUS, Walker } from '../common/character/walker';
 import { keepInside, MEADOW_CENTER, MEADOW_GROUND, meadowPoint } from './objects/meadowTerrain';
+import { SkyTvField, type SkyTv } from './objects/skyTvs';
 import { Wind, type WindFrame } from './objects/wind';
 
 /** 분지 한가운데에서 시작한다. */
@@ -43,13 +44,28 @@ export const MEADOW_ENVIRONMENT: Environment = {
   fog: { near: 45, far: 230 },
 };
 
+/** 플레이어가 이만큼 움직이면 하늘 텔레비전 칸을 다시 본다 (스폰 반경보다 훨씬 작다). */
+const SKY_TV_RESPAWN_STEP = 4;
+
 /** 초원 씬의 상태와 규칙. GPU와 DOM에 의존하지 않는다. */
 export class MeadowWorld {
   readonly player = new Player(MEADOW_SPAWN);
   readonly walker = new Walker(MEADOW_SPAWN, MEADOW_GROUND);
   readonly wind = new Wind();
+  /** 플레이어 둘레 하늘에 스폰되는 텔레비전 */
+  readonly skyTvs = new SkyTvField();
+  /** 씬이 흐른 시간(초). 일시 정지하면 멈춘다. */
+  time = 0;
+  /** 하늘 텔레비전을 마지막으로 스폰한 플레이어 자리. 이만큼 움직였을 때만 칸을 다시 본다. */
+  private skyTvAnchor: Vec3;
+
+  constructor() {
+    this.skyTvAnchor = this.player.position;
+    this.skyTvs.update(this.player.position, -Infinity);
+  }
 
   fixedStep(dt: number, command: MoveCommand): void {
+    this.time += dt;
     this.wind.step(dt);
     this.player.step(dt, command, MEADOW_GROUND);
     // 분지 가장자리 너머로는 가지 못한다. 바깥으로 가는 속도를 지운다.
@@ -60,6 +76,17 @@ export class MeadowWorld {
       if (out > 0) this.player.velocity = sub(this.player.velocity, scale(inside.outward, out));
     }
     this.walker.step(dt, this.player);
+    const [ax, , az] = this.skyTvAnchor;
+    const [px, , pz] = this.player.position;
+    if (Math.hypot(px - ax, pz - az) > SKY_TV_RESPAWN_STEP) {
+      this.skyTvAnchor = this.player.position;
+      this.skyTvs.update(this.player.position, this.time);
+    }
+  }
+
+  /** 지금 떠 있는 하늘 텔레비전 */
+  skyTvList(): SkyTv[] {
+    return [...this.skyTvs.tvs];
   }
 
   interpolatedPlayerPosition(alpha: number): Vec3 {

@@ -1,14 +1,9 @@
 import {
-  BoxGeometry,
   CapsuleGeometry,
   CircleGeometry,
-  CylinderGeometry,
-  ExtrudeGeometry,
   LatheGeometry,
   Matrix4,
   Quaternion,
-  Shape,
-  ShapeGeometry,
   SphereGeometry,
   TorusGeometry,
   Vector2,
@@ -30,7 +25,7 @@ import { displaceToMoon } from '../shapes/moonShape';
 import { bodyProfile, rocketHatch, rocketLegs, rocketRivets, rocketWindow, ROCKET_SHAPE, type RocketPart } from '../shapes/rocketShape';
 import { dishProfile } from '../shapes/satelliteShape';
 import { trackMesh } from '../shapes/trackPath';
-import { roundedRect, tvDarkBoxes, tvKnobs, tvLegs, tvScreenDepths, tvWoodBoxes, TV_SHAPE, type TvBox } from '../shapes/tvShape';
+import { defineTvMeshes } from '../../common/tv/tvGraphics';
 import { PLANET } from '../planet';
 import { terrainHeight } from '../objects/terrain';
 import { TRACK_PATH } from '../objects/train';
@@ -40,7 +35,7 @@ import { TRACK_PATH } from '../objects/train';
  * - `ring`: XY 평면에 놓인 반지름 1의 가느다란 고리(토러스). 관의 반지름은 `RING_TUBE_RATIO`다.
  * - `moon`: 반지름 1 언저리의 구에 충돌구와 바위 덩어리를 새긴 위성 (`moonShape.ts`)
  * - `rocket`, `rocketGlass`: 로켓 모형의 몸통과 창 유리 (`rocketShape.ts`)
- * - `tv`, `tvTrim`, `tvDark`, `tvScreen`: 텔레비전 모형의 나무·은색·검은 부분과 화면 유리 (`tvShape.ts`)
+ * - `tv`, `tvTrim`, `tvDark`, `tvScreen`: 텔레비전 모형의 나무·은색·검은 부분과 화면 유리 (`common/tv/tvShape.ts`)
  * - `rails`, `sleepers`: 선로의 레일과 침목. 월드 좌표로 만든 지오메트리라 단위 행렬로 그린다 (`trackPath.ts`)
  * - `terrain`: 높낮이가 있는 행성 땅. 역시 월드 좌표다
  * - `mound`(종 모양 언덕), `pillar`(끝이 둥근 기둥): y 0~1, 바닥 반지름 0.5인 회전체 (`dreamShape.ts`)
@@ -55,11 +50,8 @@ export function definePlanetMeshes(graphics: Graphics): void {
   // 로켓 자리의 모형. 장면 파일의 `size`가 한 변 1인 상자를 늘린다.
   graphics.defineMesh('rocket', createRocketGeometry());
   graphics.defineMesh('rocketGlass', createRocketGlassGeometry());
-  // 텔레비전 자리의 모형. 칠하는 색마다 지오메트리를 나눈다.
-  graphics.defineMesh('tv', createTvGeometry());
-  graphics.defineMesh('tvTrim', createTvTrimGeometry());
-  graphics.defineMesh('tvDark', createTvDarkGeometry());
-  graphics.defineMesh('tvScreen', createTvScreenGeometry());
+  // 텔레비전 자리의 모형. 칠하는 색마다 지오메트리를 나눈다 (공용 `common/tv/`).
+  defineTvMeshes(graphics);
   const track = trackMesh(TRACK_PATH);
   graphics.defineMesh('rails', triangleGeometry(track.rails));
   graphics.defineMesh('sleepers', triangleGeometry(track.sleepers));
@@ -135,51 +127,3 @@ function createRocketGlassGeometry(): BufferGeometry {
   return glass;
 }
 
-const tvBoxPart = ({ center, size }: TvBox): [BufferGeometry, Matrix4] => [
-  new BoxGeometry(...size),
-  new Matrix4().makeTranslation(...center),
-];
-
-const tvShapeOf = (points: [number, number][]): Shape => new Shape(points.map(([x, y]) => new Vector2(x, y)));
-
-/** 텔레비전의 나무 부분: 몸통, 뚜껑, 다리, 스피커 가로 살. 모양은 `tvShape.ts`가 정한다. */
-function createTvGeometry(): BufferGeometry {
-  return mergeParts([
-    ...tvWoodBoxes().map(tvBoxPart),
-    ...tvLegs().map(({ center, length, topRadius, bottomRadius }): [BufferGeometry, Matrix4] => [
-      new CylinderGeometry(topRadius, bottomRadius, length, 16),
-      new Matrix4().makeTranslation(...center),
-    ]),
-  ]);
-}
-
-/** 텔레비전의 은색 부분: 화면 테와 손잡이 */
-function createTvTrimGeometry(): BufferGeometry {
-  const { x, y, width, height, cornerRadius, bezel, bezelDepth } = TV_SHAPE.screen;
-  const frame = tvShapeOf(roundedRect(width + 2 * bezel, height + 2 * bezel, cornerRadius + bezel));
-  frame.holes.push(tvShapeOf(roundedRect(width, height, cornerRadius)));
-  const { knobRadius, knobDepth } = TV_SHAPE.panel;
-  return mergeParts([
-    [
-      new ExtrudeGeometry(frame, { depth: bezelDepth, bevelEnabled: false, curveSegments: 8 }),
-      new Matrix4().makeTranslation(x, y, tvScreenDepths().bezelBack),
-    ],
-    ...tvKnobs().map((center): [BufferGeometry, Matrix4] => [
-      new CylinderGeometry(knobRadius, knobRadius, knobDepth, 16).rotateX(Math.PI / 2),
-      new Matrix4().makeTranslation(...center),
-    ]),
-  ]);
-}
-
-/** 텔레비전의 검은 부분: 조작판과 스피커 천 */
-function createTvDarkGeometry(): BufferGeometry {
-  return mergeParts(tvDarkBoxes().map(tvBoxPart));
-}
-
-/** 텔레비전 화면 유리. 테 안쪽, 몸통 앞면 바로 앞에 놓은 둥근 모서리 판이다. */
-function createTvScreenGeometry(): BufferGeometry {
-  const { x, y, width, height, cornerRadius } = TV_SHAPE.screen;
-  return mergeParts([
-    [new ShapeGeometry(tvShapeOf(roundedRect(width, height, cornerRadius))), new Matrix4().makeTranslation(x, y, tvScreenDepths().glass)],
-  ]);
-}
