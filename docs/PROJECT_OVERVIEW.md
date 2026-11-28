@@ -24,7 +24,8 @@
 
 ```bash
 npm run dev      # 개발 서버
-npm test         # 단위 테스트
+npm test         # 단위 테스트 전부
+npm run test:only chess   # 게임·콘텐츠 하나(와 계층 규칙)만. 이름 없이 돌리면 목록을 보여 준다
 npm run build    # 타입 검사 후 dist/ 생성
 npm run preview  # 빌드 결과 미리 보기
 ```
@@ -133,6 +134,7 @@ GameBlog/
 │        └─ assets/astronaut-sticker.png  잡지에서 오린 스티커 꼴의 우주인 그림
 ├─ README.md                  저장소 소개, 조작, 시작 방법
 ├─ tools/blender/build_character.py  캐릭터 다리 모델(character.glb)을 만드는 Blender 스크립트
+├─ tools/test/                      테스트 프로젝트 목록(projects.mjs)과 하나만 돌리는 스크립트(only.mjs)
 ├─ tools/sticker/                    우주인 원본 사진과 스티커 그림을 만드는 Python 스크립트
 ├─ docs/
 │  ├─ README.md                기능별 규칙과 분석 문서의 색인
@@ -244,6 +246,20 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 ## 6. 테스트와 검증
 
 ### 자동 테스트
+
+게임과 콘텐츠는 서로 독립이라, 테스트를 Vitest 프로젝트로 나눠 바꾼 곳만 돌릴 수 있다 (2026-11-28 사용자 결정, `vite.config.ts`의 `test.projects`).
+
+| 프로젝트 | 테스트 파일 | 돌리기 |
+|---|---|---|
+| 게임 폴더 이름 (`chess`, `coloring`, `game2048`, `snake`, `towerSnake`) | `src/games/<이름>/**/*.test.ts` | `npm run test:only <이름>` |
+| 콘텐츠 폴더 이름 (`planet`, `meadow`) | `src/content/<이름>/**/*.test.ts` | `npm run test:only <이름>` |
+| `shared` | 위 폴더와 `layers.test.ts`를 뺀 나머지: `engine/`, `lib/`, `home/`, `content/common/` | `npm run test:only shared` |
+| `layers` | `src/layers.test.ts` (계층 규칙: 게임끼리 가져오지 않기 등) | `test:only`가 늘 함께 돌린다 |
+
+- 프로젝트 목록은 `tools/test/projects.mjs`가 `src/games/`, `src/content/`의 폴더에서 만든다. 게임 폴더를 더하면 프로젝트도 저절로 생긴다.
+- `npm run test:only`(`tools/test/only.mjs`)는 이름을 여러 개 받을 수 있고, 모르는 이름이면 목록을 보여 주고 실패한다 (Vitest만으로는 오타가 `layers`만 돌고 통과해 버린다).
+- 어느 것을 돌릴지는 [CLAUDE.md](../CLAUDE.md)의 "브랜치와 커밋" 4번을 따른다. `npm test`는 여전히 전부 돌린다.
+- 확인 (2026-11-28): `npm test` 369개, `test:only chess` 34개(체스 25 + layers 9), `test:only snake game2048` 30개, `test:only planet` 141개, `test:only shared` 112개, `test:only nope`은 목록을 보이고 실패.
 
 `npm test` 기준 32개 파일, 369개가 모두 통과한다 (2026-11-28, 타워 뱀 단계 4 뒤). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 

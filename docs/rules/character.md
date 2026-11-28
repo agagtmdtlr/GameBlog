@@ -26,5 +26,5 @@
 
 ## 완료 조건
 
-- `npm test`와 `npm run build`가 통과한다.
+- 바꾼 곳의 테스트(캐릭터는 `content/common/`이라 `npm run test:only shared`, 여러 곳이면 `npm test`)와 `npm run build`가 통과한다.
 - 브라우저에서 서 있는 자세와 걷는 모습을 보고, `window.__game.gl.getError()`가 0이며 콘솔 오류가 없다.

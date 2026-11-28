@@ -21,6 +21,6 @@
 
 ## 완료 조건
 
-- `npm test`와 `npm run build`가 통과한다.
+- 바꾼 곳의 테스트(`npm run test:only <이름>`, 여러 곳이면 `npm test`)와 `npm run build`가 통과한다.
 - 브라우저에서 `window.__game.gl.getError()`가 0이고 콘솔 오류가 없다.
 - three.js 버전을 올리면 [analysis/threejs.md](../analysis/threejs.md)의 "포팅 중 확인한 점"을 다시 확인한다.

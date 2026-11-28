@@ -47,6 +47,6 @@
 
 ## 완료 조건
 
-- `npm test`와 `npm run build`가 통과한다.
+- 바꾼 곳의 테스트(`npm run test:only <이름>`, 여러 곳이면 `npm test`)와 `npm run build`가 통과한다.
 - 렌더링이 바뀌면 브라우저에서 바뀐 장면을 보고, WebGL과 콘솔 오류가 없는지 본다. 방법은 [analysis/threejs.md](../analysis/threejs.md)의 "브라우저 확인 방법"에 있다.
 - 동작이나 구조가 바뀌면 같은 변경에서 해당 분석 문서와 [PROJECT_OVERVIEW.md](../PROJECT_OVERVIEW.md)를 고친다.
