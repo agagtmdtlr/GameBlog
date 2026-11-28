@@ -25,9 +25,9 @@ export const SKY_TVS = {
   size: [2.4, 4.6] as const,
   /** 기울기의 최대 각 (라디안). 대부분은 거의 똑바로 서 있다. */
   maxTilt: 0.18,
-  /** 플레이어에서 이 수평 거리 안의 칸에 스폰하고, `despawnRadius` 밖으로 나가면 없앤다. */
-  spawnRadius: 190,
-  despawnRadius: 205,
+  /** 플레이어에서 이 수평 거리 안의 칸에 스폰하고, `despawnRadius` 밖으로 나가면 없앤다. 안개 끝(125)보다 넉넉히 멀다. */
+  spawnRadius: 165,
+  despawnRadius: 180,
   /** 스폰된 텔레비전이 0에서 제 크기로 커지는 시간(초) */
   growSeconds: 1.6,
   seed: 1898,
