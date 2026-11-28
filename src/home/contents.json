@@ -36,6 +36,12 @@
       "added": "2026-11-28",
       "preview": { "image": "chess.jpg" },
       "open": { "game": "chess" }
+    },
+    {
+      "title": "타워 뱀",
+      "added": "2026-11-28",
+      "preview": { "image": "tower-snake.jpg" },
+      "open": { "game": "tower-snake" }
     }
   ]
 }
