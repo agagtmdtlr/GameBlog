@@ -1,20 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BUILDINGS,
-  CARS,
-  carPose,
-  cityParts,
-  LOOP,
-  lampPoses,
-  loopLength,
-  loopPose,
-  outward,
+  CAMERA_RADIUS,
+  DOOR,
+  doorOpenness,
+  doorRegion,
+  DOORWAY,
+  HOUSE,
+  houseParts,
+  houseWalls,
+  insideWall,
+  inRoom,
   partNeighbors,
-  ROAD_HALF_WIDTH,
-  SIDEWALK_WIDTH,
+  ROOM,
   walkerPose,
   WALKERS,
-} from './city';
+  YARD_RADIUS,
+} from './house';
 import { ColoringState } from './coloringState';
 import { CAMERA_BOUNDS, FreeCamera } from './freeCamera';
 import { hslToRgb, PALETTE_SIZE, randomPalette } from './palette';
@@ -32,51 +33,17 @@ function seeded(seed: number): () => number {
   };
 }
 
-describe('순환 도로', () => {
-  const length = loopLength();
+describe('집 배치', () => {
+  const parts = houseParts();
 
-  it('한 바퀴 돌면 제자리이고, 길을 따라 끊기지 않는다', () => {
-    const start = loopPose(0, 2);
-    const end = loopPose(length, 2);
-    expect(end.x).toBeCloseTo(start.x, 6);
-    expect(end.z).toBeCloseTo(start.z, 6);
-    const steps = 2000;
-    for (let i = 0; i < steps; i++) {
-      const a = loopPose((i / steps) * length);
-      const b = loopPose(((i + 1) / steps) * length);
-      expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeCloseTo(length / steps, 4);
-    }
-  });
-
-  it('나아가는 방향은 다음 자리를 가리키고, 바깥쪽은 그 오른쪽이다', () => {
-    for (let s = 0; s < length; s += 7.3) {
-      const a = loopPose(s);
-      const b = loopPose(s + 0.01);
-      const heading = Math.atan2(-(b.z - a.z), b.x - a.x);
-      expect(Math.cos(heading - a.heading)).toBeCloseTo(1, 4);
-      // 바깥쪽 자리는 가운데(원점)에서 더 멀다.
-      const [ox, oz] = outward(a.heading);
-      expect(Math.hypot(a.x + ox, a.z + oz)).toBeGreaterThan(Math.hypot(a.x, a.z));
-    }
-  });
-
-  it('위에서 보면 반시계로 돈다 (+x → -z)', () => {
-    expect(loopPose(0).x).toBeCloseTo(0);
-    expect(loopPose(0).z).toBeCloseTo(LOOP.halfZ);
-    const quarter = loopPose(length / 4);
-    expect(quarter.x).toBeGreaterThan(0);
-    expect(quarter.z).toBeLessThan(0);
-  });
-});
-
-describe('도시 배치', () => {
-  const parts = cityParts();
-
-  it('칠할 조각에 하늘, 해, 차, 가로등, 사람이 모두 있다', () => {
-    const shapes = new Set(parts.map((p) => p.shape));
-    for (const shape of ['sky', 'sun', 'road', 'carBody', 'lampHead', 'personBody'] as const) expect(shapes).toContain(shape);
-    expect(parts.filter((p) => p.shape === 'carBody')).toHaveLength(CARS.length);
-    expect(parts.filter((p) => p.shape === 'personHead')).toHaveLength(WALKERS.length);
+  it('바깥에는 하늘·해·문·사람이, 안에는 방과 가구가 있다', () => {
+    const names = new Set(parts.map((p) => p.name));
+    for (const name of ['sky', 'sun', 'facade', 'door', 'lampHeadLeft', 'person0Head', 'floor', 'tableTop', 'sofa', 'books', 'clock'])
+      expect(names).toContain(name);
+    expect(names.size).toBe(parts.length);
+    expect(parts.filter((p) => p.owner.kind === 'walker' && p.name.endsWith('Head'))).toHaveLength(WALKERS.length);
+    expect(parts.filter((p) => p.owner.kind === 'door')).toHaveLength(1);
+    expect(parts.filter((p) => p.inside).length).toBeGreaterThan(15);
   });
 
   it('같은 무리의 조각끼리만 이웃이다', () => {
@@ -84,63 +51,82 @@ describe('도시 배치', () => {
     parts.forEach((part, i) => {
       for (const n of neighbors[i]) expect(parts[n - 1].group).toBe(part.group);
     });
-    const body = parts.findIndex((p) => p.shape === 'carBody');
-    expect(neighbors[body]).toContain(body + 2);
+    const top = parts.findIndex((p) => p.name === 'tableTop');
+    expect(neighbors[top]).toContain(parts.findIndex((p) => p.name === 'tableLegs') + 1);
   });
 
-  it('차는 도로 위, 사람은 인도 위에 있다', () => {
-    for (let t = 0; t < 60; t += 1.7) {
-      for (const car of CARS) {
-        const lane = car.lane;
-        expect(Math.abs(lane)).toBeLessThan(ROAD_HALF_WIDTH - 1);
-        expect(Number.isFinite(carPose(car, t).x)).toBe(true);
+  it('문의 영역 번호는 문 조각을 가리킨다', () => {
+    expect(parts[doorRegion(parts) - 1].name).toBe('door');
+  });
+
+  it('방 안 가구는 방 안에, 바깥 물건은 건물 밖 마당에 놓인다', () => {
+    for (const part of parts) {
+      if (part.owner.kind !== 'static' || part.geometry.kind !== 'solids') continue;
+      const [x, , z] = part.owner.position;
+      if (part.inside) {
+        expect(Math.abs(x), part.name).toBeLessThanOrEqual(ROOM.halfX);
+        expect(Math.abs(z), part.name).toBeLessThanOrEqual(ROOM.halfZ);
+      } else if (x !== 0 || z !== 0) {
+        const outside = Math.abs(x) > HOUSE.width / 2 || Math.abs(z) > HOUSE.depth / 2;
+        expect(outside, part.name).toBe(true);
+        expect(Math.hypot(x, z), part.name).toBeLessThan(YARD_RADIUS);
       }
+    }
+  });
+
+  it('사람은 건물과 부딪히지 않게 마당을 돈다', () => {
+    const walls = houseWalls(false);
+    for (let t = 0; t < 80; t += 0.9) {
       for (const walker of WALKERS) {
-        const edge = Math.abs(walker.offset);
-        expect(edge).toBeGreaterThan(ROAD_HALF_WIDTH + 0.3);
-        expect(edge).toBeLessThan(ROAD_HALF_WIDTH + SIDEWALK_WIDTH - 0.3);
-        expect(walkerPose(walker, t).bob).toBeGreaterThanOrEqual(0);
+        const pose = walkerPose(walker, t);
+        expect(insideWall(walls, [pose.x, 1, pose.z], 0.5)).toBe(false);
+        expect(Math.hypot(pose.x, pose.z)).toBeLessThan(YARD_RADIUS);
+        expect(pose.bob).toBeGreaterThanOrEqual(0);
       }
     }
   });
+});
 
-  it('같은 차선의 차는 서로 떨어져 달린다', () => {
-    for (let t = 0; t < 40; t += 0.5) {
-      for (let i = 0; i < CARS.length; i++) {
-        for (let j = i + 1; j < CARS.length; j++) {
-          if (CARS[i].lane !== CARS[j].lane) continue;
-          const a = carPose(CARS[i], t);
-          const b = carPose(CARS[j], t);
-          expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThan(8);
-        }
-      }
-    }
+describe('문', () => {
+  it('칠하기 전에는 닫혀 있고, 칠한 뒤 잠깐 있다가 다 열린다', () => {
+    expect(doorOpenness(null, 100)).toBe(0);
+    expect(doorOpenness(10, 10 + DOOR.delay * 0.5)).toBe(0);
+    const middle = doorOpenness(10, 10 + DOOR.delay + DOOR.seconds / 2);
+    expect(middle).toBeGreaterThan(0.2);
+    expect(middle).toBeLessThan(1);
+    expect(doorOpenness(10, 10 + DOOR.delay + DOOR.seconds)).toBe(1);
+    expect(doorOpenness(-Infinity, 0)).toBe(1);
   });
 
-  it('건물은 인도 바깥에 있다', () => {
-    const length = loopLength();
-    const outer = ROAD_HALF_WIDTH + SIDEWALK_WIDTH;
-    for (const { position, size } of BUILDINGS) {
-      for (let s = 0; s < length; s += 1) {
-        const edge = loopPose(s, outer);
-        const inX = Math.abs(edge.x - position[0]) < size[0] / 2;
-        const inZ = Math.abs(edge.z - position[2]) < size[2] / 2;
-        expect(inX && inZ, `건물 ${position}`).toBe(false);
-      }
-    }
+  it('닫힌 문은 막고, 열린 문으로는 지나갈 수 있다', () => {
+    const doorway: [number, number, number] = [0, 1.7, HOUSE.depth / 2 - HOUSE.wall / 2];
+    expect(insideWall(houseWalls(false), doorway)).toBe(true);
+    expect(insideWall(houseWalls(true), doorway)).toBe(false);
+    // 문 옆 벽은 늘 막는다.
+    expect(insideWall(houseWalls(true), [2, 1.7, doorway[2]])).toBe(true);
   });
 
-  it('가로등은 고르게 놓인다', () => {
-    const lamps = lampPoses();
-    expect(lamps.length).toBeGreaterThan(3);
-    for (const lamp of lamps) expect(Number.isFinite(lamp.heading)).toBe(true);
+  it('드나드는 길은 벽에 닿지 않고, 방 안 자리는 방 안이다', () => {
+    const walls = houseWalls(true);
+    const path = [DOORWAY.outside, DOORWAY.front, DOORWAY.inside];
+    for (let i = 1; i < path.length; i++) {
+      for (let k = 0; k <= 50; k++) {
+        const a = path[i - 1];
+        const b = path[i];
+        const p: [number, number, number] = [0, 1, 2].map((axis) => a[axis] + ((b[axis] - a[axis]) * k) / 50) as [number, number, number];
+        expect(insideWall(walls, p, CAMERA_RADIUS * 0.9)).toBe(false);
+      }
+    }
+    expect(inRoom(DOORWAY.inside)).toBe(true);
+    expect(inRoom(DOORWAY.outside)).toBe(false);
   });
 });
 
 describe('자유 시점 카메라', () => {
-  it('처음에는 해 쪽(-z)을 본다', () => {
+  it('처음에는 건물 앞 마당에서 건물 쪽(-z)을 본다', () => {
     const camera = new FreeCamera();
     expect(camera.forward[2]).toBeLessThan(-0.9);
+    expect(camera.position[2]).toBeGreaterThan(HOUSE.depth / 2);
   });
 
   it('왼쪽으로 돌면 -x 쪽을 보고, 고개는 거의 수직까지만 든다', () => {
@@ -162,6 +148,28 @@ describe('자유 시점 카메라', () => {
     expect(camera.position[1]).toBe(CAMERA_BOUNDS.minY);
     camera.move(1000, 0, 0);
     expect(Math.hypot(camera.position[0], camera.position[2])).toBeCloseTo(CAMERA_BOUNDS.radius);
+  });
+
+  it('벽에 부딪히면 멈추고, 벽을 따라서는 미끄러진다', () => {
+    const walls = houseWalls(false);
+    const camera = new FreeCamera({ position: [3, 1.7, 8], yaw: 0, pitch: 0 });
+    camera.move(10, 0, 0, walls);
+    expect(camera.position[2]).toBeGreaterThanOrEqual(HOUSE.depth / 2 + CAMERA_RADIUS - 1e-9);
+    expect(camera.position[2]).toBeLessThan(HOUSE.depth / 2 + CAMERA_RADIUS + 0.5);
+    // 비스듬히 밀면 벽을 따라 옆으로 간다.
+    camera.yaw = Math.PI / 4;
+    const x = camera.position[0];
+    camera.move(2, 0, 0, walls);
+    expect(camera.position[0]).toBeLessThan(x - 1);
+  });
+
+  it('닫힌 문으로는 못 들어가고, 열린 문으로는 들어간다', () => {
+    const closed = new FreeCamera({ position: [0, 1.7, 8], yaw: 0, pitch: 0 });
+    closed.move(8, 0, 0, houseWalls(false));
+    expect(inRoom(closed.position)).toBe(false);
+    const open = new FreeCamera({ position: [0, 1.7, 8], yaw: 0, pitch: 0 });
+    for (let i = 0; i < 40; i++) open.move(0.2, 0, 0, houseWalls(true));
+    expect(inRoom(open.position)).toBe(true);
   });
 });
 

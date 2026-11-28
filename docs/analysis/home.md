@@ -94,7 +94,7 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 | `b` | 뱀 | 2026-11-28 | `snake.jpg`, 게임 화면 캡처 ([snake.md](snake.md)) |
 | `c` | 바람 부는 초원 | 2026-11-25 | `meadow.jpg` ([meadow.md](meadow.md)) |
 | `d` | 2048 | 2026-11-25 | `2048.svg`, 판 그림 ([game2048.md](game2048.md)) |
-| `e` | 색칠 놀이 | 2026-11-24 | `coloring.jpg`, 반쯤 칠한 도시 화면 캡처 ([coloring.md](coloring.md)) |
+| `e` | 색칠 놀이 | 2026-11-24 | `coloring.jpg`, 다 칠한 집 화면 캡처 (문이 열려 방 안이 보임) ([coloring.md](coloring.md)) |
 | `f` | 행성 산책 | 2026-11-24 | `planet.jpg` |
 | `g`, `h` | 비어 있음 | | |
 

@@ -8,7 +8,7 @@
 
 ## 1. 컨셉
 
-첫 화면은 코믹 프레임 메인 페이지로, 컷마다 콘텐츠 미리 보기를 보여 주고 누르면 그 콘텐츠(3D 씬, 미니 게임)로 간다 ([analysis/home.md](analysis/home.md)). 미니 게임으로 해 질 녘 3D 도시를 자유 시점으로 돌아다니며 차·가로등·사람·하늘·해 같은 물체를 눌러 무작위 색을 채우는 색칠 놀이([analysis/coloring.md](analysis/coloring.md))와 판을 밀어 같은 숫자 타일을 합치는 2048([analysis/game2048.md](analysis/game2048.md)), 3D 판 위에서 열매를 먹고 길어지는 뱀([analysis/snake.md](analysis/snake.md)), 3D 판에서 수마다 룰렛이 다음 수를 둘 사람(나·컴퓨터)을 정하는 룰렛 체스([analysis/chess.md](analysis/chess.md))가 있다. 콘텐츠의 중심은 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다닌다. 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
+첫 화면은 코믹 프레임 메인 페이지로, 컷마다 콘텐츠 미리 보기를 보여 주고 누르면 그 콘텐츠(3D 씬, 미니 게임)로 간다 ([analysis/home.md](analysis/home.md)). 미니 게임으로 해 질 녘 3D 집 한 채를 자유 시점으로 돌아다니며 물체를 눌러 무작위 색을 채우고, 문을 칠하면 열려 방 안 가구까지 칠하는 색칠 놀이([analysis/coloring.md](analysis/coloring.md))와 판을 밀어 같은 숫자 타일을 합치는 2048([analysis/game2048.md](analysis/game2048.md)), 3D 판 위에서 열매를 먹고 길어지는 뱀([analysis/snake.md](analysis/snake.md)), 3D 판에서 수마다 룰렛이 다음 수를 둘 사람(나·컴퓨터)을 정하는 룰렛 체스([analysis/chess.md](analysis/chess.md))가 있다. 콘텐츠의 중심은 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다닌다. 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
 
 ## 2. 기술 구성
 
@@ -41,7 +41,7 @@ GameBlog/
 │  ├─ main.ts                  진입점: ?game= 이면 미니 게임, ?scene= 이면 App과 씬을 동적으로 불러와 올리고, 둘 다 없으면 메인 페이지
 │  ├─ games/                   엔진 없는 미니 게임 (?game=<id>, [analysis/coloring.md](analysis/coloring.md))
 │  │  ├─ game.ts, index.ts     GameDefinition, GAMES
-│  │  ├─ coloring/             색칠 놀이: 도시 배치·움직임(city.ts), 자유 시점(freeCamera.ts), 색 묶음, 판 상태, 기록(records.ts), three.js 그리기(graphics/, shaders/)
+│  │  ├─ coloring/             색칠 놀이: 집 배치·문·벽(house.ts), 자유 시점(freeCamera.ts), 색 묶음, 판 상태, 기록(records.ts), three.js 그리기(graphics/, shaders/)
 │  │  ├─ game2048/             2048: 판 상태(board.ts), 타일 색, 기록(records.ts), DOM 화면 ([analysis/game2048.md](analysis/game2048.md))
 │  │  ├─ snake/                뱀: 놀이 상태(snakeGame.ts), 기록(records.ts), three.js 그리기(graphics/, shaders/) ([analysis/snake.md](analysis/snake.md))
 │  │  ├─ towerSnake/           타워 뱀 (개발 중): 판 상태(world.ts), 타워 종류(towers.ts), 적(enemies.ts, waves.ts, spatialGrid.ts), 자동 공격(combat.ts), 미니맵, three.js 그리기(graphics/, shaders/) ([analysis/towerSnake.md](analysis/towerSnake.md))
@@ -267,7 +267,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 |---|---|---|
 | [`math.test.ts`](../src/engine/math.test.ts) | 12 | 벡터, 쿼터니언, 행렬 |
 | [`layers.test.ts`](../src/layers.test.ts) | 9 | 계층 가져오기 규칙: 엔진 → 콘텐츠 금지, 씬끼리 금지, three.js를 가져오는 곳, 메인 페이지·lib·미니 게임의 가져오기 |
-| [`coloring.test.ts`](../src/games/coloring/coloring.test.ts) | 21 | 색칠 놀이의 순환 도로 경로, 도시 배치(조각 목록, 이웃, 차·사람 자리, 차 간격, 건물 자리), 자유 시점 카메라, 색 고르기와 완성, 색 묶음, 기록 누적·검사, 저장·되돌리기 |
+| [`coloring.test.ts`](../src/games/coloring/coloring.test.ts) | 22 | 색칠 놀이의 집 배치(조각 목록, 이웃, 문 영역, 가구·물건 자리, 사람 길), 문(열림 곡선, 막기, 드나드는 길), 자유 시점 카메라(벽 충돌), 색 고르기와 완성, 색 묶음, 기록 누적·검사, 저장·되돌리기 |
 | [`game2048.test.ts`](../src/games/game2048/game2048.test.ts) | 11 | 2048의 밀기·합치기 순서, 새 타일, 끝, 이김, 타일 id, 타일 색, 기록 누적·검사 |
 | [`gridSnake.test.ts`](../src/lib/gridSnake/gridSnake.test.ts) | 10 | 칸 위의 뱀 몸: 놓기, 방향 받기·버리기, 앞 칸·판 안, 꼬리 칸 판정, 나아가기·늘기, 제 몸 칸으로 옮기기, 마디 잃기, 빈 칸, 꺾은 방향 |
 | [`towerSnake.test.ts`](../src/games/towerSnake/towerSnake.test.ts) | 48 | 타워 뱀의 시작, 시간과 칸, 울타리 꺾기·모서리·받아 둔 방향 버리기, 몸 지나가기, 꼬리 칸, 무적, 끝, 다시 하기, 상자 자리·먹기·마디 한계·타워 잃기·종류 비율, 적 무리·다가오기·밀어내기·마디 돌아가기·머리 부딪힘·큰 녀석, 표적 고르기·화살 쿨다운·사거리·대포 범위·얼음 느려짐·번개 튀기·헛맞기·투사체 한계·처치 수 |

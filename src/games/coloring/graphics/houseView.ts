@@ -2,7 +2,6 @@ import {
   BackSide,
   Box3,
   BoxGeometry,
-  BufferAttribute,
   BufferGeometry,
   CapsuleGeometry,
   CircleGeometry,
@@ -22,8 +21,6 @@ import {
   Raycaster,
   Scene,
   ShaderMaterial,
-  Shape,
-  ShapeGeometry,
   SphereGeometry,
   SRGBColorSpace,
   Vector2,
@@ -38,23 +35,18 @@ import skyFrag from '../shaders/sky.frag?raw';
 import outlineVert from '../shaders/outline.vert?raw';
 import outlineFrag from '../shaders/outline.frag?raw';
 import {
-  BUILDINGS,
-  CARS,
-  carPose,
-  CURB_HEIGHT,
-  loopLength,
-  loopPose,
+  DOOR,
+  doorOpenness,
   type MoverPose,
   type PaintPart,
-  type PartShape,
-  ROAD_HALF_WIDTH,
-  SIDEWALK_WIDTH,
+  type PartGeometry,
   SKY_RADIUS,
+  type Solid,
   SUN_DIRECTION,
   SUN_DISTANCE,
   walkerPose,
   WALKERS,
-} from '../city';
+} from '../house';
 import type { FreeCamera } from '../freeCamera';
 import type { Rgb } from '../palette';
 
@@ -71,14 +63,8 @@ const PAPER: Rgb = [0xfb / 255, 0xf6 / 255, 0xec / 255];
 const INK: Rgb = [0x2a / 255, 0x22 / 255, 0x1e / 255];
 /** 해를 칠하기 전 해 질 녘 빛 */
 const DUSK_LIGHT: Rgb = [1, 0.84, 0.7];
-const WINDOW_LIGHT: Rgb = [1, 0.93, 0.72];
 /** 해를 칠하기 전 하늘의 해 쪽 노을빛 */
 const SUN_GLOW: Rgb = [1, 0.72, 0.45];
-
-/** 선을 두르지 않는 조각 (아주 크거나 납작해서 테두리가 어색한 것) */
-const NO_OUTLINE: ReadonlySet<PartShape> = new Set(['sky', 'ground', 'park', 'road']);
-/** 칠하면 음영 없이 빛나는 조각 */
-const GLOWING: ReadonlySet<PartShape> = new Set(['sun', 'lampHead']);
 
 const srgb = (rgb: Rgb) => new Color().setRGB(rgb[0], rgb[1], rgb[2], SRGBColorSpace);
 
@@ -105,109 +91,35 @@ interface PaintMesh {
 
 // ─── 지오메트리 ──────────────────────────────────────────────
 
-const LOOP_SAMPLES = 320;
-
-/**
- * 순환 도로를 따라 `inner`~`outer`(가운데 선에서 바깥쪽 거리) 띠. `height`가 0보다 크면 윗면 높이이고 양옆 벽도 만든다.
- */
-function loopStrip(inner: number, outer: number, base: number, height: number): BufferGeometry {
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const indices: number[] = [];
-  const length = loopLength();
-  const top = base + height;
-  const quad = (a: number, b: number, c: number, d: number) => indices.push(a, b, c, a, c, d);
-  // 윗면, 바깥 벽, 안쪽 벽을 차례로 한 줄씩
-  const rings: { offset: number; y: number; normal: (h: number) => [number, number, number] }[] = [
-    { offset: inner, y: top, normal: () => [0, 1, 0] },
-    { offset: outer, y: top, normal: () => [0, 1, 0] },
-  ];
-  if (height > 0) {
-    const out = (h: number): [number, number, number] => [Math.sin(h), 0, Math.cos(h)];
-    const inn = (h: number): [number, number, number] => [-Math.sin(h), 0, -Math.cos(h)];
-    rings.push({ offset: outer, y: top, normal: out }, { offset: outer, y: base, normal: out });
-    rings.push({ offset: inner, y: top, normal: inn }, { offset: inner, y: base, normal: inn });
-  }
-  for (let i = 0; i <= LOOP_SAMPLES; i++) {
-    const s = (i / LOOP_SAMPLES) * length;
-    for (const ring of rings) {
-      const pose = loopPose(s, ring.offset);
-      positions.push(pose.x, ring.y, pose.z);
-      normals.push(...ring.normal(pose.heading));
-    }
-  }
-  const stride = rings.length;
-  for (let i = 0; i < LOOP_SAMPLES; i++) {
-    const a = i * stride;
-    const b = (i + 1) * stride;
-    for (let pair = 0; pair < stride; pair += 2) quad(a + pair, b + pair, b + pair + 1, a + pair + 1);
-  }
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
-  geometry.setAttribute('normal', new BufferAttribute(new Float32Array(normals), 3));
-  geometry.setIndex(indices);
-  return geometry;
+/** 기본 도형 하나의 지오메트리 (주인 자리 기준) */
+function solidGeometry(solid: Solid): BufferGeometry {
+  let geometry: BufferGeometry;
+  if ('box' in solid) geometry = new BoxGeometry(...solid.box);
+  else if ('cylinder' in solid) geometry = new CylinderGeometry(...solid.cylinder, 18);
+  else if ('sphere' in solid) geometry = new SphereGeometry(solid.sphere, 18, 12);
+  else if ('blob' in solid) geometry = new IcosahedronGeometry(solid.blob, 1);
+  else geometry = new CapsuleGeometry(...solid.capsule, 4, 12);
+  if ('rotation' in solid && solid.rotation) geometry.rotateX(solid.rotation[0]).rotateY(solid.rotation[1]).rotateZ(solid.rotation[2]);
+  geometry.translate(...solid.at);
+  // 합치려면 모두 인덱스가 없어야 한다 (다면체는 인덱스가 없다).
+  return geometry.index ? geometry.toNonIndexed() : geometry;
 }
 
-/** 도로 안쪽 공원 (안쪽 인도 안쪽 가장자리까지) */
-function parkGeometry(): BufferGeometry {
-  const edge = -(ROAD_HALF_WIDTH + SIDEWALK_WIDTH);
-  const shape = new Shape();
-  const length = loopLength();
-  for (let i = 0; i < LOOP_SAMPLES; i++) {
-    const pose = loopPose((i / LOOP_SAMPLES) * length, edge);
-    if (i === 0) shape.moveTo(pose.x, -pose.z);
-    else shape.lineTo(pose.x, -pose.z);
-  }
-  const geometry = new ShapeGeometry(shape);
-  geometry.rotateX(-Math.PI / 2);
-  geometry.translate(0, CURB_HEIGHT, 0);
-  return geometry;
-}
-
-const positioned = (geometry: BufferGeometry, x: number, y: number, z: number) => geometry.translate(x, y, z);
-
-/** 조각 모양마다의 지오메트리. 움직이는 것은 자기 자리(원점) 기준, 정적인 것은 놓을 자리 기준 */
-function partGeometry(shape: PartShape): BufferGeometry {
-  switch (shape) {
+/** 조각 모양마다의 지오메트리 */
+function partGeometry(geometry: PartGeometry): BufferGeometry {
+  switch (geometry.kind) {
     case 'sky':
       return new SphereGeometry(SKY_RADIUS, 48, 24);
     case 'sun': {
       const [x, y, z] = SUN_DIRECTION;
-      return positioned(new SphereGeometry(18, 32, 16), x * SUN_DISTANCE, y * SUN_DISTANCE, z * SUN_DISTANCE);
+      return new SphereGeometry(18, 32, 16).translate(x * SUN_DISTANCE, y * SUN_DISTANCE, z * SUN_DISTANCE);
     }
-    case 'ground':
-      return new CircleGeometry(SKY_RADIUS * 0.95, 64).rotateX(-Math.PI / 2);
-    case 'park':
-      return parkGeometry();
-    case 'road':
-      return loopStrip(-ROAD_HALF_WIDTH, ROAD_HALF_WIDTH, 0.02, 0);
-    case 'sidewalkOuter':
-      return loopStrip(ROAD_HALF_WIDTH, ROAD_HALF_WIDTH + SIDEWALK_WIDTH, 0, CURB_HEIGHT);
-    case 'sidewalkInner':
-      return loopStrip(-ROAD_HALF_WIDTH - SIDEWALK_WIDTH, -ROAD_HALF_WIDTH, 0, CURB_HEIGHT);
-    case 'carBody':
-      return positioned(new BoxGeometry(4.2, 1, 2), 0, 0.85, 0);
-    case 'carCabin':
-      return positioned(new BoxGeometry(2.2, 0.8, 1.8), -0.3, 1.75, 0);
-    case 'lampPole':
-      // 기둥과, 도로 쪽(자기 좌표 -z)으로 뻗은 팔
-      return mergeGeometries([
-        positioned(new CylinderGeometry(0.12, 0.16, 5.6, 12), 0, 2.8, 0),
-        positioned(new BoxGeometry(0.16, 0.16, 1.8), 0, 5.5, -0.85),
-      ]);
-    case 'lampHead':
-      return positioned(new CylinderGeometry(0.22, 0.55, 0.5, 16), 0, 5.25, -1.75);
-    case 'personBody':
-      return positioned(new CapsuleGeometry(0.28, 0.85, 4, 12), 0, 0.72, 0);
-    case 'personHead':
-      return positioned(new SphereGeometry(0.25, 16, 12), 0, 1.6, 0);
-    case 'building':
-      return positioned(new BoxGeometry(1, 1, 1), 0, 0.5, 0);
-    case 'trunk':
-      return positioned(new CylinderGeometry(0.32, 0.45, 3, 10), 0, 1.5, 0);
-    case 'crown':
-      return positioned(new IcosahedronGeometry(2.6, 1), 0, 4.6, 0);
+    case 'disc':
+      return new CircleGeometry(geometry.radius, 64).rotateX(-Math.PI / 2).translate(0, geometry.y, 0);
+    case 'solids': {
+      const list = geometry.solids.map(solidGeometry);
+      return list.length === 1 ? list[0] : mergeGeometries(list);
+    }
   }
 }
 
@@ -221,54 +133,13 @@ function hullGeometry(geometry: BufferGeometry): BufferGeometry {
   return merged;
 }
 
-/** 건물 창: 건물 네 벽에 층마다 늘어선 따뜻한 불빛 사각형을 하나로 합친다. */
-function windowGeometry(): BufferGeometry {
-  const parts: BufferGeometry[] = [];
-  for (const { position, size } of BUILDINGS) {
-    const [bx, , bz] = position;
-    const [w, h, d] = size;
-    const faces = [
-      { width: w, normal: [0, 0, 1], center: [bx, bz + d / 2 + 0.03], rotation: 0 },
-      { width: w, normal: [0, 0, -1], center: [bx, bz - d / 2 - 0.03], rotation: Math.PI },
-      { width: d, normal: [1, 0, 0], center: [bx + w / 2 + 0.03, bz], rotation: Math.PI / 2 },
-      { width: d, normal: [-1, 0, 0], center: [bx - w / 2 - 0.03, bz], rotation: -Math.PI / 2 },
-    ];
-    for (const face of faces) {
-      const columns = Math.max(1, Math.floor(face.width / 3));
-      for (let floor = 2.2; floor + 1.8 < h; floor += 3.2) {
-        for (let c = 0; c < columns; c++) {
-          const along = (c + 0.5 - columns / 2) * (face.width / columns);
-          const plane = new PlaneGeometry(1.3, 1.7).rotateY(face.rotation);
-          const [nx, , nz] = face.normal;
-          // 벽을 따라가는 방향은 법선을 위에서 90도 돌린 것
-          plane.translate(face.center[0] + along * nz, floor, face.center[1] - along * nx);
-          parts.push(plane);
-        }
-      }
-    }
-  }
-  return mergeGeometries(parts);
-}
-
-/** 도로 가운데 점선 */
-function laneDashGeometry(): BufferGeometry {
-  const parts: BufferGeometry[] = [];
-  const length = loopLength();
-  const count = Math.floor(length / 6);
-  for (let i = 0; i < count; i++) {
-    const pose = loopPose((i / count) * length, 0);
-    parts.push(new PlaneGeometry(2.6, 0.22).rotateX(-Math.PI / 2).rotateY(pose.heading).translate(pose.x, 0.04, pose.z));
-  }
-  return mergeGeometries(parts);
-}
-
 // ─── 보기 ────────────────────────────────────────────────
 
 /**
  * 색칠 놀이의 3D 장면을 three.js로 그린다. 조각마다 메시 하나와 셰이더 재질 하나를 두고, 칠하면 그 재질의 uniform만 바꾼다.
  * 누르기는 화면 좌표에서 광선을 쏘아 가장 가까운 조각을 찾는다. 다 칠하면 화면 위에 색종이를 뿌린다.
  */
-export class CityView {
+export class HouseView {
   private readonly renderer: WebGLRenderer;
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(VERTICAL_FOV, 1, 0.3, 1200);
@@ -277,8 +148,11 @@ export class CityView {
   private readonly paints: PaintMesh[] = [];
   private readonly pickables: Mesh[] = [];
   private readonly raycaster = new Raycaster();
-  private readonly cars: Group[] = [];
   private readonly people: Group[] = [];
+  /** 문 경첩. 문을 칠하면 돌아 열린다. */
+  private readonly hinge = new Group();
+  /** 문을 칠한 시각 (`time` 기준 초), 아직이면 `null`. 일시 정지해도 문은 열린다. */
+  private doorPaintedAt: number | null = null;
   private readonly confetti: InstancedMesh;
   private readonly pieces: Confetti[] = [];
   private readonly dummy = new Object3D();
@@ -322,17 +196,17 @@ export class CityView {
         uInk: { value: new Vector3(...INK) },
       },
     });
-    const ink = new MeshBasicMaterial({ color: srgb(INK) });
-
-    this.cars = CARS.map(() => this.addGroup(this.carDecor(ink)));
     this.people = WALKERS.map((walker) => {
-      const group = this.addGroup(new Group());
+      const group = new Group();
       group.scale.setScalar(walker.height);
+      this.scene.add(group);
       return group;
     });
+    this.hinge.position.set(...DOOR.hinge);
+    this.scene.add(this.hinge);
 
     parts.forEach((part, i) => {
-      const geometry = partGeometry(part.shape);
+      const geometry = partGeometry(part.geometry);
       geometry.computeBoundingBox();
       const material = this.paintMaterial(part);
       const mesh = new Mesh(geometry, material);
@@ -341,23 +215,20 @@ export class CityView {
       if (owner.kind === 'static') {
         mesh.position.set(...owner.position);
         mesh.rotation.y = owner.rotationY;
-        mesh.scale.set(...owner.scale);
         this.scene.add(mesh);
+      } else if (owner.kind === 'walker') {
+        this.people[owner.index].add(mesh);
       } else {
-        (owner.kind === 'car' ? this.cars : this.people)[owner.index].add(mesh);
+        this.hinge.add(mesh);
       }
-      if (!NO_OUTLINE.has(part.shape)) mesh.add(new Mesh(hullGeometry(geometry), outlineMaterial));
-      if (part.shape === 'sky') {
+      if (!part.noOutline) mesh.add(new Mesh(hullGeometry(geometry), outlineMaterial));
+      if (part.geometry.kind === 'sky') {
         mesh.renderOrder = -1;
         mesh.frustumCulled = false;
       }
       this.paints.push({ mesh, part, bounds: geometry.boundingBox ?? new Box3(), color: PAPER, painted: false });
       this.pickables.push(mesh);
     });
-
-    const windows = new Mesh(windowGeometry(), new MeshBasicMaterial({ color: srgb(WINDOW_LIGHT) }));
-    const dashes = new Mesh(laneDashGeometry(), ink);
-    this.scene.add(windows, dashes);
 
     this.confetti = new InstancedMesh(new PlaneGeometry(1, 0.6), new MeshBasicMaterial({ side: DoubleSide }), CONFETTI_COUNT);
     this.confetti.visible = false;
@@ -407,7 +278,7 @@ export class CityView {
     // 누른 자리가 없으면 가운데에서 번진다. 하늘 구의 가운데는 방향이 없으므로 해 쪽에서 번지게 한다.
     const origin = point
       ? mesh.worldToLocal(point.clone())
-      : paint.part.shape === 'sky'
+      : paint.part.geometry.kind === 'sky'
         ? new Vector3(...SUN_DIRECTION)
         : bounds.getCenter(new Vector3());
     let reach = 0;
@@ -422,10 +293,10 @@ export class CityView {
       u.uPrevPainted.value = paint.painted ? 1 : 0;
       u.uPainted.value = 1;
     }
-    if (u.uGlow) u.uGlow.value = GLOWING.has(paint.part.shape) ? 1 : 0;
+    if (u.uGlow) u.uGlow.value = paint.part.glow ? 1 : 0;
     paint.color = color;
     paint.painted = true;
-    if (paint.part.shape === 'sun') {
+    if (paint.part.geometry.kind === 'sun') {
       this.shared.uLightColor.value.set(...mixRgb(DUSK_LIGHT, color, 0.5));
       this.skySunColor.set(...mixRgb(SUN_GLOW, color, 0.5));
     }
@@ -485,11 +356,26 @@ export class CityView {
     this.confetti.visible = false;
   }
 
-  /** 차와 사람을 `seconds`만큼 움직인다. */
+  /** 문 열림 정도 0~1 */
+  get doorOpenness(): number {
+    return doorOpenness(this.doorPaintedAt, this.time);
+  }
+
+  /** 문을 연다. `instant`면 곧바로 다 열린다 (이어 하기). 이미 열리고 있으면 그대로 둔다. */
+  openDoor(instant = false): void {
+    if (this.doorPaintedAt !== null) return;
+    this.doorPaintedAt = instant ? -Infinity : this.time;
+  }
+
+  /** 문을 닫는다 (새 판). */
+  closeDoor(): void {
+    this.doorPaintedAt = null;
+  }
+
+  /** 사람을 `seconds`만큼 움직인다. */
   update(seconds: number): void {
     this.elapsed += seconds;
-    this.cars.forEach((group, i) => place(group, carPose(CARS[i], this.elapsed), 0));
-    this.people.forEach((group, i) => place(group, walkerPose(WALKERS[i], this.elapsed), CURB_HEIGHT));
+    this.people.forEach((group, i) => place(group, walkerPose(WALKERS[i], this.elapsed)));
   }
 
   render(view: FreeCamera, frameSeconds: number): void {
@@ -497,6 +383,7 @@ export class CityView {
     this.shared.uTime.value = now;
     this.camera.position.set(...view.position);
     this.camera.rotation.set(view.pitch, view.yaw, 0);
+    this.hinge.rotation.y = DOOR.openAngle * this.doorOpenness;
     if (this.confetti.visible) this.updateConfetti(frameSeconds, now - this.celebratedAt);
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
@@ -515,23 +402,6 @@ export class CityView {
     this.renderer.dispose();
   }
 
-  private addGroup(group: Group): Group {
-    this.scene.add(group);
-    return group;
-  }
-
-  /** 차 바퀴 (칠하지 않는 검은 부분) */
-  private carDecor(ink: MeshBasicMaterial): Group {
-    const group = new Group();
-    const wheel = new CylinderGeometry(0.42, 0.42, 0.3, 16).rotateX(Math.PI / 2);
-    for (const [x, z] of [[1.3, 1], [1.3, -1], [-1.3, 1], [-1.3, -1]] as const) {
-      const mesh = new Mesh(wheel, ink);
-      mesh.position.set(x, 0.42, z);
-      group.add(mesh);
-    }
-    return group;
-  }
-
   private paintMaterial(part: PaintPart): ShaderMaterial {
     const own = {
       uNew: { value: new Vector3(...PAPER) },
@@ -541,7 +411,7 @@ export class CityView {
       uReach: { value: 1 },
       uUnfilled: { value: 1 },
     };
-    if (part.shape === 'sky') {
+    if (part.geometry.kind === 'sky') {
       return new ShaderMaterial({
         glslVersion: GLSL3,
         vertexShader: skyVert,
@@ -593,9 +463,9 @@ export class CityView {
   }
 }
 
-/** 움직이는 무리를 자리에 놓는다. 차는 도로(0), 사람은 인도 위(`CURB_HEIGHT`)에 선다. */
-function place(group: Group, pose: MoverPose, baseY: number): void {
-  group.position.set(pose.x, baseY + pose.bob, pose.z);
+/** 걷는 사람을 자리에 놓는다. */
+function place(group: Group, pose: MoverPose): void {
+  group.position.set(pose.x, pose.bob, pose.z);
   group.rotation.y = pose.heading;
 }
 

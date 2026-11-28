@@ -481,6 +481,33 @@ a.comic-cut.is-youtube::after {
   60% { transform: translateY(0) rotate(8deg); }
 }
 
+/* 문이 열리면 진행 막대 위에 드나들기 버튼이 튀어나온다. */
+.coloring-door {
+  top: auto;
+  left: 50%;
+  bottom: 50px;
+  width: 60px;
+  height: 60px;
+  margin-left: -30px;
+  border-radius: 18px;
+  background: #ffe27a;
+  animation: coloring-door-in 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) backwards;
+}
+
+.coloring-door svg {
+  width: 32px;
+  height: 32px;
+}
+
+.coloring-door[hidden] {
+  display: none;
+}
+
+@keyframes coloring-door-in {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+
 .coloring-progress {
   position: absolute;
   left: 50%;
