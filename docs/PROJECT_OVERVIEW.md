@@ -99,7 +99,7 @@ GameBlog/
 │     │     ├─ characterDraw.ts  캐릭터 몸·다리 그리기 항목 (행성·초원 씬이 함께 씀)
 │     ├─ common/tv/          아날로그 텔레비전 모양(`tvShape.ts`)과 부품 지오메트리(`tvGraphics.ts`). 행성 표면 텔레비전과 초원 하늘 텔레비전이 함께 씀
 │     │     └─ character.glb   Blender에서 내보낸 다리 스킨 메시
-│     ├─ meadow/               바람 부는 초원 씬: 큰 분지 땅, GPU로 만드는 잔디 격자, 바람, 플레이어 둘레에 절차적으로 스폰되는 검은 하늘 텔레비전, 바람에 비스듬히 내리는 비 ([analysis/meadow.md](analysis/meadow.md))
+│     ├─ meadow/               바람 부는 초원 씬: 큰 분지 땅, GPU로 만드는 잔디 격자, 바람, 플레이어 둘레에 절차적으로 스폰되는 검은 하늘 텔레비전, 바람에 비스듬히 내리는 비, 장면을 비추는 번개 ([analysis/meadow.md](analysis/meadow.md))
 │     └─ planet/               행성 씬
 │        ├─ index.ts           planetScene: 그래픽 등록, World·카메라·영상 소리 진행
 │        ├─ world.ts           월드 조립, 게임 규칙, 그리기 목록
