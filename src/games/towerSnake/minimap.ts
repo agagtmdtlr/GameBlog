@@ -1,3 +1,4 @@
+import type { Enemy } from './enemies';
 import type { TowerType } from './towers';
 import { BOARD, type Cell, type TowerBox } from './world';
 
@@ -8,10 +9,12 @@ const GRASS = '#c4e6a8';
 const INK = '#2a221e';
 const BODY = '#a98bf0';
 const HEAD = '#e2577a';
+/** 적 (작은 점, 큰 녀석은 크게) */
+const ENEMY = '#d6455f';
 /** 상자 색 (타워 종류마다, 판 위 상자보다 짙게) */
 const BOX: Record<TowerType, string> = { arrow: '#f2b400', cannon: '#5f6f9f', ice: '#2fa8e0', lightning: '#8f6ad8' };
 
-/** 화면 모서리의 판 전체 지도. 몸과 머리, 타워 상자, 카메라가 보는 곳을 그림으로만 보인다. */
+/** 화면 모서리의 판 전체 지도. 몸과 머리, 타워 상자, 적, 카메라가 보는 곳을 그림으로만 보인다. */
 export class Minimap {
   readonly element: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
@@ -29,7 +32,11 @@ export class Minimap {
   /**
    * 다시 그린다. `focus`는 카메라가 보는 판 위 자리(칸 단위), `view`는 화면에 보이는 칸 수(가로, 세로)다.
    */
-  draw(body: readonly Cell[], boxes: readonly TowerBox[], focus: { x: number; z: number }, view: { width: number; height: number }, blink: boolean): void {
+  draw(
+    body: readonly Cell[],
+    boxes: readonly TowerBox[],
+    enemies: readonly Enemy[],
+    focus: { x: number; z: number }, view: { width: number; height: number }, blink: boolean): void {
     const g = this.context;
     const s = (SIZE * this.ratio) / BOARD;
     g.setTransform(1, 0, 0, 1, 0, 0);
@@ -61,6 +68,23 @@ export class Minimap {
       g.lineTo(cx - r, cy);
       g.closePath();
       g.fillStyle = BOX[box.type];
+      g.fill();
+      g.strokeStyle = INK;
+      g.lineWidth = this.ratio;
+      g.stroke();
+    }
+
+    // 적: 작은 점. 큰 녀석은 테두리 두른 큰 점
+    g.fillStyle = ENEMY;
+    const speck = s * 0.9;
+    for (const e of enemies) {
+      if (e.type === 'boss') continue;
+      g.fillRect((e.x + 0.5) * s - speck / 2, (e.y + 0.5) * s - speck / 2, speck, speck);
+    }
+    for (const e of enemies) {
+      if (e.type !== 'boss') continue;
+      g.beginPath();
+      g.arc((e.x + 0.5) * s, (e.y + 0.5) * s, s * 1.8, 0, Math.PI * 2);
       g.fill();
       g.strokeStyle = INK;
       g.lineWidth = this.ratio;
