@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { ENEMY_SPECS, HEAD_RADIUS, SEGMENT_RADIUS, type Point } from './enemies';
 import { seededRandom } from './random';
+import { SpatialGrid } from './spatialGrid';
 import { pickTower, TOWER_SPECS, TOWER_TYPES, type TowerType } from './towers';
 import {
   BOARD,
   BOX_COUNT,
   BOX_MIN_DISTANCE,
+  ENEMY_STEP,
   INVULNERABLE_SECONDS,
   MAX_SEGMENTS,
   SPEED,
@@ -12,6 +15,7 @@ import {
   TowerSnakeWorld,
   type Cell,
 } from './world';
+import { BOSS_SECONDS, GROUP_SPREAD, MAX_ENEMIES, pickEnemy, SPAWN_MAX, SPAWN_MIN, WAVE_SECONDS, waveSize } from './waves';
 
 const row = (y: number, ...xs: number[]): Cell[] => xs.map((x) => ({ x, y }));
 const STEP_SECONDS = 1 / SPEED;
@@ -226,5 +230,213 @@ describe('타워 상자와 타워 (단계 2)', () => {
     const a = new TowerSnakeWorld(seededRandom(42));
     const b = new TowerSnakeWorld(seededRandom(42));
     expect(a.boxes).toEqual(b.boxes);
+  });
+});
+
+describe('적 (단계 3)', () => {
+  /** 몸을 놓고 상자와 적을 비운다. */
+  const empty = (seed = 9) => {
+    const world = new TowerSnakeWorld(seededRandom(seed));
+    world.boxes = [];
+    world.enemies = [];
+    return world;
+  };
+  const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+
+  it('격자는 가까운 통의 물체만 돌려준다', () => {
+    const grid = new SpatialGrid<string>(10);
+    grid.insert('a', 2, 2);
+    grid.insert('b', 2.4, 3.2);
+    grid.insert('c', 8, 8);
+    grid.insert('d', -5, 20);
+    const near: string[] = [];
+    grid.forEachNear(2, 2, 1, (v) => near.push(v));
+    expect(near.sort()).toEqual(['a', 'b']);
+    const corner: string[] = [];
+    grid.forEachNear(0, 9, 0, (v) => corner.push(v));
+    expect(corner).toEqual(['d']);
+  });
+
+  it('무리 크기는 분마다 2씩 늘고, 종류는 때가 되어야 나온다', () => {
+    expect(waveSize(0)).toBe(3);
+    expect(waveSize(59)).toBe(3);
+    expect(waveSize(60)).toBe(5);
+    expect(waveSize(150)).toBe(7);
+    for (let roll = 0; roll < 1; roll += 0.05) expect(pickEnemy(30, roll)).toBe('jelly');
+    const after1 = new Set(Array.from({ length: 20 }, (_, i) => pickEnemy(90, i / 20)));
+    expect([...after1].sort()).toEqual(['dart', 'jelly']);
+    const after2 = new Set(Array.from({ length: 20 }, (_, i) => pickEnemy(130, i / 20)));
+    expect([...after2].sort()).toEqual(['dart', 'jelly', 'rock']);
+  });
+
+  it('적 빠르기는 모두 뱀보다 느리다', () => {
+    for (const spec of Object.values(ENEMY_SPECS)) expect(spec.speed).toBeLessThan(SPEED);
+  });
+
+  it('2초마다 머리에서 10~12칸 떨어진 판 안에 무리가 생긴다', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const world = new TowerSnakeWorld(seededRandom(seed));
+      world.update(WAVE_SECONDS - 0.05);
+      expect(world.enemies).toHaveLength(0);
+      world.update(0.1);
+      expect(world.enemies).toHaveLength(waveSize(0));
+      const head = world.point(0);
+      for (const e of world.enemies) {
+        expect(e.type).toBe('jelly');
+        expect(dist(e, head)).toBeGreaterThan(SPAWN_MIN - GROUP_SPREAD - 0.5);
+        expect(dist(e, head)).toBeLessThan(SPAWN_MAX + GROUP_SPREAD + 0.5);
+        expect(e.x).toBeGreaterThanOrEqual(-0.5);
+        expect(e.x).toBeLessThanOrEqual(BOARD - 0.5);
+        expect(e.y).toBeGreaterThanOrEqual(-0.5);
+        expect(e.y).toBeLessThanOrEqual(BOARD - 0.5);
+      }
+    }
+  });
+
+  it('구석에 있어도 무리는 판 안에 생긴다', () => {
+    const world = empty(3);
+    world.load(row(0, 2, 1, 0), 'right', undefined, []);
+    world.enemies = [];
+    world.update(WAVE_SECONDS + 0.05);
+    expect(world.enemies.length).toBeGreaterThan(0);
+    for (const e of world.enemies) {
+      expect(e.x).toBeGreaterThanOrEqual(-0.5);
+      expect(e.y).toBeGreaterThanOrEqual(-0.5);
+    }
+  });
+
+  it('3분마다 큰 녀석이 나오고(한계와 상관없이), 보통 적은 250마리를 넘지 않는다', () => {
+    const world = empty(4);
+    // 오래 버티게 무적을 늘 채우고, 울타리를 피해 판을 돈다.
+    let boss = 0;
+    for (let t = 0; t < BOSS_SECONDS + 1; t += 0.1) {
+      world.load([{ x: 20, y: 20 }], 'right', [], []);
+      world.invulnerable = 10;
+      world.update(0.1);
+      boss = Math.max(boss, world.enemies.filter((e) => e.type === 'boss').length);
+      expect(world.enemies.filter((e) => e.type !== 'boss').length).toBeLessThanOrEqual(MAX_ENEMIES);
+    }
+    expect(boss).toBe(1);
+  });
+
+  it('적은 머리 쪽으로 다가간다', () => {
+    const world = empty();
+    world.load(row(20, 20, 19, 18), 'right', undefined, []);
+    const enemy = world.spawnEnemy('jelly', 20, 30);
+    const before = dist(enemy, world.point(0));
+    world.update(0.5);
+    expect(dist(enemy, world.point(0))).toBeLessThan(before - 0.5);
+    expect(enemy.vy).toBeLessThan(0);
+  });
+
+  it('한 점에 겹친 적은 서로 밀어낸다', () => {
+    const world = empty();
+    world.load(row(5, 5, 4, 3), 'right', undefined, []);
+    const a = world.spawnEnemy('jelly', 30, 30);
+    const b = world.spawnEnemy('jelly', 30, 30);
+    world.update(0.1);
+    expect(dist(a, b)).toBeGreaterThan(ENEMY_SPECS.jelly.radius * 2 - 0.05);
+  });
+
+  it('적은 몸 마디에 들어가지 않고 돌아간다 (마디는 피해 없음)', () => {
+    const world = empty();
+    // 세로로 선 몸. 머리는 위쪽 끝, 적은 몸 오른쪽에서 머리 쪽으로 온다.
+    world.load([{ x: 20, y: 10 }, ...Array.from({ length: 8 }, (_, i) => ({ x: 20, y: 11 + i }))], 'up', undefined, []);
+    const enemy = world.spawnEnemy('jelly', 23, 16);
+    let minGap = Infinity;
+    for (let i = 0; i < 30; i++) {
+      world.invulnerable = 10;
+      world.update(ENEMY_STEP);
+      for (let k = 1; k < world.body.length; k++) minGap = Math.min(minGap, dist(enemy, world.point(k)));
+    }
+    expect(minGap).toBeGreaterThan(ENEMY_SPECS.jelly.radius + SEGMENT_RADIUS - 0.05);
+    expect(world.segments).toBe(8);
+  });
+
+  it('적이 머리에 닿으면 꼬리 끝 마디를 잃고, 적은 튕겨 나가며 체력 절반을 잃는다', () => {
+    const world = empty();
+    world.load(row(20, 20, 19, 18, 17), 'right', ['arrow', 'cannon', 'ice'], []);
+    const enemy = world.spawnEnemy('rock', 20.6, 20);
+    const events = world.update(ENEMY_STEP);
+    const bump = events.find((e) => e.kind === 'bump');
+    expect(bump?.kind).toBe('bump');
+    if (bump?.kind !== 'bump') return;
+    expect(bump.hurt.lost).toEqual({ x: 17, y: 20 });
+    expect(bump.hurt.lostTower).toBe('ice');
+    expect(bump.killed).toBe(false);
+    expect(world.segments).toBe(2);
+    expect(world.invulnerable).toBe(INVULNERABLE_SECONDS);
+    expect(enemy.hp).toBe(ENEMY_SPECS.rock.hp / 2);
+    expect(enemy.kx).toBeGreaterThan(0);
+    expect(dist(enemy, world.point(0))).toBeGreaterThanOrEqual(ENEMY_SPECS.rock.radius + HEAD_RADIUS - 1e-6);
+  });
+
+  it('무적이면 적이 닿아도 튕기기만 하고 피해를 주고받지 않는다', () => {
+    const world = empty();
+    world.load(row(20, 20, 19, 18), 'right', undefined, []);
+    world.invulnerable = 0.5;
+    const enemy = world.spawnEnemy('jelly', 20.5, 20);
+    const events = world.update(ENEMY_STEP);
+    expect(events.some((e) => e.kind === 'bump')).toBe(false);
+    expect(world.segments).toBe(2);
+    expect(enemy.hp).toBe(ENEMY_SPECS.jelly.hp);
+    expect(enemy.kx).toBeGreaterThan(0);
+  });
+
+  it('젤리는 머리에 두 번 부딪히면 처치된다', () => {
+    const world = empty();
+    world.load(row(20, 20, 19, 18, 17), 'right', undefined, []);
+    const enemy = world.spawnEnemy('jelly', 20.5, 20);
+    world.update(ENEMY_STEP);
+    world.invulnerable = 0;
+    enemy.x = 20.5;
+    enemy.y = world.point(0).y;
+    enemy.x = world.point(0).x + 0.1;
+    const events = world.update(ENEMY_STEP);
+    const bump = events.find((e) => e.kind === 'bump');
+    expect(bump?.kind === 'bump' && bump.killed).toBe(true);
+    expect(world.enemies).not.toContain(enemy);
+    expect(world.killed).toBe(1);
+  });
+
+  it('머리만 남은 채로 적이 닿으면 끝난다', () => {
+    const world = empty();
+    world.load([{ x: 20, y: 20 }], 'right', [], []);
+    world.spawnEnemy('jelly', 20.3, 20);
+    const events = world.update(ENEMY_STEP);
+    expect(events.at(-1)?.hurt?.over).toBe(true);
+    expect(world.alive).toBe(false);
+    expect(world.update(1)).toEqual([]);
+  });
+
+  it('큰 녀석은 처치되면 젤리 넷으로 갈라진다', () => {
+    const world = empty();
+    const boss = world.spawnEnemy('boss', 30, 30);
+    expect(world.damageEnemy(boss, 100)).toBe(false);
+    expect(world.damageEnemy(boss, ENEMY_SPECS.boss.hp)).toBe(true);
+    expect(world.enemies.map((e) => e.type)).toEqual(['jelly', 'jelly', 'jelly', 'jelly']);
+    expect(world.killed).toBe(1);
+  });
+
+  it('적은 판 밖으로 나가지 않는다', () => {
+    const world = empty();
+    world.load(row(0, 2, 1, 0), 'right', undefined, []);
+    const enemy = world.spawnEnemy('dart', 1, 0);
+    enemy.ky = -20;
+    world.invulnerable = 10;
+    world.update(ENEMY_STEP * 3);
+    expect(enemy.y).toBeGreaterThanOrEqual(ENEMY_SPECS.dart.radius - 0.5 - 1e-9);
+  });
+
+  it('처음부터 다시 하면 적과 처치 수가 비워진다', () => {
+    const world = new TowerSnakeWorld(seededRandom(2));
+    world.update(WAVE_SECONDS + 0.1);
+    world.killed = 3;
+    expect(world.enemies.length).toBeGreaterThan(0);
+    world.reset();
+    expect(world.enemies).toEqual([]);
+    expect(world.killed).toBe(0);
+    world.update(WAVE_SECONDS - 0.1);
+    expect(world.enemies).toEqual([]);
   });
 });
