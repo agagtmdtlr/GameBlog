@@ -329,13 +329,13 @@ function startChess(root: HTMLElement): void {
   };
 
   /**
-   * 정해진 차례를 보여 준다: 바탕을 차례인 사람의 색으로 채우고,
-   * 내 차례면 지금 둘 색이 내 쪽(화면 앞)에 오게 판을 한 번 돌린다. 컴퓨터 차례면 판은 그대로 둔다.
+   * 정해진 차례를 보여 준다: 바탕을 차례인 사람의 색으로 채우고, 판을 한 번 돌려
+   * 지금 둘 색이 그 사람 쪽에 오게 한다. 내 차례면 화면 앞(나), 컴퓨터 차례면 화면 뒤(맞은편의 컴퓨터).
+   * 판이 다 돈 뒤에야 차례를 시작한다 (컴퓨터도 그때 생각을 시작한다).
    */
   const showTurn = async (animate: boolean): Promise<void> => {
     view.setBackdrop(BACKDROPS[next]);
-    if (next !== 'u') return;
-    const facing = position.turn as 1 | -1;
+    const facing = (next === 'u' ? position.turn : -position.turn) as 1 | -1;
     if (animate) await view.turnTo(facing, TURN_SECONDS);
     else view.setFacing(facing);
   };
@@ -390,9 +390,8 @@ function startChess(root: HTMLElement): void {
     if (progress) {
       next = progress.next;
       void pointWheel(next, false);
-      // 이어 할 때는 돌리지 않고 놓는다. 컴퓨터 차례면 방금 둔 색(대개 내가 둔 색)을 앞에 둔다.
-      view.setFacing((next === 'u' ? position.turn : -position.turn) as 1 | -1);
-      view.setBackdrop(BACKDROPS[next]);
+      // 이어 할 때는 돌리지 않고 바로 놓는다.
+      void showTurn(false);
       beginTurn();
     } else {
       // 첫 수도 룰렛이 정한다.
