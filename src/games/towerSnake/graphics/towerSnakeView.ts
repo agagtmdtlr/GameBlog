@@ -5,6 +5,7 @@ import {
   Color,
   ConeGeometry,
   CylinderGeometry,
+  DodecahedronGeometry,
   Euler,
   GLSL3,
   Group,
@@ -31,7 +32,9 @@ import toonVert from '../shaders/toon.vert?raw';
 import toonFrag from '../shaders/toon.frag?raw';
 import outlineVert from '../shaders/outline.vert?raw';
 import outlineFrag from '../shaders/outline.frag?raw';
+import { ENEMY_SPECS, ENEMY_TYPES, type Enemy, type EnemyType } from '../enemies';
 import { TOWER_TYPES, type TowerType } from '../towers';
+import { MAX_ENEMIES } from '../waves';
 import { BOARD, BOX_COUNT, type Cell, type TowerBox } from '../world';
 
 type Rgb = readonly [number, number, number];
@@ -75,6 +78,31 @@ const SHAKE_SECONDS = 0.35;
 const POP_SECONDS = 0.45;
 /** 상자 위 작은 타워의 크기 */
 const BOX_TOWER_SCALE = 0.62;
+/** 그릴 수 있는 적 수 (큰 녀석이 갈라지는 몫을 넉넉히) */
+const DRAW_ENEMIES = MAX_ENEMIES + 16;
+
+/**
+ * 적 종류마다의 몸 모양: 반지름 1짜리 도형을 적 반지름에 맞춰 키운다. +x가 나아가는 쪽이다.
+ * `stretch`는 (앞뒤, 높이, 옆) 비율, `eye`는 눈 높이(반지름 비율)다.
+ */
+interface EnemyShape {
+  readonly geometry: () => BufferGeometry;
+  readonly color: Rgb;
+  readonly stretch: readonly [number, number, number];
+  /** 걸으며 출렁이는 정도 */
+  readonly wobble: number;
+}
+
+const ENEMY_SHAPES: Readonly<Record<EnemyType, EnemyShape>> = {
+  // 젤리: 작고 둥근 분홍 방울
+  jelly: { geometry: () => new SphereGeometry(1, 18, 12), color: hex(0xff8fb1), stretch: [1, 0.85, 1], wobble: 0.12 },
+  // 날쌘이: 앞뒤로 길쭉한 주황 방울
+  dart: { geometry: () => new SphereGeometry(1, 18, 12), color: hex(0xffa95e), stretch: [1.45, 0.72, 0.8], wobble: 0.08 },
+  // 바위: 각진 회갈색 덩어리
+  rock: { geometry: () => new DodecahedronGeometry(1, 0), color: hex(0xa39488), stretch: [1, 0.82, 1], wobble: 0.03 },
+  // 큰 녀석: 짙은 분홍의 큰 젤리
+  boss: { geometry: () => new SphereGeometry(1, 28, 18), color: hex(0xe8608a), stretch: [1, 0.85, 1], wobble: 0.1 },
+};
 
 /**
  * 타워 모양의 부품 하나. 마디 받침 가운데가 원점, +x가 마디가 나아가는 쪽이다.
@@ -140,6 +168,8 @@ const srgb = (rgb: Rgb) => new Color().setRGB(rgb[0], rgb[1], rgb[2], SRGBColorS
 const raw = (rgb: Rgb) => new Color(rgb[0], rgb[1], rgb[2]);
 const vec = (rgb: Rgb) => new Vector3(rgb[0], rgb[1], rgb[2]);
 
+const UP = new Vector3(0, 1, 0);
+
 /** 칸 → 판 위 좌표 (x, z). 판 가운데가 원점, 칸 한 변이 1 */
 export const cellX = (x: number) => x - (BOARD - 1) / 2;
 
@@ -174,6 +204,7 @@ export interface ViewState {
   /** 마디마다의 타워 (`towers[i]`는 `body[i + 1]`의 타워) */
   readonly towers: readonly TowerType[];
   readonly boxes: readonly TowerBox[];
+  readonly enemies: readonly Enemy[];
 }
 
 /** 타워 뱀 판을 three.js로 그린다. 놀이 규칙은 모르고 받은 몸·타워·상자를 그린다. */
@@ -190,6 +221,9 @@ export class TowerSnakeView {
   private readonly platforms: InstancedMesh;
   private readonly parts: Record<TowerType, Part[]>;
   private readonly crates: InstancedMesh;
+  private readonly enemyBodies: Record<EnemyType, InstancedMesh>;
+  private readonly eyes: InstancedMesh;
+  private readonly pupils: InstancedMesh;
   private readonly shadows: InstancedMesh;
   private readonly head = new Group();
   private readonly tongue: Mesh;
@@ -273,7 +307,22 @@ export class TowerSnakeView {
     }
     this.crates = this.addInstanced(new RoundedBoxGeometry(0.72, 0.46, 0.72, 3, 0.1), this.toon(WHITE), BOX_COUNT + 4);
     this.crates.setColorAt(0, raw(WHITE));
-    this.shadows = new InstancedMesh(new CircleGeometry(1, 20).rotateX(-Math.PI / 2), shadowMaterial, DRAW_SEGMENTS + BOX_COUNT + 8);
+    // 적: 종류마다 몸 하나, 눈과 눈동자는 함께 쓴다.
+    this.enemyBodies = {} as Record<EnemyType, InstancedMesh>;
+    for (const type of ENEMY_TYPES) {
+      this.enemyBodies[type] = this.addInstanced(ENEMY_SHAPES[type].geometry(), this.toon(ENEMY_SHAPES[type].color), DRAW_ENEMIES);
+    }
+    const eyeBall = new SphereGeometry(1, 12, 8);
+    this.eyes = this.addInstanced(eyeBall, this.toon(WHITE), DRAW_ENEMIES * 2);
+    this.pupils = new InstancedMesh(eyeBall, this.toon(INK), DRAW_ENEMIES * 2);
+    this.pupils.frustumCulled = false;
+    this.pupils.count = 0;
+    this.scene.add(this.pupils);
+    this.shadows = new InstancedMesh(
+      new CircleGeometry(1, 20).rotateX(-Math.PI / 2),
+      shadowMaterial,
+      DRAW_SEGMENTS + BOX_COUNT + DRAW_ENEMIES + 8,
+    );
     this.shadows.frustumCulled = false;
     this.shadows.count = 0;
     this.scene.add(this.shadows);
@@ -346,6 +395,16 @@ export class TowerSnakeView {
       this.shakeUntil = this.time + SHAKE_SECONDS;
     }
     if (grown !== null) this.popAt[grown] = this.time;
+  }
+
+  /** 적에게 부딪혀 꼬리 끝 마디를 잃었다 (칸 사이에서). */
+  lose(cell: Cell, tower: TowerType | null): void {
+    if (this.to.length > 1) {
+      this.from.pop();
+      this.to.pop();
+    }
+    this.shatter(cell, tower);
+    this.shakeUntil = this.time + SHAKE_SECONDS;
   }
 
   /** 머리만 남은 채로 부딪혀 끝났다. */
@@ -424,6 +483,8 @@ export class TowerSnakeView {
     this.crates.instanceMatrix.needsUpdate = true;
     if (this.crates.instanceColor) this.crates.instanceColor.needsUpdate = true;
 
+    shadowCount = this.drawEnemies(state.enemies, t, shadowCount);
+
     for (const type of TOWER_TYPES) {
       for (const part of this.parts[type]) {
         part.mesh.count = partCounts.get(part.mesh) ?? 0;
@@ -472,6 +533,51 @@ export class TowerSnakeView {
   /** 지금 카메라가 보는 판 위 자리 (칸 단위, 미니맵의 보기 상자) */
   get focus(): { readonly x: number; readonly z: number } {
     return { x: this.target.x + (BOARD - 1) / 2, z: this.target.z + (BOARD - 1) / 2 };
+  }
+
+  /** 적을 그린다: 머리 쪽을 보고 출렁이며, 바닥에 그림자. 늘어난 그림자 수를 돌려준다. */
+  private drawEnemies(enemies: readonly Enemy[], t: number, shadowStart: number): number {
+    const counts: Record<EnemyType, number> = { jelly: 0, dart: 0, rock: 0, boss: 0 };
+    let eyes = 0;
+    let shadows = shadowStart;
+    const local = new Vector3();
+    const n = Math.min(enemies.length, DRAW_ENEMIES);
+    for (let i = 0; i < n; i++) {
+      const e = enemies[i];
+      const shape = ENEMY_SHAPES[e.type];
+      const r = ENEMY_SPECS[e.type].radius;
+      const x = cellX(e.x);
+      const z = cellX(e.y);
+      const yaw = e.vx !== 0 || e.vy !== 0 ? Math.atan2(-e.vy, e.vx) : 0;
+      const squish = Math.sin(t * 10 + e.id * 1.7) * shape.wobble;
+      const sx = r * shape.stretch[0] * (1 - squish * 0.5);
+      const sy = r * shape.stretch[1] * (1 + squish);
+      const sz = r * shape.stretch[2] * (1 - squish * 0.5);
+      this.dummy.position.set(x, sy, z);
+      this.dummy.rotation.set(0, yaw, 0);
+      this.dummy.scale.set(sx, sy, sz);
+      this.dummy.updateMatrix();
+      const body = this.enemyBodies[e.type];
+      body.setMatrixAt(counts[e.type]++, this.dummy.matrix);
+      // 눈 둘: 몸 앞쪽 위
+      for (const side of [-1, 1]) {
+        local.set(sx * 0.62, sy * 1.25, side * sz * 0.42).applyAxisAngle(UP, yaw);
+        this.place(this.eyes, eyes, x + local.x, local.y, z + local.z, yaw, r * 0.3);
+        local.set(sx * 0.62 + r * 0.17, sy * 1.28, side * sz * 0.42).applyAxisAngle(UP, yaw);
+        this.place(this.pupils, eyes, x + local.x, local.y, z + local.z, yaw, r * 0.15);
+        eyes++;
+      }
+      this.place(this.shadows, shadows++, x, 0.01, z, 0, r * 1.05);
+    }
+    for (const type of ENEMY_TYPES) {
+      this.enemyBodies[type].count = counts[type];
+      this.enemyBodies[type].instanceMatrix.needsUpdate = true;
+    }
+    for (const mesh of [this.eyes, this.pupils]) {
+      mesh.count = eyes;
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    return shadows;
   }
 
   /** `this.dummy.matrix`를 자리·방향·크기로 만든다. */

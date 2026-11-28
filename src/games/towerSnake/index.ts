@@ -1,6 +1,7 @@
 import { createRansomCanvas } from '../../lib/ransomText';
 import type { GameDefinition } from '../game';
 import { TowerSnakeView } from './graphics/towerSnakeView';
+import type { EnemyType } from './enemies';
 import { Minimap } from './minimap';
 import type { TowerType } from './towers';
 import { TowerSnakeWorld, type Cell, type Direction, type TowerBox } from './world';
@@ -205,6 +206,11 @@ function startTowerSnake(root: HTMLElement): void {
           setPhase('over');
           break;
         }
+        if (event.kind === 'bump') {
+          // 적이 머리에 부딪혀 칸 사이에서 꼬리 끝 마디를 잃었다.
+          if (event.hurt.lost) view.lose(event.hurt.lost, event.hurt.lostTower);
+          continue;
+        }
         const lost = event.hurt?.lost ? { cell: event.hurt.lost, tower: event.hurt.lostTower } : null;
         // 먹으면 꼬리 끝 타워가 새로 붙거나(늘어남) 바뀐다 (한계). 어느 쪽이든 꼬리 끝이 튀어나온다.
         view.step(event.before, world.body, lost, event.eat ? world.towers.length - 1 : null);
@@ -212,8 +218,8 @@ function startTowerSnake(root: HTMLElement): void {
       showScore();
     }
     const alpha = phase === 'over' ? 1 : world.alpha;
-    view.render(dt, { alpha, invulnerable: world.invulnerable, dead: phase === 'over', towers: world.towers, boxes: world.boxes });
-    minimap.draw(world.body, world.boxes, view.focus, view.visible, world.invulnerable > 0 && Math.sin(now / 25) > 0);
+    view.render(dt, { alpha, invulnerable: world.invulnerable, dead: phase === 'over', towers: world.towers, boxes: world.boxes, enemies: world.enemies });
+    minimap.draw(world.body, world.boxes, world.enemies, view.focus, view.visible, world.invulnerable > 0 && Math.sin(now / 25) > 0);
     requestAnimationFrame(frame);
   };
   newGame();
@@ -226,6 +232,8 @@ function startTowerSnake(root: HTMLElement): void {
         view,
         gl: view.renderer.getContext(),
         steer,
+        /** 개발 확인용: 적을 바로 놓는다. */
+        spawn: (type: EnemyType, x: number, y: number) => world.spawnEnemy(type, x, y),
         get phase() {
           return phase;
         },
@@ -241,7 +249,7 @@ function startTowerSnake(root: HTMLElement): void {
   }
 }
 
-/** 타워 뱀: 몸 마디마다 타워를 싣고 큰 판을 누빈다 (단계 2까지: 판, 움직임, 울타리·제 몸 피해, 타워 상자). */
+/** 타워 뱀: 몸 마디마다 타워를 싣고 큰 판을 누빈다 (단계 3까지: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적). */
 export const towerSnakeGame: GameDefinition = {
   id: 'tower-snake',
   start(root) {
