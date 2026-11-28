@@ -1161,3 +1161,239 @@ a.comic-cut.is-youtube::after {
   filter: drop-shadow(0 6px 0 rgb(42 34 30 / 0.35));
   animation: coloring-pop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
+
+/* 타워 뱀 (src/games/towerSnake/) */
+.tsnake {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tsnake-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.tsnake-button {
+  position: absolute;
+  top: 12px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.tsnake-button svg,
+.tsnake-score svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tsnake-button:hover,
+.tsnake-button:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 var(--ink);
+  outline: none;
+}
+
+.tsnake-button:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink);
+}
+
+.tsnake-button:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.tsnake-home { left: 12px; }
+.tsnake-pause { right: 64px; }
+.tsnake-again { right: 12px; }
+
+.tsnake[data-phase='over'] .tsnake-again {
+  background: #ffe27a;
+  animation: coloring-nudge 1.1s ease-in-out infinite;
+}
+
+.tsnake-scores {
+  position: absolute;
+  top: 12px;
+  left: 68px;
+  right: 120px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.tsnake-score {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px 0 9px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: #ffb4a2;
+  box-shadow: 0 3px 0 var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  rotate: -2deg;
+}
+
+.tsnake-score svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+.tsnake-best {
+  background: #fff;
+  rotate: 2deg;
+}
+
+.tsnake-best svg {
+  stroke-width: 2.2;
+}
+
+.tsnake-gain {
+  position: absolute;
+  right: 6px;
+  top: 100%;
+  font-size: 18px;
+  font-weight: 800;
+  color: #e2577a;
+  animation: g2048-gain 0.8s ease-out forwards;
+}
+
+.tsnake-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 64px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.tsnake-overlay[hidden] {
+  display: none;
+}
+
+.tsnake-hint {
+  align-items: flex-end;
+  padding-bottom: 16vh;
+}
+
+.tsnake-hint svg {
+  width: min(34vw, 150px);
+  height: auto;
+  fill: rgb(255 255 255 / 0.85);
+  stroke: var(--ink);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 4px 0 rgb(42 34 30 / 0.35));
+  animation: tsnake-hint 1.4s ease-in-out infinite;
+}
+
+@keyframes tsnake-hint {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-8px) rotate(3deg); }
+}
+
+.tsnake-paused {
+  padding: 0;
+  border: 0;
+  background: rgb(251 246 236 / 0.45);
+  color: var(--ink);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.tsnake-paused svg {
+  width: min(26vw, 120px);
+  height: auto;
+  fill: #ffe27a;
+  stroke: var(--ink);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 5px 0 rgb(42 34 30 / 0.35));
+}
+
+.tsnake-banner .ransom-text {
+  width: min(78%, 560px);
+  height: auto;
+  filter: drop-shadow(0 6px 0 rgb(42 34 30 / 0.35));
+  animation: coloring-pop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+@media (max-width: 400px) {
+  .tsnake-score {
+    font-size: 16px;
+    padding: 0 8px 0 6px;
+  }
+}
+
+.tsnake-score-value {
+  min-width: 2.6em;
+}
+
+.tsnake-length.is-hit {
+  animation: tsnake-hit 0.45s ease;
+  background: #e2577a;
+  color: #fff;
+}
+
+@keyframes tsnake-hit {
+  0%, 100% { translate: 0 0; }
+  20% { translate: -5px 0; }
+  40% { translate: 5px 0; }
+  60% { translate: -3px 0; }
+  80% { translate: 3px 0; }
+}
+
+.tsnake-minimap {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 120px;
+  height: 120px;
+  border: 3px solid var(--ink);
+  border-radius: 12px;
+  box-shadow: 0 3px 0 var(--ink);
+  pointer-events: none;
+}
+
+@media (max-width: 400px) {
+  .tsnake-minimap {
+    width: 88px;
+    height: 88px;
+  }
+}
