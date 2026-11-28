@@ -191,9 +191,6 @@ interface Tween {
 }
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
-/** 빠르게 돌다 천천히 멈춘다 (룰렛) */
-const easeOutQuart = (t: number) => 1 - (1 - t) ** 4;
-const TURN = Math.PI * 2;
 
 /** 판 위의 기물 하나 */
 interface PieceObject {
@@ -221,7 +218,11 @@ export class ChessView {
   private readonly squareColors: Color[] = [];
   private readonly pieces = new Map<number, PieceObject>();
   private readonly pieceRoot = new Group();
-  /** 돌아가는 판: 받침·칸·표시·기물을 함께 담는다. */
+  /** 화면 바탕색이 다가갈 색 (차례인 사람의 색) */
+  private readonly backdrop = srgb(PAPER);
+  /** 지금 카메라 쪽(앞)에 있는 색. 1 백, -1 흑 */
+  private facing: 1 | -1 = 1;
+  /** 도는 판: 받침·칸·표시·기물을 함께 담는다. */
   private readonly table = new Group();
   /** 판 아래 잉크 판: 판과 함께 돌고 줄지만, 늘 오른쪽 아래로 비껴 있다. */
   private readonly drop: Mesh;
@@ -343,6 +344,8 @@ export class ChessView {
   /** 판의 기물을 움직임 없이 그대로 놓는다. */
   setBoard(board: ArrayLike<number>): void {
     this.tweens.length = 0;
+    // 돌던 판은 멈추고 바로 놓는다.
+    this.setFacing(this.facing);
     this.pieceRoot.clear();
     this.pieces.clear();
     for (let sq = 0; sq < 64; sq++) if (board[sq] !== 0) this.makePiece(board[sq], sq);
@@ -425,6 +428,7 @@ export class ChessView {
    * 1이면 백이 앞(처음 모습), -1이면 흑이 앞이다.
    */
   setFacing(facing: 1 | -1): void {
+    this.facing = facing;
     this.turnTable(facing > 0 ? 0 : Math.PI, 1);
   }
 
@@ -435,20 +439,23 @@ export class ChessView {
   }
 
   /**
-   * 룰렛처럼 판을 한 바퀴 넘게 돌려 `facing` 색이 앞에 오게 멈춘다.
+   * `facing` 색이 앞에 오게 판을 부드럽게 반 바퀴 돌린다. 이미 앞이면 돌리지 않는다.
    * 도는 동안 판 모서리가 화면 밖으로 나가지 않게 각에 맞춰 판을 줄인다.
    */
-  spin(facing: 1 | -1, seconds: number, turns = 1): Promise<void> {
-    const start = this.table.rotation.y;
-    const target = facing > 0 ? 0 : Math.PI;
-    const least = start + turns * TURN;
-    const end = least + ((((target - least) % TURN) + TURN) % TURN);
+  turnTo(facing: 1 | -1, seconds: number): Promise<void> {
+    if (facing === this.facing) return Promise.resolve();
+    this.facing = facing;
+    const start = facing > 0 ? -Math.PI : 0;
     return this.tween(seconds, (t) => {
-      const angle = start + (end - start) * easeOutQuart(t);
+      const angle = start + Math.PI * easeInOut(t);
       // 정사각형 판을 θ만큼 돌리면 가로 폭이 |cosθ|+|sinθ|배가 된다.
-      const fit = 1 / (Math.abs(Math.cos(angle)) + Math.abs(Math.sin(angle)));
-      this.turnTable(angle, Math.min(fit, 1 - Math.sin(Math.PI * t) * 0.06));
-    }).then(() => this.setFacing(facing));
+      this.turnTable(angle, 1 / (Math.abs(Math.cos(angle)) + Math.abs(Math.sin(angle))));
+    }).then(() => this.turnTable(facing > 0 ? 0 : Math.PI, 1));
+  }
+
+  /** 화면 바탕색을 `hex`로 부드럽게 바꾼다. */
+  setBackdrop(hex: string): void {
+    this.backdrop.copy(srgb(hex));
   }
 
   /** 컴퓨터가 생각하는 동안 그 색(컴퓨터가 맡은 색)의 킹이 갸웃거린다. 0이면 멈춘다. */
@@ -533,6 +540,7 @@ export class ChessView {
 
   render(seconds: number): void {
     this.time += seconds;
+    (this.scene.background as Color).lerp(this.backdrop, 1 - Math.exp(-seconds * 6));
     for (let i = this.tweens.length - 1; i >= 0; i--) {
       const tween = this.tweens[i];
       tween.elapsed += seconds;

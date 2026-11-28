@@ -30,15 +30,23 @@ import {
 const MIN_THINK_MS = 400;
 /** 판이 끝나고 표시가 뜰 때까지 (ms) */
 const BANNER_DELAY_MS = 900;
-/** 판 룰렛이 도는 시간 (초) */
-const SPIN_SECONDS = 1.5;
-/** 판이 멈춘 뒤 결과를 보여 주는 시간 (ms) */
+/** 룰렛이 도는 시간 (ms). style.css의 `.chess-wheel-disk` transition과 같게 둔다. */
+const SPIN_MS = 1100;
+/** 룰렛이 멈춘 뒤 결과를 보여 주는 시간 (ms) */
 const SPIN_HOLD_MS = 250;
+/** 내 차례에 둘 색이 앞에 오게 판을 반 바퀴 돌리는 시간 (초) */
+const TURN_SECONDS = 0.8;
+
+/** 화면 바탕색: 차례인 사람의 색(룰렛 반쪽 색을 옅게). 정해지지 않았거나 비기면 종이색 */
+const BACKDROPS = { u: '#ffe9a3', c: '#cfe4fa', none: '#fbf6ec' } as const;
 
 const ICON_HOME =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-5.5h3V20h5V9.5"/></svg>';
 const ICON_AGAIN =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>';
+/** 차례 칩의 폰 그림 (가운데 기준) */
+const PAWN_PATH = 'M0 -9.6a3.2 3.2 0 1 0 0.01 0ZM-2.8 -4.5h5.6L4.4 3.5h-8.8ZM-6 7h12';
+
 const PROMOTION_ICONS: Record<PromotionType, string> = {
   [QUEEN]:
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 8 3 9h10l3-9-5 4-3-7-3 7Z"/><path d="M6 20.5h12"/></svg>',
@@ -56,9 +64,26 @@ const PROMOTION_LABELS: Record<PromotionType, string> = {
   [KNIGHT]: '나이트',
 };
 
-/** 차례 표: 다음 수를 둘 사람. 바탕색은 지금 둘 색(백·흑)이다. */
-const TURN_SVG = `<svg class="chess-turn-user" viewBox="-12 -12 24 24" aria-hidden="true"><circle cy="-3.6" r="3.6"/><path d="M-7 8c0-4.6 3.1-7 7-7s7 2.4 7 7Z"/></svg>
-<svg class="chess-turn-computer" viewBox="-12 -12 24 24" aria-hidden="true"><rect x="-8" y="-7" width="16" height="11" rx="1.6"/><path d="M-4 8h8M0 4v4"/></svg>`;
+/** 룰렛 판: 위 반쪽이 나(사람), 아래 반쪽이 컴퓨터. 바늘은 위에 고정되고 판이 돈다. */
+const WHEEL_SVG = `<svg class="chess-wheel-face" viewBox="-30 -30 60 60" aria-hidden="true">
+  <g class="chess-wheel-disk">
+    <path d="M-27 0A27 27 0 0 1 27 0Z" fill="#ffd34d"/>
+    <path d="M27 0A27 27 0 0 1 -27 0Z" fill="#8fc7ff"/>
+    <g transform="translate(0 -12)" fill="none" stroke="#2a221e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cy="-3.4" r="3.2"/><path d="M-6 6.5c0-4 2.7-6 6-6s6 2 6 6Z"/>
+    </g>
+    <g transform="translate(0 12) rotate(180)" fill="none" stroke="#2a221e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="-7" y="-6" width="14" height="9.5" rx="1.5"/><path d="M-3.5 7h7M0 3.5V7"/>
+    </g>
+    <path d="M-27 0H27" stroke="#2a221e" stroke-width="2.4"/>
+  </g>
+  <circle r="27" fill="none" stroke="#2a221e" stroke-width="3"/>
+  <circle r="3.6" fill="#2a221e"/>
+</svg>
+<svg class="chess-wheel-pointer" viewBox="0 0 20 16" aria-hidden="true"><path d="M2 2h16L10 14Z"/></svg>`;
+
+/** 차례 칩: 지금 둘 색. 룰렛이 고른 사람이 이 색을 둔다. */
+const SIDE_SVG = `<svg viewBox="-12 -12 24 24" aria-hidden="true"><path d="${PAWN_PATH}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, parent: HTMLElement): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -117,7 +142,7 @@ function startChess(root: HTMLElement): void {
   canvas.setAttribute('role', 'application');
   canvas.setAttribute(
     'aria-label',
-    '룰렛 체스 판. 백과 흑이 번갈아 두고, 수마다 판이 룰렛처럼 돌아 다음 수를 둘 사람을 정한다. 지금 둘 색이 내 앞에 멈추면 내 차례다. 내 차례면 지금 둘 색의 기물을 누르고 갈 칸을 누른다',
+    '룰렛 체스 판. 백과 흑이 번갈아 두고, 수마다 룰렛이 다음 수를 둘 사람을 정한다. 내 차례면 지금 둘 색의 기물을 누르고 갈 칸을 누른다',
   );
 
   const home = element('a', 'chess-button chess-home', shell);
@@ -129,10 +154,16 @@ function startChess(root: HTMLElement): void {
   again.setAttribute('aria-label', '처음부터');
   again.innerHTML = ICON_AGAIN;
 
-  // 차례 표: 판 룰렛이 멈추면 다음 수를 둘 사람(나·컴퓨터)과 둘 색을 보여 준다.
-  const turnBadge = element('div', 'chess-turn', shell);
-  turnBadge.innerHTML = TURN_SVG;
-  turnBadge.setAttribute('role', 'img');
+  // 사람 룰렛: 수를 둘 때마다 돌아 다음 수를 둘 사람(나·컴퓨터)을 바늘로 가리킨다.
+  const wheel = element('div', 'chess-wheel', shell);
+  wheel.innerHTML = WHEEL_SVG;
+  wheel.setAttribute('role', 'img');
+  const disk = wheel.querySelector<SVGGElement>('.chess-wheel-disk')!;
+  let wheelAngle = 0;
+  // 차례 칩: 지금 둘 색(백·흑)
+  const side = element('div', 'chess-side', shell);
+  side.innerHTML = SIDE_SVG;
+  side.setAttribute('role', 'img');
 
   const picker = element('div', 'chess-picker', shell);
   picker.hidden = true;
@@ -200,32 +231,29 @@ function startChess(root: HTMLElement): void {
     view.setHighlights({ selected, targets, lastMove, checks });
   };
 
-  /**
-   * 판 룰렛: 지금 둘 색이 다음 수를 둘 사람 앞에 오게 판을 돌린다.
-   * 내 차례면 그 색이 화면 앞(나), 컴퓨터 차례면 화면 뒤(맞은편의 컴퓨터)에 온다.
-   */
-  const faceTurn = async (spin: boolean): Promise<void> => {
-    const facing = (next === 'u' ? position.turn : -position.turn) as 1 | -1;
-    if (!spin) {
-      view.setFacing(facing);
-      showState();
-      return;
-    }
-    turnBadge.classList.add('is-spinning');
-    await view.spin(facing, SPIN_SECONDS);
-    turnBadge.classList.remove('is-spinning');
-    showState();
-    turnBadge.classList.add('is-landed');
+  /** 룰렛을 `player` 쪽에 멈추게 돌린다. `spin`이 거짓이면 돌지 않고 바로 가리킨다. */
+  const pointWheel = async (player: Player, spin: boolean): Promise<void> => {
+    // 판을 r도 돌리면 판의 -r도 자리가 바늘(위) 아래에 온다. 내 반쪽은 -70~70도, 컴퓨터 반쪽은 110~250도에서 멈춘다.
+    const target = (player === 'u' ? 0 : 180) + (Math.random() * 140 - 70);
+    const current = ((wheelAngle % 360) + 360) % 360;
+    const turn = (((-target - current) % 360) + 360) % 360;
+    wheelAngle += turn + (spin ? 720 : 0);
+    disk.style.transition = spin ? '' : 'none';
+    disk.style.transform = `rotate(${wheelAngle}deg)`;
+    wheel.setAttribute('aria-label', player === 'u' ? '내 차례' : '컴퓨터 차례');
+    if (!spin) return;
+    wheel.classList.add('is-spinning');
+    await wait(SPIN_MS);
+    wheel.classList.remove('is-spinning');
+    wheel.classList.add('is-landed');
     await wait(SPIN_HOLD_MS);
-    turnBadge.classList.remove('is-landed');
+    wheel.classList.remove('is-landed');
   };
 
   const showState = () => {
-    turnBadge.classList.toggle('is-thinking', thinking);
-    turnBadge.classList.toggle('is-black', position.turn === BLACK);
-    turnBadge.classList.toggle('is-computer', next === 'c');
-    const color = position.turn === WHITE ? '백' : '흑';
-    turnBadge.setAttribute('aria-label', next === 'u' ? `내 차례, ${color}` : `컴퓨터 차례, ${color}`);
+    wheel.classList.toggle('is-thinking', thinking);
+    side.classList.toggle('is-black', position.turn === BLACK);
+    side.setAttribute('aria-label', position.turn === WHITE ? '백 차례' : '흑 차례');
     shell.classList.toggle('is-over', over);
   };
 
@@ -258,6 +286,7 @@ function startChess(root: HTMLElement): void {
     const winner = reason === 'checkmate' ? players[players.length - 1] : null;
     const result: ChessResult = winner === 'u' ? 'win' : winner === 'c' ? 'loss' : 'draw';
     finishPlay(result, reason);
+    view.setBackdrop(BACKDROPS[winner === 'u' || winner === 'c' ? winner : 'none']);
     if (reason === 'checkmate') view.topple(position.kingSquare(position.turn));
     const ending: Ending = result === 'win' ? 'win' : result === 'loss' ? 'checkmate' : 'draw';
     const token = gameToken;
@@ -299,13 +328,27 @@ function startChess(root: HTMLElement): void {
     if (move) await playMove(move, 'c');
   };
 
+  /**
+   * 정해진 차례를 보여 준다: 바탕을 차례인 사람의 색으로 채우고,
+   * 내 차례면 지금 둘 색이 내 쪽(화면 앞)에 오게 판을 한 번 돌린다. 컴퓨터 차례면 판은 그대로 둔다.
+   */
+  const showTurn = async (animate: boolean): Promise<void> => {
+    view.setBackdrop(BACKDROPS[next]);
+    if (next !== 'u') return;
+    const facing = position.turn as 1 | -1;
+    if (animate) await view.turnTo(facing, TURN_SECONDS);
+    else view.setFacing(facing);
+  };
+
   /** 룰렛을 돌려 다음 사람을 정하고 그 차례를 시작한다. */
   const spinAndBegin = async () => {
     const token = gameToken;
     next = spinPlayer();
     busy = true;
     saveProgress();
-    await faceTurn(true);
+    await pointWheel(next, true);
+    if (token !== gameToken) return;
+    await showTurn(true);
     if (token !== gameToken) return;
     busy = false;
     beginTurn();
@@ -343,15 +386,17 @@ function startChess(root: HTMLElement): void {
     over = false;
     recorded = false;
     hideBanners();
-    // 앞 판에서 돌던 판 룰렛은 setBoard가 멈춘다.
-    turnBadge.classList.remove('is-spinning', 'is-landed');
     view.setBoard(position.board);
     if (progress) {
       next = progress.next;
-      void faceTurn(false);
+      void pointWheel(next, false);
+      // 이어 할 때는 돌리지 않고 놓는다. 컴퓨터 차례면 방금 둔 색(대개 내가 둔 색)을 앞에 둔다.
+      view.setFacing((next === 'u' ? position.turn : -position.turn) as 1 | -1);
+      view.setBackdrop(BACKDROPS[next]);
       beginTurn();
     } else {
       // 첫 수도 룰렛이 정한다.
+      view.setBackdrop(BACKDROPS.none);
       legal = [];
       selected = -1;
       highlight();
@@ -422,6 +467,7 @@ function startChess(root: HTMLElement): void {
   new ResizeObserver(resize).observe(shell);
   resize();
   view.setBoard(position.board);
+  void pointWheel('u', false);
   highlight();
   showState();
 
