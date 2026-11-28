@@ -9,6 +9,7 @@ import {
   DodecahedronGeometry,
   Euler,
   GLSL3,
+  InstancedBufferAttribute,
   Group,
   InstancedMesh,
   Material,
@@ -33,11 +34,13 @@ import toonVert from '../shaders/toon.vert?raw';
 import toonFrag from '../shaders/toon.frag?raw';
 import outlineVert from '../shaders/outline.vert?raw';
 import outlineFrag from '../shaders/outline.frag?raw';
+import ringVert from '../shaders/ring.vert?raw';
+import ringFrag from '../shaders/ring.frag?raw';
 import { BLAST_RADIUS, MAX_PROJECTILES, type CombatEvent, type Projectile, type ProjectileType } from '../combat';
-import { ENEMY_SPECS, ENEMY_TYPES, type Enemy, type EnemyType } from '../enemies';
-import { TOWER_TYPES, type TowerType } from '../towers';
+import { ENEMY_SPECS, ENEMY_TYPES, FLASH_SECONDS, type Enemy, type EnemyType } from '../enemies';
+import { TOWER_SPECS, TOWER_TYPES, type TowerType } from '../towers';
 import { MAX_ENEMIES } from '../waves';
-import { BOARD, BOX_COUNT, type Cell, type TowerBox } from '../world';
+import { BOARD, BOX_COUNT, type Cell, type KillEvent, type TowerBox } from '../world';
 
 type Rgb = readonly [number, number, number];
 const hex = (n: number): Rgb => [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
@@ -96,6 +99,23 @@ const BOLT_COLOR = hex(0xffd84a);
 const BLAST_SECONDS = 0.3;
 const BLAST_CAPACITY = 64;
 const BLAST_COLOR = hex(0xffa14a);
+/** 맞은 적이 하얗게 번쩍이는 정도 (0~1) */
+const FLASH_MIX = 0.85;
+/** 처치된 적이 터지는 색종이: 한 번에 나오는 수, 보이는 시간 (초), 함께 그리는 수 */
+const CONFETTI = 9;
+const CONFETTI_SECONDS = 0.7;
+const CONFETTI_CAPACITY = 720;
+const CONFETTI_COLORS = [hex(0xffd24d), hex(0x8fd8ff), hex(0xc9b3ff), hex(0xffffff)];
+/** 사거리 원: 적이 사거리보다 이만큼(칸) 가까이 오면 보이기 시작한다. 나타나고 사라지는 빠르기 (1/초) */
+const RANGE_WARN = 2;
+const RANGE_FADE = 5;
+/** 사거리 원 색 (타워 종류마다) */
+const RANGE_COLORS: Readonly<Record<TowerType, Rgb>> = {
+  arrow: hex(0xf2b705),
+  cannon: hex(0x5d6fa8),
+  ice: hex(0x3fb4f0),
+  lightning: hex(0x8f6ad8),
+};
 
 /** 투사체 모양: 반지름 1 근처의 도형. +x가 날아가는 쪽이다. */
 const SHOT_SHAPES: Readonly<Record<ProjectileType, { readonly geometry: () => BufferGeometry; readonly color: Rgb }>> = {
@@ -110,6 +130,15 @@ const SHOT_SHAPES: Readonly<Record<ProjectileType, { readonly geometry: () => Bu
 interface Bolt {
   /** 꺾인 줄기의 점 (판 위 x, z) */
   readonly points: readonly Vector2[];
+  age: number;
+}
+
+interface Confetti {
+  readonly position: Vector3;
+  readonly velocity: Vector3;
+  readonly spin: Vector3;
+  readonly color: Color;
+  readonly size: number;
   age: number;
 }
 
@@ -275,6 +304,12 @@ export class TowerSnakeView {
   private readonly blastMesh: InstancedMesh;
   private readonly bolts: Bolt[] = [];
   private readonly blasts: Blast[] = [];
+  private readonly confettiMesh: InstancedMesh;
+  private readonly confetti: Confetti[] = [];
+  private readonly rangeMesh: InstancedMesh;
+  private readonly rangeAlpha: InstancedBufferAttribute;
+  /** 마디마다 사거리 원의 진하기 (0~1) */
+  private rangeFade: number[] = [];
   private readonly flying: Piece[] = [];
   private readonly dummy = new Object3D();
   private readonly matrix = new Matrix4();
@@ -416,6 +451,26 @@ export class TowerSnakeView {
       mesh.count = 0;
       this.scene.add(mesh);
     }
+    // 처치된 적의 색종이: 선 없이 작은 납작 조각
+    this.confettiMesh = new InstancedMesh(new BoxGeometry(0.24, 0.03, 0.15), this.toon(WHITE), CONFETTI_CAPACITY);
+    this.confettiMesh.frustumCulled = false;
+    this.confettiMesh.count = 0;
+    this.confettiMesh.setColorAt(0, raw(WHITE));
+    this.scene.add(this.confettiMesh);
+
+    // 사거리 원: 바닥에 눕힌 원판, 조각마다 색과 진하기
+    const disc = new CircleGeometry(1, 64).rotateX(-Math.PI / 2);
+    this.rangeAlpha = new InstancedBufferAttribute(new Float32Array(DRAW_SEGMENTS), 1);
+    disc.setAttribute('aAlpha', this.rangeAlpha);
+    this.rangeMesh = new InstancedMesh(
+      disc,
+      new ShaderMaterial({ glslVersion: GLSL3, vertexShader: ringVert, fragmentShader: ringFrag, transparent: true, depthWrite: false, uniforms: { uHalf: { value: BOARD / 2 } } }),
+      DRAW_SEGMENTS,
+    );
+    this.rangeMesh.frustumCulled = false;
+    this.rangeMesh.count = 0;
+    this.rangeMesh.setColorAt(0, raw(WHITE));
+    this.scene.add(this.rangeMesh);
     this.scene.add(this.pieces);
   }
 
@@ -445,6 +500,8 @@ export class TowerSnakeView {
     this.flying.length = 0;
     this.bolts.length = 0;
     this.blasts.length = 0;
+    this.confetti.length = 0;
+    this.rangeFade = [];
     this.popAt = [];
     this.boxBorn.clear();
     if (body.length > 1) this.headYaw = Math.atan2(-(body[0].y - body[1].y), body[0].x - body[1].x);
@@ -497,6 +554,26 @@ export class TowerSnakeView {
       points.push(end);
     });
     this.bolts.push({ points, age: 0 });
+  }
+
+  /** 적이 처치됐다: 그 자리에서 몸 색과 밝은 색의 색종이가 터진다. 큰 녀석은 세 배로 터진다. */
+  kill(event: KillEvent): void {
+    const big = event.type === 'boss' ? 3 : 1;
+    const r = ENEMY_SPECS[event.type].radius;
+    const colors = [ENEMY_SHAPES[event.type].color, ...CONFETTI_COLORS];
+    for (let i = 0; i < CONFETTI * big; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = (1.2 + Math.random() * 1.8) * (big > 1 ? 1.4 : 1);
+      this.confetti.push({
+        position: new Vector3(cellX(event.x) + Math.cos(angle) * r * 0.5, r, cellX(event.y) + Math.sin(angle) * r * 0.5),
+        velocity: new Vector3(Math.cos(angle) * speed, 2.6 + Math.random() * 2.2, Math.sin(angle) * speed),
+        spin: new Vector3(Math.random() * 14 - 7, Math.random() * 14 - 7, Math.random() * 14 - 7),
+        color: raw(i % 3 === 0 ? colors[0] : colors[i % colors.length]),
+        size: 0.8 + Math.random() * 0.6,
+        age: 0,
+      });
+    }
+    if (this.confetti.length > CONFETTI_CAPACITY) this.confetti.splice(0, this.confetti.length - CONFETTI_CAPACITY);
   }
 
   /** 머리만 남은 채로 부딪혀 끝났다. */
@@ -576,6 +653,7 @@ export class TowerSnakeView {
     if (this.crates.instanceColor) this.crates.instanceColor.needsUpdate = true;
 
     shadowCount = this.drawEnemies(state.enemies, t, shadowCount);
+    this.drawRanges(points, state.towers, state.enemies, dt, dead);
 
     for (const type of TOWER_TYPES) {
       for (const part of this.parts[type]) {
@@ -657,6 +735,8 @@ export class TowerSnakeView {
       // 얼음에 맞아 느려진 동안 하늘색으로 물든다.
       tint.setRGB(...shape.color);
       if (e.slow > 0) tint.lerp(raw(ICE_TINT), ICE_MIX);
+      // 피해를 받으면 잠깐 하얗게 번쩍인다.
+      if (e.flash > 0) tint.lerp(raw(WHITE), FLASH_MIX * Math.min(1, e.flash / FLASH_SECONDS));
       body.setColorAt(counts[e.type]++, tint);
       // 눈 둘: 몸 앞쪽 위
       for (const side of [-1, 1]) {
@@ -678,6 +758,44 @@ export class TowerSnakeView {
       mesh.instanceMatrix.needsUpdate = true;
     }
     return shadows;
+  }
+
+  /**
+   * 사거리 원: 적이 사거리 가까이 온 타워 둘레에 흐린 원이 떠오르고, 멀어지면 사라진다. 끝나면 모두 사라진다.
+   * `points[k + 1]`이 `towers[k]`의 자리다.
+   */
+  private drawRanges(points: readonly Vector3[], towers: readonly TowerType[], enemies: readonly Enemy[], dt: number, dead: boolean): void {
+    const count = Math.min(DRAW_SEGMENTS, towers.length, points.length - 1);
+    this.rangeFade.length = count;
+    const color = new Color();
+    let drawn = 0;
+    for (let k = 0; k < count; k++) {
+      const p = points[k + 1];
+      const tower = towers[k];
+      const range = TOWER_SPECS[tower].range;
+      const warn = (range + RANGE_WARN) ** 2;
+      let near = false;
+      for (let i = 0; !dead && i < enemies.length; i++) {
+        const dx = cellX(enemies[i].x) - p.x;
+        const dz = cellX(enemies[i].y) - p.z;
+        if (dx * dx + dz * dz < warn) {
+          near = true;
+          break;
+        }
+      }
+      const next = Math.min(1, Math.max(0, (this.rangeFade[k] ?? 0) + (near ? 1 : -1) * RANGE_FADE * dt));
+      this.rangeFade[k] = next;
+      if (next <= 0.01) continue;
+      // 나타날 때 조금 작은 데서 퍼진다.
+      this.place(this.rangeMesh, drawn, p.x, 0.035, p.z, 0, range * (0.85 + 0.15 * next));
+      this.rangeMesh.setColorAt(drawn, color.copy(raw(RANGE_COLORS[tower])));
+      this.rangeAlpha.setX(drawn, next);
+      drawn++;
+    }
+    this.rangeMesh.count = drawn;
+    this.rangeMesh.instanceMatrix.needsUpdate = true;
+    if (this.rangeMesh.instanceColor) this.rangeMesh.instanceColor.needsUpdate = true;
+    this.rangeAlpha.needsUpdate = true;
   }
 
   /** 날아가는 투사체: 가는 쪽을 보고, 대포알은 포물선을 그린다. */
@@ -737,6 +855,32 @@ export class TowerSnakeView {
     for (let i = this.blasts.length - 1; i >= 0; i--) if (this.blasts[i].age > BLAST_SECONDS) this.blasts.splice(i, 1);
     this.blastMesh.count = blasts;
     this.blastMesh.instanceMatrix.needsUpdate = true;
+
+    // 색종이: 튀어 올랐다가 팔랑이며 떨어지고, 바닥에 닿으면 멈춰 사라진다.
+    let pieces = 0;
+    for (const c of this.confetti) {
+      c.age += dt;
+      if (c.age > CONFETTI_SECONDS) continue;
+      c.velocity.y -= 9 * dt;
+      c.velocity.multiplyScalar(Math.exp(-2.2 * dt));
+      c.position.addScaledVector(c.velocity, dt);
+      if (c.position.y < 0.03) {
+        c.position.y = 0.03;
+        c.velocity.set(0, 0, 0);
+      }
+      const life = 1 - c.age / CONFETTI_SECONDS;
+      this.dummy.position.copy(c.position);
+      this.dummy.rotation.set(c.spin.x * c.age, c.spin.y * c.age, c.spin.z * c.age);
+      this.dummy.scale.setScalar(c.size * Math.min(1, life * 2.5));
+      this.dummy.updateMatrix();
+      this.confettiMesh.setMatrixAt(pieces, this.dummy.matrix);
+      this.confettiMesh.setColorAt(pieces, c.color);
+      pieces++;
+    }
+    for (let i = this.confetti.length - 1; i >= 0; i--) if (this.confetti[i].age > CONFETTI_SECONDS) this.confetti.splice(i, 1);
+    this.confettiMesh.count = pieces;
+    this.confettiMesh.instanceMatrix.needsUpdate = true;
+    if (this.confettiMesh.instanceColor) this.confettiMesh.instanceColor.needsUpdate = true;
   }
 
   /** `this.dummy.matrix`를 자리·방향·크기로 만든다. */

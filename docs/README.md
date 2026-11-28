@@ -11,7 +11,7 @@
 | 2048 | 판을 밀어 같은 숫자 타일을 합치는 미니 게임(`games/game2048/`), 밀기·합치기 규칙, 타일 색, 애니메이션, 점수와 최고 점수, 이김·끝 표시 | [rules/world.md](rules/world.md) | [analysis/game2048.md](analysis/game2048.md) |
 | 뱀 | 판 위를 나아가며 열매를 먹고 길어지는 3D 미니 게임(`games/snake/`), 여러 게임이 함께 쓰는 칸 위의 몸 움직임(`lib/gridSnake/`), 방향 받기·부딪힘·빠르기 규칙, 몸·머리·열매 그리기, 칸 사이 매끄러운 움직임, 카메라 맞추기, 끌기 입력, 멈추기, 기록 | [rules/world.md](rules/world.md) | [analysis/snake.md](analysis/snake.md) |
 | 룰렛 체스 | 3D 판에서 컴퓨터와 두는 미니 게임(`games/chess/`), 수마다 다음 수를 둘 사람(나·컴퓨터)을 정하는 룰렛, 차례인 사람의 바탕색과 판 돌리기, 번갈아 두는 백·흑, 체크메이트·되돌리기 금지 규칙, 규칙 엔진(캐슬링·앙파상·승진·무승부), 컴퓨터 상대의 메이트 우선·알파-베타 탐색·세기·웹 워커, 판·기물 모양과 움직임, 기록 | [rules/world.md](rules/world.md) | [analysis/chess.md](analysis/chess.md) |
-| 타워 뱀 | 뱀 변형 미니 게임(`games/towerSnake/`, `?game=tower-snake`, 개발 중), 41 × 41 판과 머리를 따라가는 카메라, 울타리에서 꺾기, 몸 지나가며 마디 잃기, 무적, 미니맵, 타워 상자와 타워 넷(먹으면 꼬리에 붙음, 40마디 한계), 적 넷과 무리(머리에 닿으면 마디 잃음), 타워 자동 공격(화살·대포 범위·얼음 느려짐·번개 튀기, 처치 수), 앞으로 더할 연출 | [plans/towerSnake.md](plans/towerSnake.md) | [analysis/towerSnake.md](analysis/towerSnake.md) |
+| 타워 뱀 | 뱀 변형 미니 게임(`games/towerSnake/`, `?game=tower-snake`, 개발 중), 41 × 41 판과 머리를 따라가는 카메라, 울타리에서 꺾기, 몸 지나가며 마디 잃기, 무적, 미니맵, 타워 상자와 타워 넷(먹으면 꼬리에 붙음, 40마디 한계), 적 넷과 무리(머리에 닿으면 마디 잃음), 타워 자동 공격(화살·대포 범위·얼음 느려짐·번개 튀기, 처치 수), 맞음 번쩍임·처치 색종이·사거리 원, 앞으로 더할 기록 | [plans/towerSnake.md](plans/towerSnake.md) | [analysis/towerSnake.md](analysis/towerSnake.md) |
 | 플레이 기록 | 미니 게임의 기록을 이 기기의 브라우저(IndexedDB)에 남기기(`lib/save/`), 누적 수치·판 기록·하다 만 판, 형식 버전과 옮기기, 새 게임에 붙이기, 보류한 서버 연동 | [rules/world.md](rules/world.md) | [analysis/saveRecords.md](analysis/saveRecords.md) |
 | 오림 글자 | 종이를 찢어 오린 글자를 이어 붙인 제목(`lib/ransomText/`), 영어만 지원, 글꼴·종이 색·찢긴 가장자리, DOM 캔버스나 빌보드·텍스처에 그리기 | [rules/world.md](rules/world.md) | [analysis/ransomText.md](analysis/ransomText.md) |
 | 월드 컨셉과 구조 | 글 없이 그래픽으로 전달하는 컨셉, 지워진 콘텐츠·작동 영역 시스템의 참고 커밋 | [rules/world.md](rules/world.md) | [analysis/threejs.md](analysis/threejs.md) |
@@ -39,7 +39,7 @@
 - [../README.md](../README.md): 저장소 소개, 조작, 시작 방법
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): 현재 구조, 기능, 명령어, 알려진 한계
 - [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md): 결정 배경과 앞으로의 계획
-- [plans/towerSnake.md](plans/towerSnake.md): 타워 뱀(뱀 변형, 몸 마디마다 타워를 싣고 몰려오는 적을 막는 미니 게임) 개발 계획서 (2026-11-28 규칙 확정, 단계 4까지 완료)
+- [plans/towerSnake.md](plans/towerSnake.md): 타워 뱀(뱀 변형, 몸 마디마다 타워를 싣고 몰려오는 적을 막는 미니 게임) 개발 계획서 (2026-11-28 규칙 확정, 단계 5까지 완료)
 
 ## 문서 구분
 
