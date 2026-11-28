@@ -55,7 +55,7 @@ git log --oneline e8b0285..HEAD -- src/games src/main.ts
 - `src/layers.test.ts`가 검사한다: 게임은 `engine/`, `content/`, `home/`, 다른 게임을 가져오지 않고, `main.ts` 말고는 게임을 가져오지 않는다. three.js는 게임의 `graphics/`에서만 가져온다. 게임이 `lib/`을 가져오는 것은 된다.
 - 메인 페이지 컷은 `"open": { "game": "<id>" }`로 게임을 연다 ([home.md](home.md)).
 
-지금 게임: 색칠 놀이(`coloring`), 2048(`2048`, [game2048.md](game2048.md)).
+지금 게임: 색칠 놀이(`coloring`), 2048(`2048`, [game2048.md](game2048.md)), 체스(`chess`, [chess.md](chess.md)).
 
 새 게임 추가: `src/games/<게임>/index.ts`에 `GameDefinition`을 만들고 `GAMES`에 더한 뒤, `contents.json`의 컷에 `open.game`을 넣는다.
 

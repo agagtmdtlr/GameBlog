@@ -9,6 +9,7 @@
 | 메인 페이지 | 첫 화면 코믹 프레임, 오림 글자 제목, 컷 배치(다각형·여백)와 컷 나누기, 컷에 넣는 콘텐츠(미리 보기 그림·영상·YouTube 썸네일, 씬·미니 게임·YouTube·외부 주소로 가기), 씬에서 메인으로 돌아가기 | [rules/world.md](rules/world.md) | [analysis/home.md](analysis/home.md) |
 | 색칠 놀이와 미니 게임 | 3D 해 질 녘 도시를 자유 시점으로 돌아다니며 메시를 눌러 무작위 색을 채우는 색칠 놀이(`games/coloring/`), 도시 배치(도로·차·가로등·사람·건물·나무·하늘·해), 자유 시점 카메라와 조작, 칠하기 셰이더·선 테두리, 색 묶음, 클리어 연출, 엔진 없는 미니 게임 계층(`games/`, `?game=<id>`)과 새 게임 추가 | [rules/world.md](rules/world.md) | [analysis/coloring.md](analysis/coloring.md) |
 | 2048 | 판을 밀어 같은 숫자 타일을 합치는 미니 게임(`games/game2048/`), 밀기·합치기 규칙, 타일 색, 애니메이션, 점수와 최고 점수, 이김·끝 표시 | [rules/world.md](rules/world.md) | [analysis/game2048.md](analysis/game2048.md) |
+| 체스 | 3D 판에서 백을 잡고 컴퓨터(흑)와 두는 미니 게임(`games/chess/`), 규칙 엔진(캐슬링·앙파상·승진·무승부), 컴퓨터 상대의 탐색·세기·웹 워커, 판·기물 모양과 움직임, 무르기, 기록 | [rules/world.md](rules/world.md) | [analysis/chess.md](analysis/chess.md) |
 | 플레이 기록 | 미니 게임의 기록을 이 기기의 브라우저(IndexedDB)에 남기기(`lib/save/`), 누적 수치·판 기록·하다 만 판, 형식 버전과 옮기기, 새 게임에 붙이기, 보류한 서버 연동 | [rules/world.md](rules/world.md) | [analysis/saveRecords.md](analysis/saveRecords.md) |
 | 오림 글자 | 종이를 찢어 오린 글자를 이어 붙인 제목(`lib/ransomText/`), 영어만 지원, 글꼴·종이 색·찢긴 가장자리, DOM 캔버스나 빌보드·텍스처에 그리기 | [rules/world.md](rules/world.md) | [analysis/ransomText.md](analysis/ransomText.md) |
 | 월드 컨셉과 구조 | 글 없이 그래픽으로 전달하는 컨셉, 지워진 콘텐츠·작동 영역 시스템의 참고 커밋 | [rules/world.md](rules/world.md) | [analysis/threejs.md](analysis/threejs.md) |

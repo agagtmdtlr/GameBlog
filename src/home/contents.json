@@ -20,6 +20,11 @@
       "title": "2048",
       "preview": { "image": "2048.svg" },
       "open": { "game": "2048" }
+    },
+    "f": {
+      "title": "체스",
+      "preview": { "image": "chess.jpg" },
+      "open": { "game": "chess" }
     }
   }
 }
