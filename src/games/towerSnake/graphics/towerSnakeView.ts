@@ -1,5 +1,6 @@
 import {
   BackSide,
+  BoxGeometry,
   BufferGeometry,
   CircleGeometry,
   Color,
@@ -32,6 +33,7 @@ import toonVert from '../shaders/toon.vert?raw';
 import toonFrag from '../shaders/toon.frag?raw';
 import outlineVert from '../shaders/outline.vert?raw';
 import outlineFrag from '../shaders/outline.frag?raw';
+import { BLAST_RADIUS, MAX_PROJECTILES, type CombatEvent, type Projectile, type ProjectileType } from '../combat';
 import { ENEMY_SPECS, ENEMY_TYPES, type Enemy, type EnemyType } from '../enemies';
 import { TOWER_TYPES, type TowerType } from '../towers';
 import { MAX_ENEMIES } from '../waves';
@@ -78,6 +80,45 @@ const SHAKE_SECONDS = 0.35;
 const POP_SECONDS = 0.45;
 /** 상자 위 작은 타워의 크기 */
 const BOX_TOWER_SCALE = 0.62;
+/** 얼음에 맞아 느려진 적이 물드는 색과 정도 */
+const ICE_TINT = hex(0xaee6ff);
+const ICE_MIX = 0.65;
+/** 투사체가 나는 높이, 대포알 포물선의 꼭대기 높이 (칸) */
+const SHOT_HEIGHT = 0.75;
+const CANNON_ARC = 1.4;
+/** 번개 줄기가 보이는 시간 (초), 한 번 튈 때 꺾는 마디 수와 꺾는 폭 (칸) */
+const BOLT_SECONDS = 0.18;
+const BOLT_KINKS = 3;
+const BOLT_JITTER = 0.22;
+const BOLT_CAPACITY = 480;
+const BOLT_COLOR = hex(0xffd84a);
+/** 대포알이 터지는 둥근 빛: 보이는 시간 (초)과 수 */
+const BLAST_SECONDS = 0.3;
+const BLAST_CAPACITY = 64;
+const BLAST_COLOR = hex(0xffa14a);
+
+/** 투사체 모양: 반지름 1 근처의 도형. +x가 날아가는 쪽이다. */
+const SHOT_SHAPES: Readonly<Record<ProjectileType, { readonly geometry: () => BufferGeometry; readonly color: Rgb }>> = {
+  // 화살: 가늘고 뾰족한 노란 촉
+  arrow: { geometry: () => new ConeGeometry(0.06, 0.42, 8).rotateZ(-Math.PI / 2), color: hex(0xffd24d) },
+  // 대포알: 짙은 쇠공
+  cannon: { geometry: () => new SphereGeometry(0.13, 12, 8), color: hex(0x4a4f6b) },
+  // 얼음: 하늘색 조각
+  ice: { geometry: () => new OctahedronGeometry(0.12).scale(1.8, 1, 1), color: hex(0x8fd8ff) },
+};
+
+interface Bolt {
+  /** 꺾인 줄기의 점 (판 위 x, z) */
+  readonly points: readonly Vector2[];
+  age: number;
+}
+
+interface Blast {
+  readonly x: number;
+  readonly z: number;
+  age: number;
+}
+
 /** 그릴 수 있는 적 수 (큰 녀석이 갈라지는 몫을 넉넉히) */
 const DRAW_ENEMIES = MAX_ENEMIES + 16;
 
@@ -205,6 +246,7 @@ export interface ViewState {
   readonly towers: readonly TowerType[];
   readonly boxes: readonly TowerBox[];
   readonly enemies: readonly Enemy[];
+  readonly projectiles: readonly Projectile[];
 }
 
 /** 타워 뱀 판을 three.js로 그린다. 놀이 규칙은 모르고 받은 몸·타워·상자를 그린다. */
@@ -228,6 +270,11 @@ export class TowerSnakeView {
   private readonly head = new Group();
   private readonly tongue: Mesh;
   private readonly pieces: InstancedMesh;
+  private readonly shots: Record<ProjectileType, InstancedMesh>;
+  private readonly boltMesh: InstancedMesh;
+  private readonly blastMesh: InstancedMesh;
+  private readonly bolts: Bolt[] = [];
+  private readonly blasts: Blast[] = [];
   private readonly flying: Piece[] = [];
   private readonly dummy = new Object3D();
   private readonly matrix = new Matrix4();
@@ -311,6 +358,8 @@ export class TowerSnakeView {
     this.enemyBodies = {} as Record<EnemyType, InstancedMesh>;
     for (const type of ENEMY_TYPES) {
       this.enemyBodies[type] = this.addInstanced(ENEMY_SHAPES[type].geometry(), this.toon(ENEMY_SHAPES[type].color), DRAW_ENEMIES);
+      // 느려진 적을 물들이려고 조각마다 색을 쓴다.
+      this.enemyBodies[type].setColorAt(0, raw(ENEMY_SHAPES[type].color));
     }
     const eyeBall = new SphereGeometry(1, 12, 8);
     this.eyes = this.addInstanced(eyeBall, this.toon(WHITE), DRAW_ENEMIES * 2);
@@ -350,6 +399,23 @@ export class TowerSnakeView {
     this.pieces.frustumCulled = false;
     this.pieces.count = 0;
     this.pieces.setColorAt(0, raw(PLATFORM));
+
+    // 투사체, 번개 줄기, 대포알 터짐
+    this.shots = {} as Record<ProjectileType, InstancedMesh>;
+    for (const type of ['arrow', 'cannon', 'ice'] as const) {
+      this.shots[type] = this.addInstanced(SHOT_SHAPES[type].geometry(), this.toon(SHOT_SHAPES[type].color), MAX_PROJECTILES);
+    }
+    this.boltMesh = new InstancedMesh(new BoxGeometry(1, 0.07, 0.07), new MeshBasicMaterial({ color: srgb(BOLT_COLOR) }), BOLT_CAPACITY);
+    this.blastMesh = new InstancedMesh(
+      new SphereGeometry(1, 20, 10),
+      new MeshBasicMaterial({ color: srgb(BLAST_COLOR), transparent: true, opacity: 0.45, depthWrite: false }),
+      BLAST_CAPACITY,
+    );
+    for (const mesh of [this.boltMesh, this.blastMesh]) {
+      mesh.frustumCulled = false;
+      mesh.count = 0;
+      this.scene.add(mesh);
+    }
     this.scene.add(this.pieces);
   }
 
@@ -377,6 +443,8 @@ export class TowerSnakeView {
     this.snakeFade.value = 0;
     this.headFlash.value = 0;
     this.flying.length = 0;
+    this.bolts.length = 0;
+    this.blasts.length = 0;
     this.popAt = [];
     this.boxBorn.clear();
     if (body.length > 1) this.headYaw = Math.atan2(-(body[0].y - body[1].y), body[0].x - body[1].x);
@@ -405,6 +473,30 @@ export class TowerSnakeView {
     }
     this.shatter(cell, tower);
     this.shakeUntil = this.time + SHAKE_SECONDS;
+  }
+
+  /** 타워 공격을 보인다: 번개 줄기, 대포알 터짐 */
+  effect(event: CombatEvent): void {
+    if (event.kind === 'blast') {
+      this.blasts.push({ x: cellX(event.x), z: cellX(event.y), age: 0 });
+      if (this.blasts.length > BLAST_CAPACITY) this.blasts.shift();
+      return;
+    }
+    // 점 사이를 몇 마디로 나눠 옆으로 흔든 꺾인 줄기
+    const points: Vector2[] = [];
+    event.points.forEach((p, i) => {
+      const end = new Vector2(cellX(p.x), cellX(p.y));
+      if (i > 0) {
+        const start = points[points.length - 1];
+        const side = new Vector2(-(end.y - start.y), end.x - start.x).normalize();
+        for (let k = 1; k < BOLT_KINKS; k++) {
+          const at = start.clone().lerp(end, k / BOLT_KINKS);
+          points.push(at.addScaledVector(side, (Math.random() * 2 - 1) * BOLT_JITTER));
+        }
+      }
+      points.push(end);
+    });
+    this.bolts.push({ points, age: 0 });
   }
 
   /** 머리만 남은 채로 부딪혀 끝났다. */
@@ -509,6 +601,8 @@ export class TowerSnakeView {
     this.shadows.instanceMatrix.needsUpdate = true;
 
     this.updatePieces(dt);
+    this.drawShots(state.projectiles);
+    this.updateEffects(dt);
 
     // 카메라: 머리를 부드럽게 따라가고, 피해를 받으면 떨린다.
     this.target.lerp(headPos, 1 - Math.exp(-dt * FOLLOW));
@@ -541,6 +635,7 @@ export class TowerSnakeView {
     let eyes = 0;
     let shadows = shadowStart;
     const local = new Vector3();
+    const tint = new Color();
     const n = Math.min(enemies.length, DRAW_ENEMIES);
     for (let i = 0; i < n; i++) {
       const e = enemies[i];
@@ -558,7 +653,11 @@ export class TowerSnakeView {
       this.dummy.scale.set(sx, sy, sz);
       this.dummy.updateMatrix();
       const body = this.enemyBodies[e.type];
-      body.setMatrixAt(counts[e.type]++, this.dummy.matrix);
+      body.setMatrixAt(counts[e.type], this.dummy.matrix);
+      // 얼음에 맞아 느려진 동안 하늘색으로 물든다.
+      tint.setRGB(...shape.color);
+      if (e.slow > 0) tint.lerp(raw(ICE_TINT), ICE_MIX);
+      body.setColorAt(counts[e.type]++, tint);
       // 눈 둘: 몸 앞쪽 위
       for (const side of [-1, 1]) {
         local.set(sx * 0.62, sy * 1.25, side * sz * 0.42).applyAxisAngle(UP, yaw);
@@ -572,12 +671,72 @@ export class TowerSnakeView {
     for (const type of ENEMY_TYPES) {
       this.enemyBodies[type].count = counts[type];
       this.enemyBodies[type].instanceMatrix.needsUpdate = true;
+      if (this.enemyBodies[type].instanceColor) this.enemyBodies[type].instanceColor!.needsUpdate = true;
     }
     for (const mesh of [this.eyes, this.pupils]) {
       mesh.count = eyes;
       mesh.instanceMatrix.needsUpdate = true;
     }
     return shadows;
+  }
+
+  /** 날아가는 투사체: 가는 쪽을 보고, 대포알은 포물선을 그린다. */
+  private drawShots(projectiles: readonly Projectile[]): void {
+    const counts: Record<ProjectileType, number> = { arrow: 0, cannon: 0, ice: 0 };
+    for (const p of projectiles) {
+      const yaw = Math.atan2(-(p.ty - p.y), p.tx - p.x);
+      let y = SHOT_HEIGHT;
+      if (p.type === 'cannon') {
+        const total = Math.hypot(p.tx - p.sx, p.ty - p.sy);
+        const left = Math.hypot(p.tx - p.x, p.ty - p.y);
+        const t = total > 1e-6 ? Math.min(1, Math.max(0, 1 - left / total)) : 1;
+        y = SHOT_HEIGHT * (1 - t) + 0.25 * t + CANNON_ARC * 4 * t * (1 - t);
+      }
+      this.place(this.shots[p.type], counts[p.type]++, cellX(p.x), y, cellX(p.y), yaw, 1);
+    }
+    for (const type of ['arrow', 'cannon', 'ice'] as const) {
+      this.shots[type].count = counts[type];
+      this.shots[type].instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  /** 번개 줄기와 대포알 터짐을 흘려보내며 그린다. */
+  private updateEffects(dt: number): void {
+    let bolts = 0;
+    for (const bolt of this.bolts) {
+      bolt.age += dt;
+      if (bolt.age > BOLT_SECONDS) continue;
+      const fade = 1 - bolt.age / BOLT_SECONDS;
+      for (let i = 1; i < bolt.points.length && bolts < BOLT_CAPACITY; i++) {
+        const a = bolt.points[i - 1];
+        const b = bolt.points[i];
+        const length = a.distanceTo(b);
+        this.dummy.position.set((a.x + b.x) / 2, SHOT_HEIGHT, (a.y + b.y) / 2);
+        this.dummy.rotation.set(0, Math.atan2(-(b.y - a.y), b.x - a.x), 0);
+        this.dummy.scale.set(length, 0.4 + fade, 0.4 + fade);
+        this.dummy.updateMatrix();
+        this.boltMesh.setMatrixAt(bolts++, this.dummy.matrix);
+      }
+    }
+    for (let i = this.bolts.length - 1; i >= 0; i--) if (this.bolts[i].age > BOLT_SECONDS) this.bolts.splice(i, 1);
+    this.boltMesh.count = bolts;
+    this.boltMesh.instanceMatrix.needsUpdate = true;
+
+    let blasts = 0;
+    for (const blast of this.blasts) {
+      blast.age += dt;
+      if (blast.age > BLAST_SECONDS) continue;
+      const t = blast.age / BLAST_SECONDS;
+      const radius = (0.3 + (BLAST_RADIUS + 0.2) * Math.sqrt(t)) * (1 - t * t * 0.3);
+      this.dummy.position.set(blast.x, 0.15, blast.z);
+      this.dummy.rotation.set(0, 0, 0);
+      this.dummy.scale.set(radius, radius * 0.35 * (1 - t), radius);
+      this.dummy.updateMatrix();
+      this.blastMesh.setMatrixAt(blasts++, this.dummy.matrix);
+    }
+    for (let i = this.blasts.length - 1; i >= 0; i--) if (this.blasts[i].age > BLAST_SECONDS) this.blasts.splice(i, 1);
+    this.blastMesh.count = blasts;
+    this.blastMesh.instanceMatrix.needsUpdate = true;
   }
 
   /** `this.dummy.matrix`를 자리·방향·크기로 만든다. */
