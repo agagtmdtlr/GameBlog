@@ -21,7 +21,6 @@ GameBlog는 three.js로 만든 3D 놀이 공간 블로그입니다. 글을 읽�
 |---|---|
 | 렌더링 | [three.js](https://threejs.org/) 0.187 (WebGL2). 조명과 재질은 직접 작성한 GLSL 셰이더를 `RawShaderMaterial`로 적용합니다 |
 | 언어와 도구 | TypeScript, Vite, Vitest |
-| 모델과 그림 | 캐릭터 다리는 Blender 스크립트로, 우주인 스티커는 Python 스크립트로 만듭니다. 나머지 모양은 모두 코드로 만듭니다 |
 | 배포 | `main`에 푸시하면 GitHub Actions가 테스트와 빌드를 거쳐 GitHub Pages에 올립니다 |
 
 런타임 의존성은 `three` 하나뿐입니다.
@@ -69,7 +68,6 @@ src/
 │  ├─ index.ts    게임 목록
 │  └─ <게임>/     게임별 규칙, 화면, 그리기
 └─ lib/           여러 콘텐츠가 함께 쓰는 코드: 플레이 기록 저장, 오려 붙인 글자 제목 등
-tools/            Blender 캐릭터 스크립트, 스티커 생성 스크립트
 docs/             구조 분석과 규칙 문서
 ```
 
@@ -94,17 +92,3 @@ docs/             구조 분석과 규칙 문서
 2. 바꾼 파일만 골라서 커밋합니다.
 3. `npm test`와 `npm run build`를 통과시킨 뒤 `main`에 `--no-ff`로 병합하고 푸시합니다.
 4. worktree와 작업 브랜치를 지웁니다.
-
-## 에셋 다시 만들기
-
-캐릭터 다리 모델(`src/content/common/character/character.glb`)의 원본은 Blender 스크립트입니다. glb 파일을 직접 고치지 말고 아래 스크립트로 다시 만들어 주세요.
-
-```bash
-"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" --background --factory-startup --python tools/blender/build_character.py
-```
-
-우주인 스티커(`src/content/planet/assets/astronaut-sticker.png`)는 원본 사진을 Pillow와 NumPy로 가공해 만듭니다.
-
-```bash
-python -I tools/sticker/make_astronaut_sticker.py tools/sticker/astronaut-source.png src/content/planet/assets/astronaut-sticker.png preview.png
-```
