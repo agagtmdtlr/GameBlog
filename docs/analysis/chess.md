@@ -73,7 +73,7 @@ three.js는 `graphics/`에서만 쓴다 (`src/layers.test.ts`). 런타임 라이
 
 ## 메인 페이지
 
-- 컷 `f`에 넣었다 (`contents.json`, `open.game: "chess"`).
+- 메인 페이지 콘텐츠 목록에 넣었다 (`contents.json`, `open.game: "chess"`). 놓이는 컷은 더한 날 순서로 정해진다 ([home.md](home.md)의 "지금 놓인 순서"). 처음 넣을 때는 컷 `f`였다.
 - 미리 보기 `src/home/previews/chess.jpg`(900 × 615)는 개발 서버에서 1050 × 700 화면에 이탈리안 시작(`e2e4 e7e5 g1f3 b8c6 f1c4 f8c5 c2c3 g8f6 d2d4 e5d4`)을 두고 f3 나이트를 고른 뒤, 단추를 숨기고 캔버스의 가운데(가로 10~90%, 세로 13~95%)를 JPEG로 저장했다. 저장은 data URL을 로컬 일회용 수신 서버로 보내 파일로 썼다.
 
 ## 브라우저 확인 (2026-11-28, 개발 서버)

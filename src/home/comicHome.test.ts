@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SCENES } from '../content';
 import { GAMES } from '../games';
-import { loadCutContents, loadPageTitle, targetLink, titleLineOptions } from './comicContents';
+import { loadContents, loadCutContents, loadPageTitle, placeContents, targetLink, titleLineOptions, type CutContent } from './comicContents';
 import { COMIC_LAYOUT, insetPolygon, isConvex, MIN_PAGE_ASPECT, naturalAspect, placeCuts, signedArea, type Point } from './comicLayout';
 import contentsData from './contents.json';
 
@@ -81,11 +81,26 @@ describe('코믹 프레임 배치', () => {
 });
 
 describe('컷 콘텐츠 (contents.json)', () => {
-  const contents = loadCutContents(contentsData);
+  const cutIds = COMIC_LAYOUT.cuts.map((cut) => cut.id);
+  const contents = loadCutContents(contentsData, cutIds);
 
-  it('모든 콘텐츠가 있는 컷을 가리킨다', () => {
-    const ids = COMIC_LAYOUT.cuts.map((cut) => cut.id);
-    for (const id of contents.keys()) expect(ids, id).toContain(id);
+  it('콘텐츠가 컷 수보다 많지 않다', () => {
+    expect(loadContents(contentsData).length).toBeLessThanOrEqual(cutIds.length);
+  });
+
+  it('최근에 더한 콘텐츠부터 컷 순서대로 놓는다 (같은 날이면 목록 뒤쪽이 먼저)', () => {
+    const item = (title: string, added: string): CutContent => ({
+      title,
+      added,
+      preview: { kind: 'image', file: 'a.png' },
+      open: { kind: 'game', gameId: title },
+    });
+    const placed = placeContents([item('old', '2026-11-01'), item('new', '2026-11-20'), item('newer', '2026-11-20'), item('mid', '2026-11-10')], ['a', 'b', 'c']);
+    expect([...placed].map(([id, content]) => `${id}:${content.title}`)).toEqual(['a:newer', 'b:new', 'c:mid']);
+    // 지금 목록에서 가장 최근 콘텐츠가 첫 컷에 온다.
+    const list = loadContents(contentsData);
+    const newest = [...list].reverse().reduce((best, content) => (content.added > best.added ? content : best));
+    expect(contents.get(cutIds[0])).toEqual(newest);
   });
 
   it('씬으로 들어가는 컷은 있는 씬을 가리키고, 미리 보기 파일이 previews/에 있다', () => {
@@ -106,17 +121,19 @@ describe('컷 콘텐츠 (contents.json)', () => {
   });
 
   it('모양이 틀린 콘텐츠를 알린다', () => {
-    const cut = { title: 't', preview: { image: 'a.png' }, open: { scene: 'planet' } };
-    expect(() => loadCutContents({ cuts: { a: cut } })).not.toThrow();
-    expect(() => loadCutContents({ cuts: { a: { ...cut, title: '' } } })).toThrow('cuts.a.title');
-    expect(() => loadCutContents({ cuts: { a: { ...cut, preview: { image: 'a.png', youtube: 'x' } } } })).toThrow(
-      'cuts.a.preview',
+    const cut = { title: 't', added: '2026-11-28', preview: { image: 'a.png' }, open: { scene: 'planet' } };
+    expect(() => loadContents({ contents: [cut] })).not.toThrow();
+    expect(() => loadContents({ contents: [{ ...cut, title: '' }] })).toThrow('contents[0].title');
+    expect(() => loadContents({ contents: [{ ...cut, added: '11/28' }] })).toThrow('contents[0].added');
+    expect(() => loadContents({ cuts: { a: cut } })).toThrow('contents');
+    expect(() => loadContents({ contents: [{ ...cut, preview: { image: 'a.png', youtube: 'x' } }] })).toThrow(
+      'contents[0].preview',
     );
-    expect(() => loadCutContents({ cuts: { a: { ...cut, preview: { youtube: 'short' } } } })).toThrow(
-      'cuts.a.preview.youtube',
+    expect(() => loadContents({ contents: [{ ...cut, preview: { youtube: 'short' } }] })).toThrow(
+      'contents[0].preview.youtube',
     );
-    expect(() => loadCutContents({ cuts: { a: { ...cut, open: { url: 'javascript:alert(1)' } } } })).toThrow(
-      'cuts.a.open.url',
+    expect(() => loadContents({ contents: [{ ...cut, open: { url: 'javascript:alert(1)' } }] })).toThrow(
+      'contents[0].open.url',
     );
   });
 

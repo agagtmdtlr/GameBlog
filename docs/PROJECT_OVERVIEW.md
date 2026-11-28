@@ -48,8 +48,8 @@ GameBlog/
 │  ├─ lib/save/                플레이 기록: 이 기기의 IndexedDB에 누적 수치·판 기록·하다 만 판 ([analysis/saveRecords.md](analysis/saveRecords.md))
 │  ├─ home/                    메인 페이지: 코믹 프레임 컷마다 콘텐츠 미리 보기 ([analysis/home.md](analysis/home.md))
 │  │  ├─ comicLayout.ts        컷 배치(볼록 다각형)와 컷 사이 여백 계산
-│  │  ├─ contents.json         컷마다 넣을 콘텐츠(미리 보기, 누르면 갈 곳)
-│  │  ├─ comicContents.ts      contents.json 읽기·검사, 링크 주소
+│  │  ├─ contents.json         넣을 콘텐츠 목록(더한 날, 미리 보기, 누르면 갈 곳). 최근 것부터 첫 컷에 놓는다
+│  │  ├─ comicContents.ts      contents.json 읽기·검사, 최근 것부터 컷에 놓기, 링크 주소
 │  │  ├─ comicPage.ts          DOM 그리기
 │  │  └─ previews/             컷 미리 보기 그림
 │  ├─ style.css                오버레이 스타일
@@ -243,7 +243,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 
 ### 자동 테스트
 
-`npm test` 기준 30개 파일, 302개가 모두 통과한다 (2026-11-28, 뱀·체스 추가 후). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 30개 파일, 303개가 모두 통과한다 (2026-11-28, 메인 페이지를 최근 콘텐츠부터 놓게 바꾼 뒤). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
