@@ -17,7 +17,7 @@ import type { Vec3 } from '../../../engine/math';
 import type { CameraView, Environment } from '../../../engine/frame';
 import type { RenderLayer } from '../../../engine/render/graphics';
 import { createTvPartGeometries } from '../../common/tv/tvGraphics';
-import { TV_SHAPE } from '../../common/tv/tvShape';
+import { TV_CABINET_BOTTOM, TV_SHAPE } from '../../common/tv/tvShape';
 import { growScale, type SkyTv } from '../objects/skyTvs';
 
 /**
@@ -47,16 +47,19 @@ function paint(geometry: BufferGeometry, color: Vec3, part: number): BufferGeome
   return flat;
 }
 
-/** 텔레비전 부품을 색칠해 하나로 합친 지오메트리 (`position`, `normal`, `color`, `aPart`) */
+/**
+ * 텔레비전 부품을 색칠해 하나로 합친 지오메트리 (`position`, `normal`, `color`, `aPart`).
+ * 사진의 브라운관처럼 다리가 없다 (2026-11-28 사용자 요청). 몸통 가운데가 원점에 오도록 내려, 기울기와 둥실거림이 몸통 가운데를 돈다.
+ */
 function tvGeometry(): BufferGeometry {
-  const parts = createTvPartGeometries();
+  const parts = createTvPartGeometries({ legs: false });
   const painted = [
     paint(parts.wood, BODY_COLOR, 0),
     paint(parts.trim, TRIM_COLOR, 1),
     paint(parts.dark, DARK_COLOR, 2),
     paint(parts.screen, TV_SHAPE.screenColor, 3),
   ];
-  const merged = mergeGeometries(painted);
+  const merged = mergeGeometries(painted).translate(0, -(TV_CABINET_BOTTOM + 0.5) / 2, 0);
   for (const g of [...painted, ...Object.values(parts)]) g.dispose();
   return merged;
 }

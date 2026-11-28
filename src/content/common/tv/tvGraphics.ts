@@ -10,11 +10,11 @@ const tvBoxPart = ({ center, size }: TvBox): [BufferGeometry, Matrix4] => [
 
 const tvShapeOf = (points: [number, number][]): Shape => new Shape(points.map(([x, y]) => new Vector2(x, y)));
 
-/** 텔레비전의 나무 부분: 몸통, 뚜껑, 다리, 스피커 가로 살. 모양은 `tvShape.ts`가 정한다. */
-function createTvGeometry(): BufferGeometry {
+/** 텔레비전의 나무 부분: 몸통, 뚜껑, 다리(`legs`일 때), 스피커 가로 살. 모양은 `tvShape.ts`가 정한다. */
+function createTvGeometry(legs: boolean): BufferGeometry {
   return mergeParts([
     ...tvWoodBoxes().map(tvBoxPart),
-    ...tvLegs().map(({ center, length, topRadius, bottomRadius }): [BufferGeometry, Matrix4] => [
+    ...(legs ? tvLegs() : []).map(({ center, length, topRadius, bottomRadius }): [BufferGeometry, Matrix4] => [
       new CylinderGeometry(topRadius, bottomRadius, length, 16),
       new Matrix4().makeTranslation(...center),
     ]),
@@ -60,9 +60,12 @@ export interface TvPartGeometries {
   screen: BufferGeometry;
 }
 
-/** 텔레비전 부품 지오메트리를 새로 만든다. 좌표는 `tvShape.ts`의 한 변 1인 상자 안이다. */
-export function createTvPartGeometries(): TvPartGeometries {
-  return { wood: createTvGeometry(), trim: createTvTrimGeometry(), dark: createTvDarkGeometry(), screen: createTvScreenGeometry() };
+/**
+ * 텔레비전 부품 지오메트리를 새로 만든다. 좌표는 `tvShape.ts`의 한 변 1인 상자 안이다.
+ * `legs`가 false면 다리 없이 몸통만 만든다 (초원 하늘 텔레비전). 몸통의 자리는 그대로다.
+ */
+export function createTvPartGeometries({ legs = true }: { legs?: boolean } = {}): TvPartGeometries {
+  return { wood: createTvGeometry(legs), trim: createTvTrimGeometry(), dark: createTvDarkGeometry(), screen: createTvScreenGeometry() };
 }
 
 /** 텔레비전 메시 `tv`, `tvTrim`, `tvDark`, `tvScreen`을 등록한다. */
