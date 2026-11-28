@@ -57,7 +57,7 @@ git log --oneline e8b0285..HEAD -- src/games src/main.ts
 
 지금 게임: 색칠 놀이(`coloring`), 2048(`2048`, [game2048.md](game2048.md)), 뱀(`snake`, [snake.md](snake.md)), 체스(`chess`, [chess.md](chess.md)).
 
-새 게임 추가: `src/games/<게임>/index.ts`에 `GameDefinition`을 만들고 `GAMES`에 더한 뒤, `contents.json`의 컷에 `open.game`을 넣는다.
+새 게임 추가: `src/games/<게임>/index.ts`에 `GameDefinition`을 만들고 `GAMES`에 더한 뒤, `contents.json`의 `contents` 목록 끝에 `open.game`과 `added`로 항목을 더한다 (최근 콘텐츠가 첫 컷에 온다, [home.md](home.md)).
 
 ## 파일 (`src/games/coloring/`)
 

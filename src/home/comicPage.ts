@@ -76,13 +76,16 @@ const pointList = (points: readonly Point[]) => points.map(([x, y]) => `${x},${y
 
 /**
  * 메인 페이지: 코믹 프레임의 컷마다 콘텐츠 미리 보기를 보여 주고, 누르면 그 콘텐츠로 간다.
- * 컷 배치는 `comicLayout.ts`, 컷에 넣을 콘텐츠는 `contents.json`에서 바꾼다.
+ * 컷 배치는 `comicLayout.ts`, 컷에 넣을 콘텐츠는 `contents.json`에서 바꾼다. 최근에 더한 콘텐츠가 첫 컷(`a`)에 온다.
  *
  * 종이는 화면을 꽉 채운다. 세로로 긴 화면에서는 종이를 세로로 늘여(`placeCuts`의 `aspect`) 빈 곳을 없애고,
  * 제목은 한 줄과 두 줄 가운데 제목 띠에 더 크게 들어가는 쪽을 쓴다. 화면 크기가 바뀌면 다시 놓는다.
  */
 export function showComicPage(root: HTMLElement): void {
-  const contents = loadCutContents(contentsData);
+  const contents = loadCutContents(
+    contentsData,
+    COMIC_LAYOUT.cuts.map((cut) => cut.id),
+  );
 
   const sheet = document.createElement('nav');
   sheet.className = 'comic-page';

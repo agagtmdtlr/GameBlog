@@ -60,40 +60,45 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 
 ```json
 {
-  "cuts": {
-    "a": { "title": "행성 산책", "preview": { "image": "planet.jpg" }, "open": { "scene": "planet" } },
-    "d": { "title": "색칠 놀이", "preview": { "image": "coloring.jpg" }, "open": { "game": "coloring" } }
-  }
+  "contents": [
+    { "title": "행성 산책", "added": "2026-11-24", "preview": { "image": "planet.jpg" }, "open": { "scene": "planet" } },
+    { "title": "체스", "added": "2026-11-28", "preview": { "image": "chess.jpg" }, "open": { "game": "chess" } }
+  ]
 }
 ```
+
+콘텐츠는 컷 id를 적지 않는다. **최근에 더한 콘텐츠가 첫 컷 `a`에 오고**, 그다음부터 컷 배치 순서(`a`, `b`, `c`, …)대로 채운다 (2026-11-28 사용자 요청, `placeContents`). 같은 날 더한 콘텐츠는 목록에서 뒤에 있는 것을 더 최근으로 본다. 콘텐츠보다 컷이 많으면 뒤쪽 컷이 빈 컷으로 남는다.
 
 | 키 | 값 |
 |---|---|
 | `title` | 스크린 리더 이름과 마우스 툴팁. 화면에 글로 쓰지 않는다 |
+| `added` | 더한 날 `YYYY-MM-DD`. 놓이는 순서를 정한다 |
 | `preview` | 하나만: `image`(previews/의 그림. png·jpg·webp·gif·svg), `video`(previews/의 mp4·webm, 소리 없이 반복), `youtube`(영상 id → 16:9 썸네일 `maxresdefault`, 없으면 `mqdefault`) |
 | `open` | 하나만: `scene`(이 사이트의 씬 id), `game`(이 사이트의 미니 게임 id, `GAMES`), `youtube`(영상 id, 새 탭), `url`(`https://` 주소, 새 탭) |
 
 - 콘텐츠가 없는 컷은 망점 무늬 빈 컷으로 남고 누를 수 없다.
-- 테스트가 콘텐츠의 컷 id가 배치에 있는지, `scene`이 `SCENES`에, `game`이 `GAMES`에 있는지, 미리 보기 파일이 `previews/`에 있는지 검사한다.
+- 테스트가 콘텐츠 수가 컷 수를 넘지 않는지, 최근 콘텐츠가 첫 컷에 오는지, `scene`이 `SCENES`에, `game`이 `GAMES`에 있는지, 미리 보기 파일이 `previews/`에 있는지 검사한다.
 - `open.youtube` 컷에는 가운데에 재생 삼각형을 얹는다.
 
 ### 컷에 콘텐츠를 넣는 절차
 
 1. 미리 보기 그림을 `src/home/previews/`에 넣는다 (컷 상자 비율에 가깝게, 900px 안팎 JPEG). YouTube 썸네일을 쓰면 필요 없다.
-2. `contents.json`의 `cuts`에 컷 id로 항목을 더한다.
+2. `contents.json`의 `contents` 목록 **끝에** 오늘 날짜(`added`)로 항목을 더한다. 메인 페이지 첫 컷에 놓이고, 나머지는 한 칸씩 뒤로 밀린다.
 3. `npm test`로 검사한다.
 
-`b`는 사용자가 게임 "Flower"를 모방해 Unity로 만든 시연 영상이다 (2026-11-24 사용자 요청, 임시로 넣었던 "Big Buck Bunny"를 대체).
+### 지금 놓인 순서 (2026-11-28)
 
-`c`는 사용자가 보드게임 "치킨차차"를 온라인 게임으로 이식한 프로젝트의 시연 영상이다 (2026-11-24 사용자 요청).
+| 컷 | 콘텐츠 | 더한 날 | 미리 보기 |
+|---|---|---|---|
+| `a` | 체스 | 2026-11-28 | `chess.jpg`, 3D 판 화면 캡처 ([chess.md](chess.md)) |
+| `b` | 뱀 | 2026-11-28 | `snake.jpg`, 게임 화면 캡처 ([snake.md](snake.md)) |
+| `c` | 바람 부는 초원 | 2026-11-25 | `meadow.jpg` ([meadow.md](meadow.md)) |
+| `d` | 2048 | 2026-11-25 | `2048.svg`, 판 그림 ([game2048.md](game2048.md)) |
+| `e` | 색칠 놀이 | 2026-11-24 | `coloring.jpg`, 반쯤 칠한 도시 화면 캡처 ([coloring.md](coloring.md)) |
+| `f` | 행성 산책 | 2026-11-24 | `planet.jpg` |
+| `g`, `h` | 비어 있음 | | |
 
-`c`는 뱀이다 (2026-11-28 사용자 요청). 미리 보기 `previews/snake.jpg`는 게임 화면 캡처이고 만드는 법은 [snake.md](snake.md)에 있다.
-
-`d`는 색칠 놀이다 (2026-11-24 사용자 요청). 미리 보기 `previews/coloring.jpg`는 노을 하늘과 도시를 반쯤 칠한 장면의 화면 캡처이고 만드는 법은 [coloring.md](coloring.md)에 있다 (2026-11-25, 3D로 바꾸며 SVG 미리 보기를 대체).
-
-`e`는 2048이다 (2026-11-25 사용자 요청). 미리 보기 `previews/2048.svg`는 판 그림이고 [game2048.md](game2048.md)에 설명이 있다.
-
-`f`는 체스다 (2026-11-28 사용자 요청). 미리 보기 `previews/chess.jpg`는 3D 판의 화면 캡처이고 만드는 법은 [chess.md](chess.md)에 있다.
+더한 날은 각 콘텐츠가 `contents.json`에 처음 들어간 커밋 날짜다. 예전에 컷 `b`·`c`에 넣었던 YouTube 시연 영상(Flower 모방 Unity 영상, 치킨차차 이식 영상)은 2026-11-25에 사용자 요청으로 뺐다.
 
 `previews/planet.jpg`는 개발 서버의 `?scene=planet` 시작 화면에서 캔버스를 3:2로 잘라 900×600 JPEG로 저장했다.
 

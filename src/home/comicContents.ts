@@ -3,9 +3,11 @@
  * DOM 없이 계산하므로 테스트할 수 있다.
  *
  * ```json
- * { "title": "Game Blog", "cuts": { "<컷 id>": { "title": "...", "preview": { ... }, "open": { ... } } } }
+ * { "title": "Game Blog", "contents": [{ "title": "...", "added": "2026-11-28", "preview": { ... }, "open": { ... } }] }
  * ```
  *
+ * - 콘텐츠는 컷 id를 적지 않는다. 최근에 더한 것부터 컷 배치 순서(`a`, `b`, …)대로 채운다 (`placeContents`).
+ * - `added`: 더한 날 (`YYYY-MM-DD`). 같은 날이면 목록에서 뒤에 있는 것을 더 최근으로 본다. 새 콘텐츠는 목록 끝에 더한다.
  * - `preview`: `{ "image": "<previews/의 파일>" }`, `{ "video": "<previews/의 파일>" }`(소리 없이 반복),
  *   `{ "youtube": "<영상 id>" }`(YouTube 썸네일) 중 하나
  * - `open`: `{ "scene": "<씬 id>" }`(이 사이트의 3D 씬으로 들어감), `{ "game": "<게임 id>" }`(이 사이트의 미니 게임),
@@ -26,6 +28,8 @@ export type CutTarget =
 
 export interface CutContent {
   readonly title: string;
+  /** 더한 날 (`YYYY-MM-DD`) */
+  readonly added: string;
   readonly preview: CutPreview;
   readonly open: CutTarget;
 }
@@ -69,21 +73,44 @@ function readTarget(value: unknown, where: string): CutTarget {
   return { kind: 'url', href: text };
 }
 
-/** `contents.json`을 읽는다. 모양이 틀리면 어디가 틀렸는지 알리는 오류를 던진다. */
-export function loadCutContents(data: unknown): Map<string, CutContent> {
-  if (!isRecord(data) || !isRecord(data.cuts)) throw new Error('contents: { "cuts": { ... } } 꼴이어야 합니다');
-  const contents = new Map<string, CutContent>();
-  for (const [id, entry] of Object.entries(data.cuts)) {
-    const where = `cuts.${id}`;
+const DATE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+/** `contents.json`의 콘텐츠 목록을 적힌 순서대로 읽는다. 모양이 틀리면 어디가 틀렸는지 알리는 오류를 던진다. */
+export function loadContents(data: unknown): CutContent[] {
+  if (!isRecord(data) || !Array.isArray(data.contents)) throw new Error('contents: { "contents": [ ... ] } 꼴이어야 합니다');
+  return data.contents.map((entry: unknown, i) => {
+    const where = `contents[${i}]`;
     if (!isRecord(entry)) throw new Error(`${where}: 객체여야 합니다`);
     if (typeof entry.title !== 'string' || entry.title.trim() === '') throw new Error(`${where}.title: 이름이 필요합니다`);
-    contents.set(id, {
+    if (typeof entry.added !== 'string' || !DATE.test(entry.added)) throw new Error(`${where}.added: YYYY-MM-DD 날짜여야 합니다`);
+    return {
       title: entry.title,
+      added: entry.added,
       preview: readPreview(entry.preview, `${where}.preview`),
       open: readTarget(entry.open, `${where}.open`),
-    });
-  }
-  return contents;
+    };
+  });
+}
+
+/**
+ * 콘텐츠를 최근에 더한 것부터 컷 순서대로 놓는다. 같은 날이면 목록에서 뒤에 있는 것이 먼저다.
+ * 컷보다 콘텐츠가 많으면 오래된 것은 놓지 않는다 (테스트가 막는다).
+ */
+export function placeContents(contents: readonly CutContent[], cutIds: readonly string[]): Map<string, CutContent> {
+  const newestFirst = contents
+    .map((content, index) => ({ content, index }))
+    .sort((a, b) => (a.content.added === b.content.added ? b.index - a.index : a.content.added < b.content.added ? 1 : -1))
+    .map((entry) => entry.content);
+  const placed = new Map<string, CutContent>();
+  cutIds.forEach((id, i) => {
+    if (i < newestFirst.length) placed.set(id, newestFirst[i]);
+  });
+  return placed;
+}
+
+/** `contents.json`을 읽어 컷 id마다의 콘텐츠로 놓는다. */
+export function loadCutContents(data: unknown, cutIds: readonly string[]): Map<string, CutContent> {
+  return placeContents(loadContents(data), cutIds);
 }
 
 /** `contents.json`의 `title`: 코믹 프레임 위 오림 글자 제목. 영어만 쓴다 (오림 글자가 영어만 지원). */

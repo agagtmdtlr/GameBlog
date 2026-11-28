@@ -62,7 +62,7 @@ git log --oneline 469dc1e..HEAD -- src/games/snake src/home/previews/snake.jpg
 
 ## 메인 페이지
 
-- 컷 `c`에 넣었다 (`contents.json`, `open.game: "snake"`).
+- 메인 페이지 콘텐츠 목록에 넣었다 (`contents.json`, `open.game: "snake"`). 놓이는 컷은 더한 날 순서로 정해진다 ([home.md](home.md)의 "지금 놓인 순서"). 처음 넣을 때는 컷 `c`였다.
 - 미리 보기 `src/home/previews/snake.jpg`(900×530)는 개발 서버를 1100×760으로 열고 `__snake.load`로 S자로 감긴 길이 19의 뱀과 머리 앞 열매를 놓은 뒤, 캔버스 가운데를 컷 비율(약 1.7)로 잘라 JPEG로 저장했다. 저장은 브라우저에서 data URL을 로컬 일회용 수신 서버로 보내 파일로 썼다.
 
 ## 브라우저 확인 (2026-11-28, 개발 서버)
