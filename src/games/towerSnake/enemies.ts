@@ -31,6 +31,8 @@ export const KNOCK_SPEED = 7;
 const KNOCK_DECAY = 6;
 /** 얼음에 맞아 느려졌을 때 빠르기 비율 (단계 4) */
 export const SLOW_FACTOR = 0.5;
+/** 피해를 받고 하얗게 번쩍이는 시간 (초, 단계 5) */
+export const FLASH_SECONDS = 0.12;
 /** 마디에 막혔을 때 옆으로 미끄러지는 정도 (빠르기 비율) */
 const SLIDE = 0.8;
 
@@ -50,11 +52,13 @@ export interface Enemy {
   readonly maxHp: number;
   /** 남은 느려짐 시간 (초, 단계 4) */
   slow: number;
+  /** 남은 번쩍임 시간 (초, 단계 5). 피해를 받으면 `FLASH_SECONDS`가 된다. */
+  flash: number;
 }
 
 export function createEnemy(id: number, type: EnemyType, x: number, y: number): Enemy {
   const hp = ENEMY_SPECS[type].hp;
-  return { id, type, x, y, vx: 0, vy: 0, kx: 0, ky: 0, hp, maxHp: hp, slow: 0 };
+  return { id, type, x, y, vx: 0, vy: 0, kx: 0, ky: 0, hp, maxHp: hp, slow: 0, flash: 0 };
 }
 
 export interface Point {
@@ -87,6 +91,7 @@ export function moveEnemies(
     e.kx *= decay;
     e.ky *= decay;
     e.slow = Math.max(0, e.slow - h);
+    e.flash = Math.max(0, e.flash - h);
   }
 
   // 서로 밀어내기: 겹친 만큼의 절반씩 (짝마다 한 번)

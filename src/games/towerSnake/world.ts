@@ -1,6 +1,6 @@
 import { GridSnake, LEFT_OF, RIGHT_OF, sameCell, type Cell, type Direction } from '../../lib/gridSnake';
 import { Combat, type CombatEvent, type Projectile } from './combat';
-import { createEnemy, ENEMY_SPECS, HEAD_RADIUS, KNOCK_SPEED, moveEnemies, type Enemy, type EnemyType, type Point } from './enemies';
+import { createEnemy, ENEMY_SPECS, FLASH_SECONDS, HEAD_RADIUS, KNOCK_SPEED, moveEnemies, type Enemy, type EnemyType, type Point } from './enemies';
 import type { Random } from './random';
 import { SpatialGrid } from './spatialGrid';
 import { pickTower, START_TOWER, type TowerType } from './towers';
@@ -79,13 +79,21 @@ export interface BumpEvent {
   readonly killed: boolean;
 }
 
-export type WorldEvent = TickEvent | BumpEvent | CombatEvent;
+/** 적이 처치됐다 (그리기가 그 자리에서 색종이처럼 터뜨린다) */
+export interface KillEvent {
+  readonly kind: 'kill';
+  readonly type: EnemyType;
+  readonly x: number;
+  readonly y: number;
+}
+
+export type WorldEvent = TickEvent | BumpEvent | CombatEvent | KillEvent;
 
 /** 가로·세로 중 먼 쪽의 칸 거리 */
 const reach = (a: Cell, b: Cell) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
 /**
- * 타워 뱀 한 판의 상태 (단계 4: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격).
+ * 타워 뱀 한 판의 상태 (단계 5: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격, 연출 이벤트).
  * 몸 움직임은 공용 `GridSnake`가 맡고, 여기서는 울타리에서 꺾기, 제 몸 지나가기, 마디 잃기, 무적, 끝, 상자 먹기, 적 무리, 타워 공격(`Combat`)을 정한다.
  * `update(dt)`로 시간을 받아 `SPEED`마다 한 칸 나아가고, 적은 `ENEMY_STEP`마다 움직인다.
  */
@@ -120,6 +128,8 @@ export class TowerSnakeWorld {
   private previous: Cell[] = [];
   private readonly grid = new SpatialGrid<Enemy>(BOARD);
   private readonly combat = new Combat();
+  /** `update` 동안 처치 이벤트를 넣을 곳 */
+  private sink: WorldEvent[] | null = null;
 
   constructor(private readonly random: Random = Math.random) {
     this.reset();
@@ -196,6 +206,7 @@ export class TowerSnakeWorld {
   /** 시간을 `dt`초 흘린다. 그동안 일어난 일(칸마다, 적이 부딪힐 때마다)을 일어난 차례로 돌려준다. */
   update(dt: number): WorldEvent[] {
     const events: WorldEvent[] = [];
+    this.sink = events;
     let remaining = dt;
     // 다음 칸까지 잘라 가며 흘려서, 적이 보는 머리 자리가 칸 사이에서도 맞게 한다.
     while (this.alive && remaining > 1e-9) {
@@ -210,6 +221,7 @@ export class TowerSnakeWorld {
         events.push(this.tick());
       }
     }
+    this.sink = null;
     return events;
   }
 
@@ -220,13 +232,20 @@ export class TowerSnakeWorld {
     return enemy;
   }
 
-  /** 적에게 피해를 준다. 처치했으면 `true`. 큰 녀석은 처치되면 젤리로 갈라진다. */
+  /**
+   * 적에게 피해를 준다. 처치했으면 `true`. 살아남으면 잠깐 번쩍이고, 처치하면 `update`가 돌려줄 이벤트에 `kill`을 넣는다.
+   * 큰 녀석은 처치되면 젤리로 갈라진다.
+   */
   damageEnemy(enemy: Enemy, amount: number): boolean {
     enemy.hp -= amount;
-    if (enemy.hp > 0) return false;
+    if (enemy.hp > 0) {
+      enemy.flash = FLASH_SECONDS;
+      return false;
+    }
     const index = this.enemies.indexOf(enemy);
     if (index >= 0) this.enemies.splice(index, 1);
     this.killed++;
+    this.sink?.push({ kind: 'kill', type: enemy.type, x: enemy.x, y: enemy.y });
     if (enemy.type === 'boss') {
       for (let i = 0; i < BOSS_SPLIT; i++) {
         const angle = (i / BOSS_SPLIT) * Math.PI * 2;

@@ -12,7 +12,7 @@ import {
   type CombatWorld,
 } from './combat';
 import { createEnemy, type Enemy } from './enemies';
-import { ENEMY_SPECS, HEAD_RADIUS, SEGMENT_RADIUS, type Point } from './enemies';
+import { ENEMY_SPECS, FLASH_SECONDS, HEAD_RADIUS, SEGMENT_RADIUS, type Point } from './enemies';
 import { seededRandom } from './random';
 import { SpatialGrid } from './spatialGrid';
 import { pickTower, TOWER_SPECS, TOWER_TYPES, type TowerType } from './towers';
@@ -27,6 +27,7 @@ import {
   START_SEGMENTS,
   TowerSnakeWorld,
   type Cell,
+  type KillEvent,
 } from './world';
 import { BOSS_SECONDS, GROUP_SPREAD, MAX_ENEMIES, pickEnemy, SPAWN_MAX, SPAWN_MIN, WAVE_SECONDS, waveSize } from './waves';
 
@@ -649,5 +650,59 @@ describe('자동 공격 (단계 4)', () => {
     expect(world.projectiles.length).toBeGreaterThan(0);
     world.reset();
     expect(world.projectiles).toHaveLength(0);
+  });
+});
+
+describe('연출 이벤트 (단계 5)', () => {
+  it('피해를 받고 살아남은 적은 잠깐 번쩍이고, 걸음마다 줄어든다', () => {
+    const world = new TowerSnakeWorld(seededRandom(2));
+    world.boxes = [];
+    world.load([{ x: 5, y: 5 }], 'right', [], []);
+    const rock = world.spawnEnemy('rock', 30, 30);
+    expect(rock.flash).toBe(0);
+    expect(world.damageEnemy(rock, 10)).toBe(false);
+    expect(rock.flash).toBe(FLASH_SECONDS);
+    world.update(FLASH_SECONDS / 2);
+    expect(rock.flash).toBeGreaterThan(0);
+    expect(rock.flash).toBeLessThan(FLASH_SECONDS);
+    world.update(FLASH_SECONDS);
+    expect(rock.flash).toBe(0);
+  });
+
+  it('타워가 처치하면 그 적의 종류와 자리로 kill 이벤트를 낸다', () => {
+    const world = new TowerSnakeWorld(seededRandom(6));
+    world.boxes = [];
+    world.load(row(20, 20, 19, 18), 'right', ['lightning', 'lightning'], []);
+    world.spawnEnemy('dart', 19, 22);
+    const events = world.update(1);
+    const kills = events.filter((e): e is KillEvent => e.kind === 'kill');
+    expect(world.killed).toBe(1);
+    expect(kills).toHaveLength(1);
+    expect(kills[0].type).toBe('dart');
+    expect(Math.hypot(kills[0].x - 19, kills[0].y - 22)).toBeLessThan(3);
+  });
+
+  it('큰 녀석이 처치되면 kill 하나를 내고 젤리 넷으로 갈라진다', () => {
+    const world = new TowerSnakeWorld(seededRandom(2));
+    world.boxes = [];
+    world.load([{ x: 5, y: 5 }], 'right', [], []);
+    const boss = world.spawnEnemy('boss', 30, 30);
+    boss.hp = 1;
+    // update 밖에서 준 피해는 이벤트를 내지 않는다 (받을 곳이 없다).
+    expect(world.damageEnemy(boss, 5)).toBe(true);
+    expect(world.enemies.filter((e) => e.type === 'jelly')).toHaveLength(4);
+  });
+
+  it('머리에 부딪혀 처치된 적도 kill 이벤트를 낸다', () => {
+    const world = new TowerSnakeWorld(seededRandom(3));
+    world.boxes = [];
+    world.load(row(20, 20, 19, 18), 'right', ['arrow', 'arrow'], []);
+    const dart = world.spawnEnemy('dart', 20.6, 20);
+    dart.hp = 1;
+    const events = world.update(ENEMY_STEP);
+    const order = events.map((e) => e.kind);
+    expect(order).toContain('kill');
+    expect(order).toContain('bump');
+    expect(order.indexOf('kill')).toBeLessThan(order.indexOf('bump'));
   });
 });

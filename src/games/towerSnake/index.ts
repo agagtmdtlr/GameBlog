@@ -213,6 +213,10 @@ function startTowerSnake(root: HTMLElement): void {
           view.effect(event);
           continue;
         }
+        if (event.kind === 'kill') {
+          view.kill(event);
+          continue;
+        }
         if (event.hurt?.over) {
           view.crash();
           setPhase('over');
@@ -261,7 +265,7 @@ function startTowerSnake(root: HTMLElement): void {
   }
 }
 
-/** 타워 뱀: 몸 마디마다 타워를 싣고 큰 판을 누빈다 (단계 4까지: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격). */
+/** 타워 뱀: 몸 마디마다 타워를 싣고 큰 판을 누빈다 (단계 5까지: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격, 연출). */
 export const towerSnakeGame: GameDefinition = {
   id: 'tower-snake',
   start(root) {
