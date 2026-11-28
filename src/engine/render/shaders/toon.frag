@@ -20,6 +20,8 @@ uniform vec3 uGroundColor;
 uniform vec3 uMoonColor;
 uniform vec3 uNightAmbient;
 uniform vec3 uWorldCenter;
+uniform vec3 uFogColor;
+uniform vec2 uFogRange;
 uniform vec4 uOccluder;
 uniform bool uReceiveOccluder;
 
@@ -190,5 +192,11 @@ void main() {
   shade = max(shade, 0.6 * (1.0 - visibility) / 0.45);
   vec3 shaded = (direct + ambient) * mix(1.0, HALFTONE_INK, halftoneDots(shade));
 
-  fragColor = vec4(linearToSrgb(acesFilm(shaded + emissive)), 1.0);
+  // 거리 안개는 화면 출력값(sRGB)에서 배경색으로 섞는다. 그래야 먼 땅이 하늘과 같은 색으로 사라진다.
+  vec3 outColor = linearToSrgb(acesFilm(shaded + emissive));
+  if (uFogRange.y > uFogRange.x) {
+    float fog = smoothstep(uFogRange.x, uFogRange.y, length(uCameraPos - vWorldPos));
+    outColor = mix(outColor, uFogColor, fog);
+  }
+  fragColor = vec4(outColor, 1.0);
 }

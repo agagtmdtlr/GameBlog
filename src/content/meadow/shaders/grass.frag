@@ -12,6 +12,9 @@ uniform vec3 uGroundColor;
 uniform vec3 uFadeColor;
 // 카메라 수평 거리: 이 사이에서 잎 색이 땅 색으로 녹아든다.
 uniform vec2 uColorFade;
+// 거리 안개 (툰 셰이더와 같은 식): 색은 sRGB 배경색, 범위는 시작·끝 거리
+uniform vec3 uFogColor;
+uniform vec2 uFogRange;
 
 in vec3 vWorldPos;
 in vec3 vNormal;
@@ -94,5 +97,9 @@ void main() {
   float far = smoothstep(uColorFade.x, uColorFade.y, length(vWorldPos.xz - uCameraPos.xz));
   color = mix(color, uFadeColor, far);
 
-  fragColor = vec4(linearToSrgb(acesFilm(color)), 1.0);
+  vec3 outColor = linearToSrgb(acesFilm(color));
+  if (uFogRange.y > uFogRange.x) {
+    outColor = mix(outColor, uFogColor, smoothstep(uFogRange.x, uFogRange.y, length(uCameraPos - vWorldPos)));
+  }
+  fragColor = vec4(outColor, 1.0);
 }

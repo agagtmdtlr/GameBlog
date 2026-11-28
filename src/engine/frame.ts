@@ -81,6 +81,11 @@ export interface Environment {
   shadowCenter?: Vec3;
   /** 중력이 향하는 땅의 중심. 이 점에서 바깥이 위쪽이고, 해가 그 위쪽 아래로 지면 밤이다. 없으면 원점. */
   worldCenter?: Vec3;
+  /**
+   * 거리 안개. 카메라에서 `near`부터 짙어져 `far`에서 배경색(`background`)과 같아진다. 없으면 안개가 없다.
+   * 엔진 툰 셰이더가 쓰고, 씬 셰이더는 `uFogColor`, `uFogRange`로 같은 식을 쓸 수 있다.
+   */
+  fog?: { near: number; far: number };
 }
 
 export interface CameraView {
