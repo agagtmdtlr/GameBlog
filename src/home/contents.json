@@ -11,6 +11,11 @@
       "preview": { "image": "meadow.jpg" },
       "open": { "scene": "meadow" }
     },
+    "c": {
+      "title": "뱀",
+      "preview": { "image": "snake.jpg" },
+      "open": { "game": "snake" }
+    },
     "d": {
       "title": "색칠 놀이",
       "preview": { "image": "coloring.jpg" },
