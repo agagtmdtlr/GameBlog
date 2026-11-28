@@ -17,5 +17,6 @@ three.js로 렌더링하는 3D 플레이 공간 형태의 블로그다.
 1. 작업을 시작할 때 최신 `main`에서 작업 브랜치를 만든다. 이름은 `feature/<주제>`, `fix/<주제>`, `docs/<주제>` 꼴로 짓는다.
 2. 이 폴더에서 브랜치를 바꾸면 다른 세션의 파일이 바뀌므로, 작업 브랜치는 `git worktree add ../GameBlog-wt/<주제> -b <브랜치> main`으로 따로 체크아웃해서 작업한다.
 3. 커밋에는 이 작업에서 바꾼 파일만 경로로 골라 넣는다. `git add -A`, `git add .`는 쓰지 않는다. 모르는 변경이 보이면 커밋하지 말고 사용자에게 알린다.
-4. 작업이 끝나면 작업 브랜치에서 `npm test`와 `npm run build`를 통과시킨 뒤, 이 폴더(`main`)에서 `git merge --no-ff <브랜치>`로 병합하고 `git push origin main`으로 푸시한다.
+4. 작업이 끝나면 작업 브랜치에서 테스트와 `npm run build`를 통과시킨 뒤, 이 폴더(`main`)에서 `git merge --no-ff <브랜치>`로 병합하고 `git push origin main`으로 푸시한다.
+   - 테스트는 바꾼 곳만 돌린다 (2026-11-28 사용자 결정, 게임·콘텐츠는 서로 독립이다). 게임·콘텐츠 폴더 하나(`src/games/<이름>/`, `src/content/<이름>/`)만 바꿨으면 `npm run test:only <이름>`, 함께 쓰는 코드(`engine/`, `lib/`, `home/`, `content/common/`, 폴더 밖 파일)를 바꿨으면 `npm run test:only shared`, 여러 곳에 걸치거나 테스트 설정을 바꿨으면 `npm test`(전부). 이름 목록은 `npm run test:only`가 보여 준다.
 5. 병합하고 푸시한 뒤에는 `git worktree remove`로 작업 폴더를 지우고 작업 브랜치를 삭제한다.

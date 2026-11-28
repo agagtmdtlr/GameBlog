@@ -84,7 +84,7 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 
 1. 미리 보기 그림을 `src/home/previews/`에 넣는다 (컷 상자 비율에 가깝게, 900px 안팎 JPEG). YouTube 썸네일을 쓰면 필요 없다.
 2. `contents.json`의 `contents` 목록 **끝에** 오늘 날짜(`added`)로 항목을 더한다. 메인 페이지 첫 컷에 놓이고, 나머지는 한 칸씩 뒤로 밀린다.
-3. `npm test`로 검사한다.
+3. `npm run test:only shared`로 검사한다 (메인 페이지는 `shared` 프로젝트다).
 
 ### 지금 놓인 순서 (2026-11-28)
 
