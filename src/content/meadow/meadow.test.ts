@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { dot, length, normalize, sub } from '../../engine/math';
 import { groundNormal, groundRadius } from '../../engine/physics/collision';
 import { PLAYER_RADIUS } from '../common/character/player';
-import { keepInside, MEADOW, MEADOW_CENTER, MEADOW_GROUND, meadowHeight, meadowPoint } from './objects/meadowTerrain';
+import { keepInside, MEADOW, MEADOW_CENTER, MEADOW_GROUND, MeadowGround, meadowHeight, meadowPoint, meadowSwell } from './objects/meadowTerrain';
 import { Lightning, LIGHTNING, lightningStrike, strikeFlash } from './objects/lightning';
 import { RAIN, rainVelocity } from './objects/rain';
 import { growScale, SKY_TVS, SkyTvField, skyTvAt } from './objects/skyTvs';
@@ -48,14 +48,19 @@ describe('초원 땅', () => {
 });
 
 describe('초원 월드', () => {
-  it('시작 지점 캐릭터가 땅에 서 있다', () => {
-    expect(length(sub(MEADOW_SPAWN, meadowPoint(0, 0)))).toBeCloseTo(PLAYER_RADIUS, 4);
+  it('시작 지점 캐릭터가 너울 치는 땅 위에 서 있다', () => {
+    expect(length(sub(MEADOW_SPAWN, meadowPoint(0, 0, 0, 0)))).toBeCloseTo(PLAYER_RADIUS, 4);
     const world = new MeadowWorld();
-    for (let i = 0; i < 240; i++) world.fixedStep(1 / 120, { direction: [0, 0, 0] });
-    const p = world.player.position;
-    const above = length(sub(p, MEADOW_CENTER)) - groundRadius(MEADOW_GROUND, normalize(sub(p, MEADOW_CENTER)));
-    expect(above).toBeGreaterThan(PLAYER_RADIUS * 0.8);
-    expect(above).toBeLessThan(PLAYER_RADIUS * 1.3);
+    // 너울이 오르내리는 동안 캐릭터가 땅에서 크게 떨어지거나 파묻히지 않는다.
+    for (let i = 0; i < 1200; i++) {
+      world.fixedStep(1 / 120, { direction: [0, 0, 0] });
+      if (i < 120) continue;
+      const p = world.player.position;
+      const above = length(sub(p, MEADOW_CENTER)) - groundRadius(world.ground, normalize(sub(p, MEADOW_CENTER)));
+      expect(above).toBeGreaterThan(PLAYER_RADIUS * 0.8);
+      // 물마루가 빠르게 내려갈 때는 잠깐 살짝 뜬다.
+      expect(above).toBeLessThan(PLAYER_RADIUS * 2);
+    }
   });
 
   it('걸어서 분지 밖으로 나가지 못한다', () => {
@@ -243,5 +248,31 @@ describe('번개', () => {
     expect(lit.background[2]).toBeGreaterThan(calm.background[2]);
     const toward = world.lightning.direction(world.player.position)!;
     expect(dot(lit.lightDirection, toward)).toBeGreaterThan(dot(calm.lightDirection, toward));
+  });
+});
+
+describe('땅 너울', () => {
+  it('너울이 시간에 따라 흘러가고, 높이는 정해진 폭 안이다', () => {
+    const peak = MEADOW.swells.reduce((sum, [a]) => sum + a, 0);
+    let changed = 0;
+    for (const [x, z] of [[0, 0], [12, -30], [-70, 44]]) {
+      for (let t = 0; t < 20; t += 0.7) {
+        const h = meadowSwell(x, z, t);
+        expect(Math.abs(h)).toBeLessThanOrEqual(peak + 1e-9);
+        if (Math.abs(h - meadowSwell(x, z, t + 0.5)) > 0.05) changed++;
+      }
+    }
+    expect(changed).toBeGreaterThan(30);
+  });
+
+  it('걷는 땅의 높이가 너울을 더한 땅 위의 점과 맞는다', () => {
+    const ground = new MeadowGround();
+    ground.time = 7.3;
+    for (const [x, z] of [[0, 0], [37, -12], [-80, 64]]) {
+      const p = meadowPoint(x, z, 0, ground.time);
+      const fromCenter = sub(p, MEADOW_CENTER);
+      expect(length(fromCenter)).toBeCloseTo(groundRadius(ground, normalize(fromCenter)), 3);
+      expect(meadowPoint(x, z, 0, 0)).not.toEqual(meadowPoint(x, z, 0, 3));
+    }
   });
 });

@@ -78,6 +78,7 @@ export class GrassLayer implements RenderLayer {
   private readonly meshes: Mesh<InstancedBufferGeometry, RawShaderMaterial>[];
   private wind: WindFrame | undefined;
   private pusher: { center: Vec3; radius: number } | undefined;
+  private swellTime = 0;
 
   /** @param groundColor 잔디 아래 땅의 색 (선형 RGB). 먼 잎이 이 색을 받은 땅으로 녹아든다. */
   constructor(private readonly groundColor: Vec3) {
@@ -104,6 +105,7 @@ export class GrassLayer implements RenderLayer {
           uPushReach: { value: GRASS_BLADE.pushReach },
           uSaturation: { value: GRASS_BLADE.saturation },
           uTime: { value: 0 },
+          uSwellTime: { value: 0 },
           uWindDir: { value: new Vector2(1, 0) },
           uWindStrength: { value: 0 },
           uGustTravel: { value: 0 },
@@ -126,10 +128,11 @@ export class GrassLayer implements RenderLayer {
     });
   }
 
-  /** 이번 프레임의 바람과 잔디를 밀어내는 몸. 씬이 `frame`을 만들 때 넘긴다. */
-  set(wind: WindFrame, pusher: { center: Vec3; radius: number }): void {
+  /** 이번 프레임의 바람, 잔디를 밀어내는 몸, 땅 너울의 시각. 씬이 `frame`을 만들 때 넘긴다. */
+  set(wind: WindFrame, pusher: { center: Vec3; radius: number }, swellTime: number): void {
     this.wind = wind;
     this.pusher = pusher;
+    this.swellTime = swellTime;
   }
 
   update({ camera, environment }: { camera: CameraView; environment: Environment }): void {
@@ -157,6 +160,7 @@ export class GrassLayer implements RenderLayer {
       u.uSkyColor.value.fromArray(environment.skyColor);
       u.uGroundColor.value.fromArray(environment.groundColor);
       u.uFadeColor.value.fromArray(fade);
+      u.uSwellTime.value = this.swellTime;
       u.uFogColor.value.fromArray(environment.background);
       u.uFogRange.value.set(environment.fog?.near ?? 0, environment.fog?.far ?? 0);
       const wind = this.wind;

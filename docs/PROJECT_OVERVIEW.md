@@ -99,7 +99,7 @@ GameBlog/
 │     │     ├─ characterDraw.ts  캐릭터 몸·다리 그리기 항목 (행성·초원 씬이 함께 씀)
 │     ├─ common/tv/          아날로그 텔레비전 모양(`tvShape.ts`)과 부품 지오메트리(`tvGraphics.ts`). 행성 표면 텔레비전과 초원 하늘 텔레비전이 함께 씀
 │     │     └─ character.glb   Blender에서 내보낸 다리 스킨 메시
-│     ├─ meadow/               바람 부는 초원 씬: 큰 분지 땅, GPU로 만드는 잔디 격자, 바람, 플레이어 둘레에 절차적으로 스폰되는 검은 하늘 텔레비전, 바람에 비스듬히 내리는 비, 장면을 비추는 번개 ([analysis/meadow.md](analysis/meadow.md))
+│     ├─ meadow/               바람 부는 초원 씬: 큰 분지 땅, GPU로 만드는 잔디 격자, 바람, 플레이어 둘레에 절차적으로 스폰되는 검은 하늘 텔레비전, 바람에 비스듬히 내리는 비, 장면을 비추는 번개, 바다처럼 너울지는 땅 ([analysis/meadow.md](analysis/meadow.md))
 │     └─ planet/               행성 씬
 │        ├─ index.ts           planetScene: 그래픽 등록, World·카메라·영상 소리 진행
 │        ├─ world.ts           월드 조립, 게임 규칙, 그리기 목록
@@ -284,7 +284,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 | [`physics.test.ts`](../src/engine/physics/physics.test.ts) | 13 | 구-행성 충돌, 구-상자 충돌, 반발, 고정 시간 간격 |
 | [`game.test.ts`](../src/content/planet/game.test.ts) | 42 | 구 조작(중력, 한 바퀴 돌기), 카메라, 월드 통합, 텔레비전 자리, 로켓 자리, 표면 장면 파일, 해, 위성 |
 | [`bubbleBelt.test.ts`](../src/content/planet/objects/bubbleBelt.test.ts) | 5 | 비눗방울 띠의 기저, 씨앗 재현, 크기 분포, 카메라·위성·해 궤도와의 간격, 떠다니기 |
-| [`meadow.test.ts`](../src/content/meadow/meadow.test.ts) | 10 | 초원 땅 높이와 땅 위의 점, 비탈, 분지 가장자리, 분지 밖으로 못 나가기, 시작 지점, 그림자·밤 중심, 바람 세기·방향·돌풍 띠 |
+| [`meadow.test.ts`](../src/content/meadow/meadow.test.ts) | 22 | 초원 땅 높이와 땅 위의 점, 비탈, 분지 가장자리, 분지 밖으로 못 나가기, 너울 치는 땅 위의 시작 지점, 그림자·밤 중심, 바람 세기·방향·돌풍 띠, 하늘 텔레비전 스폰, 비, 번개, 땅 너울 |
 | [`npc.test.ts`](../src/content/planet/npc.test.ts) | 12 | NPC 목록의 시작 위치와 색, 돌아다니기와 쉬기, 시드 재현, 캐릭터끼리 밀어내기, 그리기, 인사 말풍선 |
 | [`bodyShape.test.ts`](../src/content/planet/bodyShape.test.ts) | 10 | NPC 몸 모양의 엉덩이 자리, 땅과의 간격, 방향과 기저 |
 | [`terrain.test.ts`](../src/content/planet/objects/terrain.test.ts) | 9 | 땅 높낮이와 평평한 곳, 비탈, 언덕 위에 서기, 땅·캡슐 충돌, 지형물 배치 |
