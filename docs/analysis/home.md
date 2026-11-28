@@ -87,6 +87,8 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 
 `c`는 사용자가 보드게임 "치킨차차"를 온라인 게임으로 이식한 프로젝트의 시연 영상이다 (2026-11-24 사용자 요청).
 
+`c`는 뱀이다 (2026-11-28 사용자 요청). 미리 보기 `previews/snake.jpg`는 게임 화면 캡처이고 만드는 법은 [snake.md](snake.md)에 있다.
+
 `d`는 색칠 놀이다 (2026-11-24 사용자 요청). 미리 보기 `previews/coloring.jpg`는 노을 하늘과 도시를 반쯤 칠한 장면의 화면 캡처이고 만드는 법은 [coloring.md](coloring.md)에 있다 (2026-11-25, 3D로 바꾸며 SVG 미리 보기를 대체).
 
 `e`는 2048이다 (2026-11-25 사용자 요청). 미리 보기 `previews/2048.svg`는 판 그림이고 [game2048.md](game2048.md)에 설명이 있다.
