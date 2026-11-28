@@ -8,7 +8,7 @@
 
 ## 1. 컨셉
 
-첫 화면은 코믹 프레임 메인 페이지로, 컷마다 콘텐츠 미리 보기를 보여 주고 누르면 그 콘텐츠(3D 씬, 미니 게임)로 간다 ([analysis/home.md](analysis/home.md)). 미니 게임으로 해 질 녘 3D 도시를 자유 시점으로 돌아다니며 차·가로등·사람·하늘·해 같은 물체를 눌러 무작위 색을 채우는 색칠 놀이([analysis/coloring.md](analysis/coloring.md))와 판을 밀어 같은 숫자 타일을 합치는 2048([analysis/game2048.md](analysis/game2048.md)), 3D 판 위에서 열매를 먹고 길어지는 뱀([analysis/snake.md](analysis/snake.md)), 3D 판에서 수마다 룰렛이 차례를 정하는 룰렛 체스([analysis/chess.md](analysis/chess.md))가 있다. 콘텐츠의 중심은 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다닌다. 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
+첫 화면은 코믹 프레임 메인 페이지로, 컷마다 콘텐츠 미리 보기를 보여 주고 누르면 그 콘텐츠(3D 씬, 미니 게임)로 간다 ([analysis/home.md](analysis/home.md)). 미니 게임으로 해 질 녘 3D 도시를 자유 시점으로 돌아다니며 차·가로등·사람·하늘·해 같은 물체를 눌러 무작위 색을 채우는 색칠 놀이([analysis/coloring.md](analysis/coloring.md))와 판을 밀어 같은 숫자 타일을 합치는 2048([analysis/game2048.md](analysis/game2048.md)), 3D 판 위에서 열매를 먹고 길어지는 뱀([analysis/snake.md](analysis/snake.md)), 3D 판에서 수마다 룰렛이 다음 수를 둘 사람(나·컴퓨터)을 정하는 룰렛 체스([analysis/chess.md](analysis/chess.md))가 있다. 콘텐츠의 중심은 3D 플레이 공간이다. 내용은 **글이 아니라 그래픽과 플레이 상호작용으로만 전달**한다. 방문자는 작은 행성 위에서 구체 몸에 두 다리가 달린 캐릭터로 걸어 다닌다. 표면에는 스플라인 선로를 따라 도는 기차가 있다. 하늘에는 행성을 도는 해, 제자리에서 자전하는 위성, 궤적 선을 그리며 행성을 도는 인공위성, 행성을 띠처럼 감싸고 떠다니는 비눗방울, 얼굴이 있는 별들이 떠 있다. 렌더링은 three.js로 하고, 셰이더는 직접 작성한다.
 
 ## 2. 기술 구성
 
@@ -44,7 +44,7 @@ GameBlog/
 │  │  ├─ game2048/             2048: 판 상태(board.ts), 타일 색, 기록(records.ts), DOM 화면 ([analysis/game2048.md](analysis/game2048.md))
 │  │  ├─ snake/                뱀: 놀이 상태(snakeGame.ts), 기록(records.ts), three.js 그리기(graphics/, shaders/) ([analysis/snake.md](analysis/snake.md))
 │  │  ├─ towerSnake/           타워 뱀 (개발 중): 판 상태(world.ts), 타워 종류(towers.ts), 미니맵, three.js 그리기(graphics/, shaders/) ([analysis/towerSnake.md](analysis/towerSnake.md))
-│  │  └─ chess/                룰렛 체스: 규칙(rules.ts), 컴퓨터 상대(ai.ts 기댓값 탐색, 웹 워커), 기록(records.ts), three.js 판·기물(graphics/) ([analysis/chess.md](analysis/chess.md))
+│  │  └─ chess/                룰렛 체스: 규칙(rules.ts), 컴퓨터 상대(ai.ts 메이트 우선·알파-베타, 웹 워커), 기록(records.ts), three.js 판·기물(graphics/) ([analysis/chess.md](analysis/chess.md))
 │  ├─ lib/ransomText/          오림 글자: 찢어 오린 종이 글자로 만든 영어 제목 ([analysis/ransomText.md](analysis/ransomText.md))
 │  ├─ lib/gridSnake/           칸 위의 뱀 몸 움직임: 방향 받기, 나아가기, 늘이기, 마디 잃기. 뱀과 타워 뱀이 함께 씀 ([analysis/snake.md](analysis/snake.md))
 │  ├─ lib/save/                플레이 기록: 이 기기의 IndexedDB에 누적 수치·판 기록·하다 만 판 ([analysis/saveRecords.md](analysis/saveRecords.md))
@@ -245,7 +245,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 
 ### 자동 테스트
 
-`npm test` 기준 32개 파일, 340개가 모두 통과한다 (2026-11-28, 타워 뱀 단계 2 뒤). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 32개 파일, 341개가 모두 통과한다 (2026-11-28, 타워 뱀 단계 2와 사람을 고르는 룰렛 체스 뒤). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
@@ -256,7 +256,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 | [`gridSnake.test.ts`](../src/lib/gridSnake/gridSnake.test.ts) | 10 | 칸 위의 뱀 몸: 놓기, 방향 받기·버리기, 앞 칸·판 안, 꼬리 칸 판정, 나아가기·늘기, 제 몸 칸으로 옮기기, 마디 잃기, 빈 칸, 꺾은 방향 |
 | [`towerSnake.test.ts`](../src/games/towerSnake/towerSnake.test.ts) | 20 | 타워 뱀의 시작, 시간과 칸, 울타리 꺾기·모서리·받아 둔 방향 버리기, 몸 지나가기, 꼬리 칸, 무적, 끝, 다시 하기, 상자 자리·먹기·마디 한계·타워 잃기·종류 비율 |
 | [`snake.test.ts`](../src/games/snake/snake.test.ts) | 10 | 뱀의 시작, 나아가기, 방향 받기, 먹기, 빠르기 한계, 벽·몸 부딪힘, 꼬리 칸, 판 채우기, 기록 누적·검사 |
-| [`chess.test.ts`](../src/games/chess/chess.test.ts) | 24 | 표준 수 개수(perft), 무르기 복원, 표준 끝 판정, 캐슬링·앙파상·승진, 룰렛 규칙(되돌리기 금지, 도박 수와 킹 잡기, 체크메이트, 앙파상, 판 기록), 컴퓨터(킹 잡기 우선, 퀸 잡기, 킹 지키기, 판 복원), 기록 누적·옮기기·검사 |
+| [`chess.test.ts`](../src/games/chess/chess.test.ts) | 25 | 표준 수 개수(perft), 무르기 복원, 표준 끝 판정, 캐슬링·앙파상·승진, 룰렛 규칙(되돌리기 금지, 번갈아 두기, 체크메이트, 떠나온 칸뿐인 메이트, 판 기록), 컴퓨터(메이트 우선, 퀸 잡기, 되돌리기 금지, 판 복원), 기록 누적·검사·옮기기 |
 | [`save.test.ts`](../src/lib/save/save.test.ts) | 18 | 플레이 기록장: IndexedDB·메모리 저장소의 쌓기, 누적, 최근 순서, 게임별 분리, 하다 만 판, 거래 실패, 형식 버전, 다시 열기, 동시 쓰기 |
 | [`vertexLayout.test.ts`](../src/engine/render/vertexLayout.test.ts) | 8 | 셰이더 정점 속성 맞추기, 속성 정점 수 검사, 사용자 속성을 가진 GeometryData 변환, 엔진 기본 메시 속성, uniform 변환, 툰 재질 uniform |
 | [`billboard.test.ts`](../src/engine/render/billboard.test.ts) | 4 | 빌보드 아틀라스 배치와 텍스처 좌표, 그리기 순서 (시험용 그림 목록) |

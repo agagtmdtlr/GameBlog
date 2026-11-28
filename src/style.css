@@ -1055,7 +1055,7 @@ a.comic-cut.is-youtube::after {
   animation: coloring-nudge 1.1s ease-in-out infinite;
 }
 
-/* 차례 룰렛: 판(.chess-wheel-disk)이 돌고 위의 바늘이 다음 차례를 가리킨다. */
+/* 사람 룰렛: 판(.chess-wheel-disk)이 돌고 위의 바늘이 다음 수를 둘 사람(나·컴퓨터)을 가리킨다. */
 .chess-wheel {
   position: absolute;
   top: 6px;
@@ -1091,6 +1091,38 @@ a.comic-cut.is-youtube::after {
   stroke: var(--ink);
   stroke-width: 2.4;
   stroke-linejoin: round;
+}
+
+/* 차례 칩: 룰렛 오른쪽에서 지금 둘 색(백·흑)을 폰으로 보여 준다. */
+.chess-side {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  margin-left: 38px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: #fffaf0;
+  box-shadow: 0 3px 0 var(--ink);
+  pointer-events: none;
+  transition: background 0.2s;
+}
+
+.chess-side svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.4;
+}
+
+.chess-side.is-black {
+  background: #4b3f63;
+}
+
+.chess-side.is-black svg {
+  stroke: #fffaf0;
 }
 
 .chess-wheel.is-landed .chess-wheel-face {
