@@ -261,7 +261,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 - 어느 것을 돌릴지는 [CLAUDE.md](../CLAUDE.md)의 "브랜치와 커밋" 4번을 따른다. `npm test`는 여전히 전부 돌린다.
 - 확인 (2026-11-28): `npm test` 369개, `test:only chess` 34개(체스 25 + layers 9), `test:only snake game2048` 30개, `test:only planet` 141개, `test:only shared` 112개, `test:only nope`은 목록을 보이고 실패.
 
-`npm test` 기준 32개 파일, 378개가 모두 통과한다 (2026-11-28, 타워 뱀 단계 7 뒤. 봇으로 수치를 보는 `towerSnake/balance.test.ts` 1개는 `TOWER_SNAKE_BALANCE=1`일 때만 돌아 건너뛴다). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 32개 파일, 387개가 모두 통과한다 (2026-11-28, 타워 뱀 강해지는 적 뒤. 봇으로 수치를 보는 `towerSnake/balance.test.ts` 1개는 `TOWER_SNAKE_BALANCE=1`일 때만 돌아 건너뛴다). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
@@ -270,7 +270,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 | [`coloring.test.ts`](../src/games/coloring/coloring.test.ts) | 22 | 색칠 놀이의 집 배치(조각 목록, 이웃, 문 영역, 가구·물건 자리, 사람 길), 문(열림 곡선, 막기, 드나드는 길), 자유 시점 카메라(벽 충돌), 색 고르기와 완성, 색 묶음, 기록 누적·검사, 저장·되돌리기 |
 | [`game2048.test.ts`](../src/games/game2048/game2048.test.ts) | 11 | 2048의 밀기·합치기 순서, 새 타일, 끝, 이김, 타일 id, 타일 색, 기록 누적·검사 |
 | [`gridSnake.test.ts`](../src/lib/gridSnake/gridSnake.test.ts) | 10 | 칸 위의 뱀 몸: 놓기, 방향 받기·버리기, 앞 칸·판 안, 꼬리 칸 판정, 나아가기·늘기, 제 몸 칸으로 옮기기, 마디 잃기, 빈 칸, 꺾은 방향 |
-| [`towerSnake.test.ts`](../src/games/towerSnake/towerSnake.test.ts) | 56 | 타워 뱀의 시작, 시간과 칸, 울타리 꺾기·모서리·받아 둔 방향 버리기, 몸 지나가기, 꼬리 칸, 무적, 끝, 다시 하기, 상자 자리·먹기·마디 한계·타워 잃기·종류 비율, 적 무리·다가오기·밀어내기·마디 돌아가기·머리 부딪힘·큰 녀석, 표적 고르기·화살 쿨다운·사거리·대포 범위·얼음 느려짐·번개 튀기·헛맞기·투사체 한계·처치 수, 맞음 번쩍임·처치 이벤트, 기록 쌓기·저장 값 검사, 성능(적 250·마디 40으로 600걸음) |
+| [`towerSnake.test.ts`](../src/games/towerSnake/towerSnake.test.ts) | 58 | 타워 뱀의 시작, 시간과 칸, 울타리 꺾기·모서리·받아 둔 방향 버리기, 몸 지나가기, 꼬리 칸, 무적, 끝, 다시 하기, 상자 자리·먹기·마디 한계·타워 잃기·종류 비율, 적 무리·다가오기·밀어내기·마디 돌아가기·머리 부딪힘·큰 녀석, 표적 고르기·화살 쿨다운·사거리·대포 범위·얼음 느려짐·번개 튀기·헛맞기·투사체 한계·처치 수, 맞음 번쩍임·처치 이벤트, 기록 쌓기·저장 값 검사, 성능(적 250·마디 40으로 600걸음), 시간에 따라 강해지는 적 |
 | [`snake.test.ts`](../src/games/snake/snake.test.ts) | 10 | 뱀의 시작, 나아가기, 방향 받기, 먹기, 빠르기 한계, 벽·몸 부딪힘, 꼬리 칸, 판 채우기, 기록 누적·검사 |
 | [`chess.test.ts`](../src/games/chess/chess.test.ts) | 25 | 표준 수 개수(perft), 무르기 복원, 표준 끝 판정, 캐슬링·앙파상·승진, 룰렛 규칙(되돌리기 금지, 번갈아 두기, 체크메이트, 떠나온 칸뿐인 메이트, 판 기록), 컴퓨터(메이트 우선, 퀸 잡기, 되돌리기 금지, 판 복원), 기록 누적·검사·옮기기 |
 | [`save.test.ts`](../src/lib/save/save.test.ts) | 18 | 플레이 기록장: IndexedDB·메모리 저장소의 쌓기, 누적, 최근 순서, 게임별 분리, 하다 만 판, 거래 실패, 형식 버전, 다시 열기, 동시 쓰기 |

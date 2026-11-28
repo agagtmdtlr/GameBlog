@@ -31,6 +31,8 @@ export const KNOCK_SPEED = 7;
 const KNOCK_DECAY = 6;
 /** 얼음에 맞아 느려졌을 때 빠르기 비율 (단계 4) */
 export const SLOW_FACTOR = 0.5;
+/** 시간에 따라 빨라져도 넘지 않는 빠르기 (칸/초). 뱀(5)보다 느려야 피할 수 있다. */
+export const MAX_ENEMY_SPEED = 4.6;
 /** 피해를 받고 하얗게 번쩍이는 시간 (초, 단계 5) */
 export const FLASH_SECONDS = 0.12;
 /** 마디에 막혔을 때 옆으로 미끄러지는 정도 (빠르기 비율) */
@@ -54,11 +56,14 @@ export interface Enemy {
   slow: number;
   /** 남은 번쩍임 시간 (초, 단계 5). 피해를 받으면 `FLASH_SECONDS`가 된다. */
   flash: number;
+  /** 빠르기 배수 (생길 때 정해진다, 시간에 따라 커진다) */
+  readonly pace: number;
 }
 
-export function createEnemy(id: number, type: EnemyType, x: number, y: number): Enemy {
-  const hp = ENEMY_SPECS[type].hp;
-  return { id, type, x, y, vx: 0, vy: 0, kx: 0, ky: 0, hp, maxHp: hp, slow: 0, flash: 0 };
+/** 적 하나를 만든다. `hp`·`pace`는 체력·빠르기 배수다 (시간이 지나면 강해진다, `waves.ts`의 `enemyGrowth`). */
+export function createEnemy(id: number, type: EnemyType, x: number, y: number, hp = 1, pace = 1): Enemy {
+  const life = Math.round(ENEMY_SPECS[type].hp * hp);
+  return { id, type, x, y, vx: 0, vy: 0, kx: 0, ky: 0, hp: life, maxHp: life, slow: 0, flash: 0, pace };
 }
 
 export interface Point {
@@ -80,7 +85,7 @@ export function moveEnemies(
 ): void {
   const decay = Math.exp(-KNOCK_DECAY * h);
   for (const e of enemies) {
-    const speed = ENEMY_SPECS[e.type].speed * (e.slow > 0 ? SLOW_FACTOR : 1);
+    const speed = Math.min(MAX_ENEMY_SPEED, ENEMY_SPECS[e.type].speed * e.pace) * (e.slow > 0 ? SLOW_FACTOR : 1);
     const dx = head.x - e.x;
     const dy = head.y - e.y;
     const d = Math.hypot(dx, dy);
