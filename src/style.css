@@ -1055,14 +1055,52 @@ a.comic-cut.is-youtube::after {
   animation: coloring-nudge 1.1s ease-in-out infinite;
 }
 
-/* 차례 표: 바탕은 지금 둘 색(백·흑), 그림은 다음 수를 둘 사람(나·컴퓨터). 판이 도는 동안은 그림을 숨기고 흔들린다. */
-.chess-turn {
+/* 사람 룰렛: 판(.chess-wheel-disk)이 돌고 위의 바늘이 다음 수를 둘 사람(나·컴퓨터)을 가리킨다. */
+.chess-wheel {
   position: absolute;
-  top: 10px;
+  top: 6px;
   left: 50%;
-  width: 46px;
-  height: 46px;
-  margin-left: -23px;
+  width: 56px;
+  height: 64px;
+  margin-left: -28px;
+  pointer-events: none;
+}
+
+.chess-wheel-face {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 3px 0 var(--ink));
+}
+
+.chess-wheel-disk {
+  transition: transform 1.1s cubic-bezier(0.15, 0.6, 0.2, 1);
+}
+
+.chess-wheel-pointer {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 18px;
+  height: 14px;
+  margin-left: -9px;
+  z-index: 1;
+  fill: #ff7a6b;
+  stroke: var(--ink);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+
+/* 차례 칩: 룰렛 오른쪽에서 지금 둘 색(백·흑)을 폰으로 보여 준다. */
+.chess-side {
+  position: absolute;
+  top: 26px;
+  left: 50%;
+  width: 34px;
+  height: 34px;
+  margin-left: 38px;
   border: 3px solid var(--ink);
   border-radius: 50%;
   background: #fffaf0;
@@ -1071,60 +1109,32 @@ a.comic-cut.is-youtube::after {
   transition: background 0.2s;
 }
 
-.chess-turn svg {
-  position: absolute;
-  inset: 5px;
-  width: calc(100% - 10px);
-  height: calc(100% - 10px);
+.chess-side svg {
+  width: 100%;
+  height: 100%;
   fill: none;
   stroke: var(--ink);
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transition: opacity 0.15s;
+  stroke-width: 2.4;
 }
 
-.chess-turn.is-black {
+.chess-side.is-black {
   background: #4b3f63;
 }
 
-.chess-turn.is-black svg {
+.chess-side.is-black svg {
   stroke: #fffaf0;
 }
 
-.chess-turn .chess-turn-computer,
-.chess-turn.is-computer .chess-turn-user {
-  opacity: 0;
+.chess-wheel.is-landed .chess-wheel-face {
+  animation: chess-wheel-land 0.25s ease-out;
 }
 
-.chess-turn.is-computer .chess-turn-computer {
-  opacity: 1;
-}
-
-.chess-turn.is-spinning .chess-turn-user,
-.chess-turn.is-spinning .chess-turn-computer {
-  opacity: 0;
-}
-
-.chess-turn.is-spinning {
-  animation: chess-turn-spin 0.5s ease-in-out infinite;
-}
-
-.chess-turn.is-landed {
-  animation: chess-turn-land 0.25s ease-out;
-}
-
-.chess-turn.is-thinking {
+.chess-wheel.is-thinking .chess-wheel-pointer {
   animation: coloring-nudge 0.9s ease-in-out infinite;
 }
 
-@keyframes chess-turn-spin {
-  25% { transform: rotate(-12deg); }
-  75% { transform: rotate(12deg); }
-}
-
-@keyframes chess-turn-land {
-  50% { transform: scale(1.2); }
+@keyframes chess-wheel-land {
+  50% { transform: scale(1.18); }
 }
 
 .chess-picker {
