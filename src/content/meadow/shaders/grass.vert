@@ -19,6 +19,12 @@ uniform int uGridSize;
 uniform vec4 uBand;
 // 카메라 수평 거리: 이 사이에서 잎이 땅 색으로 녹아들고 키가 준다 (grass.frag와 같은 값).
 uniform vec2 uColorFade;
+// 잎 키: x~y가 보통 잎, z~w가 길게 자란 잎. 길게 자란 잎의 비율과 밑동 폭 범위
+uniform vec4 uHeight;
+uniform float uTallChance;
+uniform vec2 uWidth;
+// 몸이 잎을 눕히는 수평 거리 (몸 반지름의 배수)
+uniform float uPushReach;
 // 먼 격자는 잎을 넓혀 빈 곳을 메운다.
 uniform float uWidthScale;
 
@@ -88,11 +94,11 @@ void main() {
 
   float seed = r1.y;
   float yaw = r2.x * 2.0 * PI;
-  // 대부분 0.35~0.8이고 몇몇은 길게 자란다.
-  float height = r2.y < 0.07 ? mix(0.9, 1.3, r1.y) : mix(0.35, 0.8, r1.y);
+  // 대부분 보통 키이고 몇몇은 길게 자라 덤불 위로 솟는다.
+  float height = r2.y < uTallChance ? mix(uHeight.z, uHeight.w, r1.y) : mix(uHeight.x, uHeight.y, r1.y);
   // 잎 색이 땅 색으로 녹아드는 먼 곳에서는 키도 줄어 땅으로 사라진다. 격자끼리 맞물리는 곳에서는 줄지 않는다.
   height *= 1.0 - smoothstep(uColorFade.x, uColorFade.y + 10.0, dist) * 0.7;
-  float width = mix(0.05, 0.085, r0.x) * uWidthScale;
+  float width = mix(uWidth.x, uWidth.y, r0.x) * uWidthScale;
 
   vec3 root = meadowPoint(xz, -0.06);
   vec3 up = normalize(vec3(root.x, root.y + MEADOW_CURVATURE, root.z));
@@ -127,7 +133,7 @@ void main() {
     float vertical = dot(d, up);
     vec3 flat_ = d - up * vertical;
     float r = length(flat_);
-    float s = (1.0 - smoothstep(uPusher.w * 0.35, uPusher.w * 1.25, r))
+    float s = (1.0 - smoothstep(uPusher.w * 0.35, uPusher.w * uPushReach, r))
       * (1.0 - smoothstep(uPusher.w * 1.2, uPusher.w * 2.2, abs(vertical)));
     if (s > 0.0) {
       bend += (r > 1e-3 ? flat_ / r : side) * s * 1.6;

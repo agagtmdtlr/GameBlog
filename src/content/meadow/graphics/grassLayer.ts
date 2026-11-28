@@ -18,8 +18,20 @@ import type { RenderLayer } from '../../../engine/render/graphics';
 import type { WindFrame } from '../objects/wind';
 import { meadowTerrainGlsl } from './terrainGlsl';
 
-/** 잎 하나의 마디 수. 마디마다 정점 두 개, 끝에 하나다. */
-const SEGMENTS = 4;
+/** 잎 하나의 마디 수. 마디마다 정점 두 개, 끝에 하나다. 키가 커서 휜 모양이 매끄럽도록 5마디다. */
+const SEGMENTS = 5;
+
+/**
+ * 잎의 모양. 키는 캐릭터 몸(중심 높이 약 1.3)에 닿는 풀숲 높이다 (2026-11-28 사용자 요청, 0.35~0.8에서 키움).
+ * `pushReach`는 몸이 잎을 눕히는 수평 거리(몸 반지름의 배수)로, 캐릭터 둘레가 풀숲 속에서 트여 보이게 한다.
+ */
+export const GRASS_BLADE = {
+  height: [0.9, 1.6] as const,
+  tallChance: 0.12,
+  tallHeight: [1.8, 2.5] as const,
+  width: [0.06, 0.11] as const,
+  pushReach: 1.6,
+};
 
 /**
  * 잔디 격자. 가까울수록 촘촘하고, 멀수록 성기고 잎이 넓다. 이웃 격자는 카메라 거리 `band`로 몫을 나눠 맞물린다.
@@ -84,6 +96,10 @@ export class GrassLayer implements RenderLayer {
           uGridSize: { value: ring.size },
           uBand: { value: new Vector4(...ring.band) },
           uWidthScale: { value: ring.widthScale },
+          uHeight: { value: new Vector4(...GRASS_BLADE.height, ...GRASS_BLADE.tallHeight) },
+          uTallChance: { value: GRASS_BLADE.tallChance },
+          uWidth: { value: new Vector2(...GRASS_BLADE.width) },
+          uPushReach: { value: GRASS_BLADE.pushReach },
           uTime: { value: 0 },
           uWindDir: { value: new Vector2(1, 0) },
           uWindStrength: { value: 0 },

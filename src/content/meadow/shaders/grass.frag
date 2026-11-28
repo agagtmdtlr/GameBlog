@@ -62,7 +62,8 @@ void main() {
   float patchA = sin(p.x * 0.07 + 0.4) * sin(p.y * 0.06 - 1.2) + 0.5 * sin((p.x + p.y) * 0.13);
   float patchB = sin(p.x * 0.045 - p.y * 0.08 + 2.0);
 
-  vec3 green = mix(ROOT_COLOR, TIP_COLOR, smoothstep(0.0, 1.0, vT));
+  // 키 큰 풀숲에서는 잎 윗부분이 화면을 많이 덮으므로, 잎 중간까지 짙은 풀빛이 남고 끝에서 옅어진다.
+  vec3 green = mix(ROOT_COLOR, TIP_COLOR, pow(smoothstep(0.0, 1.0, vT), 1.7));
   green *= 0.82 + 0.36 * vSeed;
   green *= mix(vec3(1.0), DRY_TINT, smoothstep(0.4, 1.3, patchA) * 0.7);
   green *= mix(vec3(1.0), COOL_TINT, smoothstep(0.3, 1.0, patchB) * 0.6);
