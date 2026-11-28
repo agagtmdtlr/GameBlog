@@ -14,6 +14,7 @@ import {
 import { createEnemy, type Enemy } from './enemies';
 import { ENEMY_SPECS, FLASH_SECONDS, HEAD_RADIUS, SEGMENT_RADIUS, type Point } from './enemies';
 import { seededRandom } from './random';
+import { emptyTowerSnakeStats, TOWER_SNAKE_RECORDS, type TowerSnakePlay } from './records';
 import { SpatialGrid } from './spatialGrid';
 import { pickTower, TOWER_SPECS, TOWER_TYPES, type TowerType } from './towers';
 import {
@@ -704,5 +705,64 @@ describe('연출 이벤트 (단계 5)', () => {
     expect(order).toContain('kill');
     expect(order).toContain('bump');
     expect(order.indexOf('kill')).toBeLessThan(order.indexOf('bump'));
+  });
+});
+
+describe('타워 뱀 기록 (단계 6)', () => {
+  const play = (over: Partial<TowerSnakePlay> = {}): TowerSnakePlay => ({
+    seconds: 95.5,
+    kills: 40,
+    longest: 9,
+    eaten: { arrow: 3, cannon: 2, ice: 1, lightning: 1 },
+    end: 'down',
+    towers: ['arrow', 'cannon', 'ice'],
+    ...over,
+  });
+  const times = { startedAt: 0, endedAt: 1 };
+
+  it('판을 쌓으면 누적 수치가 는다', () => {
+    let stats = TOWER_SNAKE_RECORDS.accumulate(emptyTowerSnakeStats(), play(), times);
+    stats = TOWER_SNAKE_RECORDS.accumulate(
+      stats,
+      play({ seconds: 30.2, kills: 55, longest: 4, eaten: { arrow: 1, cannon: 0, ice: 0, lightning: 2 }, end: 'restart' }),
+      times,
+    );
+    expect(stats).toEqual({
+      plays: 2,
+      bestSeconds: 95.5,
+      bestKills: 55,
+      longest: 9,
+      totalKills: 95,
+      totalSeconds: 125.7,
+      eaten: { arrow: 4, cannon: 2, ice: 1, lightning: 3 },
+    });
+  });
+
+  it('저장된 값을 검사한다', () => {
+    const migrate = TOWER_SNAKE_RECORDS.migrate!;
+    expect(migrate('play', 1, play())).toEqual(play());
+    expect(migrate('play', 1, { ...play(), end: 'bored' })).toBeUndefined();
+    expect(migrate('play', 1, { ...play(), kills: -1 })).toBeUndefined();
+    expect(migrate('play', 1, { ...play(), towers: ['arrow', 'laser'] })).toBeUndefined();
+    expect(migrate('play', 1, { ...play(), eaten: { arrow: 'x' } })).toBeUndefined();
+    expect(migrate('play', 2, play())).toBeUndefined();
+    expect(migrate('stats', 1, { plays: 3 })).toEqual({ ...emptyTowerSnakeStats(), plays: 3 });
+    expect(migrate('stats', 1, { plays: 3, eaten: { ice: 2 } })).toEqual({
+      ...emptyTowerSnakeStats(),
+      plays: 3,
+      eaten: { arrow: 0, cannon: 0, ice: 2, lightning: 0 },
+    });
+    expect(migrate('stats', 1, { plays: 'x' })).toBeUndefined();
+    expect(migrate('progress', 1, {})).toBeUndefined();
+  });
+
+  it('판 상태에서 기록할 값을 모두 얻는다: 버틴 시간, 처치, 가장 긴 길이, 먹은 종류', () => {
+    const world = new TowerSnakeWorld(seededRandom(4));
+    world.load(row(20, 20, 19, 18), 'right', ['arrow', 'arrow'], [{ cell: { x: 21, y: 20 }, type: 'ice' }]);
+    world.update(STEP_SECONDS * 1.5);
+    expect(world.eaten.ice).toBe(1);
+    expect(world.longest).toBe(3);
+    expect(world.time).toBeCloseTo(STEP_SECONDS * 1.5);
+    expect(TOWER_SNAKE_RECORDS.migrate!('play', 1, play({ seconds: world.time, longest: world.longest, eaten: { ...world.eaten }, towers: [...world.towers] }))).toBeDefined();
   });
 });

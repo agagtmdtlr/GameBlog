@@ -1390,8 +1390,8 @@ a.comic-cut.is-youtube::after {
   min-width: 2.6em;
 }
 
-/* 좁은 화면: 점수 표 셋(시간, 처치, 마디)이 버튼 사이에 들어가게 줄인다. */
-@media (max-width: 400px) {
+/* 좁은 화면: 점수 표 넷(시간, 왕관, 처치, 마디)이 버튼 사이에 들어가게 줄인다. */
+@media (max-width: 660px) {
   .tsnake-scores {
     gap: 4px;
   }
@@ -1409,6 +1409,22 @@ a.comic-cut.is-youtube::after {
 
   .tsnake-score-value {
     min-width: 1.2em;
+  }
+}
+
+/* 더 좁은 화면 (휴대폰): 두 줄로 둘씩 놓는다. */
+@media (max-width: 470px) {
+  .tsnake-scores {
+    top: 6px;
+    flex-wrap: wrap;
+  }
+
+  .tsnake-score {
+    flex: 0 1 calc(50% - 2px);
+    height: 30px;
+    border-width: 2px;
+    border-radius: 10px;
+    box-shadow: 0 2px 0 var(--ink);
   }
 }
 

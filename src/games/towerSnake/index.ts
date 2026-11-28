@@ -1,8 +1,16 @@
 import { createRansomCanvas } from '../../lib/ransomText';
+import { openRecordBook, type RecordBook } from '../../lib/save';
 import type { GameDefinition } from '../game';
 import { TowerSnakeView } from './graphics/towerSnakeView';
 import type { EnemyType } from './enemies';
 import { Minimap } from './minimap';
+import {
+  emptyTowerSnakeStats,
+  TOWER_SNAKE_RECORDS,
+  type TowerSnakePlay,
+  type TowerSnakeProgress,
+  type TowerSnakeStats,
+} from './records';
 import type { TowerType } from './towers';
 import { TowerSnakeWorld, type Cell, type Direction, type TowerBox } from './world';
 
@@ -22,6 +30,9 @@ const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v1
 /** 버틴 시간: 모래시계 */
 const ICON_TIME =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/></svg>';
+/** 가장 오래 버틴 시간: 왕관 */
+const ICON_CROWN =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18h16M4.5 15 3 7l5 3.5L12 5l4 5.5L21 7l-1.5 8Z"/></svg>';
 /** 처치 수: 터진 방울 */
 const ICON_KILL =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>';
@@ -61,6 +72,8 @@ function iconButton(className: string, label: string, icon: string, parent: HTML
   return button;
 }
 
+const warn = (error: unknown) => console.warn('타워 뱀 기록을 저장하지 못했습니다.', error);
+
 /** 초 → `분:초` */
 const clock = (seconds: number) => {
   const s = Math.floor(seconds);
@@ -85,6 +98,10 @@ function startTowerSnake(root: HTMLElement): void {
   timeTag.innerHTML = ICON_TIME;
   timeTag.setAttribute('aria-label', '버틴 시간');
   const timeValue = element('span', 'tsnake-score-value', timeTag);
+  const bestTag = element('div', 'tsnake-score tsnake-best', scores);
+  bestTag.innerHTML = ICON_CROWN;
+  bestTag.setAttribute('aria-label', '가장 오래 버틴 시간');
+  const bestValue = element('span', 'tsnake-score-value', bestTag);
   const killTag = element('div', 'tsnake-score tsnake-kills', scores);
   killTag.innerHTML = ICON_KILL;
   killTag.setAttribute('aria-label', '처치 수');
@@ -108,6 +125,10 @@ function startTowerSnake(root: HTMLElement): void {
   const world = new TowerSnakeWorld();
   const view = new TowerSnakeView(canvas);
   let phase: Phase = 'ready';
+  let book: RecordBook<TowerSnakeStats, TowerSnakePlay, TowerSnakeProgress> | null = null;
+  let stats = emptyTowerSnakeStats();
+  let startedAt = Date.now();
+  let recorded = false;
 
   const setPhase = (next: Phase) => {
     phase = next;
@@ -123,6 +144,7 @@ function startTowerSnake(root: HTMLElement): void {
   let shownSegments = -1;
   const showScore = () => {
     timeValue.textContent = clock(world.time);
+    bestValue.textContent = clock(Math.max(stats.bestSeconds, world.time));
     killValue.textContent = String(world.killed);
     if (world.segments !== shownSegments) {
       // 마디를 잃으면 점수 표가 흔들린다.
@@ -136,7 +158,32 @@ function startTowerSnake(root: HTMLElement): void {
     }
   };
 
+  /** 이번 판을 판 기록으로 남긴다. 한 칸도 나아가지 않은 판은 남기지 않는다. */
+  const finishPlay = (end: TowerSnakePlay['end']) => {
+    if (recorded || world.ticks === 0 || !book) return;
+    recorded = true;
+    const play: TowerSnakePlay = {
+      seconds: Math.round(world.time * 10) / 10,
+      kills: world.killed,
+      longest: world.longest,
+      eaten: { ...world.eaten },
+      end,
+      towers: [...world.towers],
+    };
+    book
+      .record(play, { startedAt, endedAt: Date.now() })
+      .then((next) => {
+        stats = next;
+        showScore();
+      })
+      .catch(warn);
+  };
+
   const newGame = () => {
+    // 도중에 새로 시작하면 하던 판을 `restart`로 남긴다 (끝난 판은 이미 남겼다).
+    finishPlay('restart');
+    recorded = false;
+    startedAt = Date.now();
     world.reset();
     view.reset(world.body);
     shownSegments = -1;
@@ -219,6 +266,7 @@ function startTowerSnake(root: HTMLElement): void {
         }
         if (event.hurt?.over) {
           view.crash();
+          finishPlay('down');
           setPhase('over');
           break;
         }
@@ -241,6 +289,18 @@ function startTowerSnake(root: HTMLElement): void {
   newGame();
   requestAnimationFrame(frame);
 
+  // 기록장을 연다. 여는 동안에도 놀 수 있고, 연 뒤의 판부터 남는다.
+  void (async () => {
+    const opened = await openRecordBook<TowerSnakeStats, TowerSnakePlay, TowerSnakeProgress>(TOWER_SNAKE_RECORDS);
+    try {
+      stats = await opened.stats();
+    } catch (error) {
+      warn(error);
+    }
+    book = opened;
+    showScore();
+  })();
+
   if (import.meta.env.DEV) {
     Object.assign(window, {
       __towerSnake: {
@@ -253,6 +313,10 @@ function startTowerSnake(root: HTMLElement): void {
         get phase() {
           return phase;
         },
+        get stats() {
+          return stats;
+        },
+        book: () => book,
         /** 개발 확인용: 몸(과 타워, 상자)을 바로 놓는다. */
         load: (body: Cell[], direction: Direction, towers?: TowerType[], boxes?: TowerBox[]) => {
           world.load(body, direction, towers, boxes);
@@ -265,7 +329,7 @@ function startTowerSnake(root: HTMLElement): void {
   }
 }
 
-/** 타워 뱀: 몸 마디마다 타워를 싣고 큰 판을 누빈다 (단계 5까지: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격, 연출). */
+/** 타워 뱀: 몸 마디마다 타워를 싣고 큰 판을 누빈다 (판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격, 연출, 기록). */
 export const towerSnakeGame: GameDefinition = {
   id: 'tower-snake',
   start(root) {

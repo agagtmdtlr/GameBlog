@@ -90,13 +90,14 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 
 | 컷 | 콘텐츠 | 더한 날 | 미리 보기 |
 |---|---|---|---|
-| `a` | 룰렛 체스 | 2026-11-28 | `chess.jpg`, 3D 판 화면 캡처 ([chess.md](chess.md)) |
-| `b` | 뱀 | 2026-11-28 | `snake.jpg`, 게임 화면 캡처 ([snake.md](snake.md)) |
-| `c` | 바람 부는 초원 | 2026-11-25 | `meadow.jpg` ([meadow.md](meadow.md)) |
-| `d` | 2048 | 2026-11-25 | `2048.svg`, 판 그림 ([game2048.md](game2048.md)) |
-| `e` | 색칠 놀이 | 2026-11-24 | `coloring.jpg`, 반쯤 칠한 도시 화면 캡처 ([coloring.md](coloring.md)) |
-| `f` | 행성 산책 | 2026-11-24 | `planet.jpg` |
-| `g`, `h` | 비어 있음 | | |
+| `a` | 타워 뱀 | 2026-11-28 | `tower-snake.jpg`, 적 무리를 쏘는 화면 캡처 ([towerSnake.md](towerSnake.md)) |
+| `b` | 룰렛 체스 | 2026-11-28 | `chess.jpg`, 3D 판 화면 캡처 ([chess.md](chess.md)) |
+| `c` | 뱀 | 2026-11-28 | `snake.jpg`, 게임 화면 캡처 ([snake.md](snake.md)) |
+| `d` | 바람 부는 초원 | 2026-11-25 | `meadow.jpg` ([meadow.md](meadow.md)) |
+| `e` | 2048 | 2026-11-25 | `2048.svg`, 판 그림 ([game2048.md](game2048.md)) |
+| `f` | 색칠 놀이 | 2026-11-24 | `coloring.jpg`, 반쯤 칠한 도시 화면 캡처 ([coloring.md](coloring.md)) |
+| `g` | 행성 산책 | 2026-11-24 | `planet.jpg` |
+| `h` | 비어 있음 | | |
 
 더한 날은 각 콘텐츠가 `contents.json`에 처음 들어간 커밋 날짜다. 예전에 컷 `b`·`c`에 넣었던 YouTube 시연 영상(Flower 모방 Unity 영상, 치킨차차 이식 영상)은 2026-11-25에 사용자 요청으로 뺐다.
 
