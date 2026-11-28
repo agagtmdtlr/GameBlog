@@ -38,7 +38,7 @@
 - [../README.md](../README.md): 저장소 소개, 조작, 시작 방법
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): 현재 구조, 기능, 명령어, 알려진 한계
 - [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md): 결정 배경과 앞으로의 계획
-- [plans/towerSnake.md](plans/towerSnake.md): 타워 뱀(뱀 변형, 몸 마디마다 타워를 싣고 몰려오는 적을 막는 미니 게임) 개발 계획서 초안 (2026-11-28)
+- [plans/towerSnake.md](plans/towerSnake.md): 타워 뱀(뱀 변형, 몸 마디마다 타워를 싣고 몰려오는 적을 막는 미니 게임) 개발 계획서 (2026-11-28 규칙 확정, 개발 전)
 
 ## 문서 구분
 
