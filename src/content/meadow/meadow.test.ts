@@ -3,6 +3,7 @@ import { dot, length, normalize, sub } from '../../engine/math';
 import { groundNormal, groundRadius } from '../../engine/physics/collision';
 import { PLAYER_RADIUS } from '../common/character/player';
 import { keepInside, MEADOW, MEADOW_CENTER, MEADOW_GROUND, meadowHeight, meadowPoint } from './objects/meadowTerrain';
+import { Lightning, LIGHTNING, lightningStrike, strikeFlash } from './objects/lightning';
 import { RAIN, rainVelocity } from './objects/rain';
 import { growScale, SKY_TVS, SkyTvField, skyTvAt } from './objects/skyTvs';
 import { Wind, windDirection, windStrength, WIND } from './objects/wind';
@@ -188,5 +189,59 @@ describe('비', () => {
     expect(gusty[0] / gusty[2]).toBeCloseTo(0.6 / -0.8, 6);
     // 가장 거센 바람에도 빗줄기는 수직에서 45도보다 덜 기운다.
     expect(Math.hypot(gusty[0], gusty[2])).toBeLessThan(RAIN.fallSpeed);
+  });
+});
+
+describe('번개', () => {
+  it('같은 번호의 번개는 늘 같고, 플레이어 둘레 정해진 거리와 구름 높이에서 친다', () => {
+    const player = MEADOW_SPAWN;
+    for (let i = 0; i < 40; i++) {
+      const a = lightningStrike(i, 10, player);
+      expect(lightningStrike(i, 10, player)).toEqual(a);
+      const distance = Math.hypot(a.cloud[0] - player[0], a.cloud[2] - player[2]);
+      expect(distance).toBeGreaterThan(LIGHTNING.distance[0] - 1);
+      expect(distance).toBeLessThan(LIGHTNING.distance[1] + 1);
+      expect(a.cloud[1]).toBeGreaterThan(LIGHTNING.cloudHeight[0] - 30);
+      if (a.bolt.length > 0) {
+        expect(a.bolt).toHaveLength(LIGHTNING.segments + 1);
+        expect(a.bolt[0]).toEqual(a.cloud);
+        // 줄기는 땅까지 내려온다.
+        expect(a.bolt[a.bolt.length - 1][1]).toBeLessThan(a.cloud[1] - 40);
+      } else {
+        expect(a.branches).toHaveLength(0);
+      }
+    }
+  });
+
+  it('번쩍임은 치는 순간 가장 밝고, 잦아들어 끝난다', () => {
+    const strike = lightningStrike(3, 5, MEADOW_SPAWN);
+    expect(strikeFlash(strike, 4.9)).toBe(0);
+    expect(strikeFlash(strike, 5)).toBe(1);
+    expect(strikeFlash(strike, 5 + LIGHTNING.duration + 0.01)).toBe(0);
+    for (const { offset, strength } of strike.pulses) expect(strikeFlash(strike, 5 + offset + 1e-9)).toBeGreaterThanOrEqual(strength - 1e-6);
+  });
+
+  it('번개는 정해진 간격으로 치고, 칠 때 초원이 번개 쪽에서 밝아진다', () => {
+    const lightning = new Lightning();
+    let strikes = 0;
+    let last: unknown;
+    for (let t = 0; t < 120; t += 1 / 60) {
+      lightning.step(t, MEADOW_SPAWN);
+      if (lightning.current !== last) {
+        strikes++;
+        last = lightning.current;
+      }
+    }
+    expect(strikes).toBeGreaterThanOrEqual(120 / LIGHTNING.interval[1] - 1);
+    expect(strikes).toBeLessThanOrEqual(120 / LIGHTNING.interval[0] + 1);
+
+    const world = new MeadowWorld();
+    const calm = world.environment(1);
+    while (world.lightningFlash() < 0.9) world.fixedStep(1 / 60, { direction: [0, 0, 0] });
+    const lit = world.environment(1);
+    expect(lit.lightColor[0]).toBeGreaterThan(calm.lightColor[0] * 2);
+    expect(lit.background[2]).toBeGreaterThan(calm.background[2]);
+    const toward = world.lightning.direction(world.player.position)!;
+    expect(dot(lit.lightDirection, toward)).toBeGreaterThan(dot(calm.lightDirection, toward));
   });
 });

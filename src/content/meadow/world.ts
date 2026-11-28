@@ -1,8 +1,9 @@
-import { dot, lerp, mat4Identity, normalize, normalMatrix, scale, sub, type Vec3 } from '../../engine/math';
+import { add, dot, lerp, mat4Identity, normalize, normalMatrix, scale, sub, type Vec3 } from '../../engine/math';
 import { SurfacePattern, type DrawItem, type Environment, type Material } from '../../engine/frame';
 import { characterDrawItems } from '../common/character/characterDraw';
 import { PLAYER_RADIUS, Player, type MoveCommand } from '../common/character/player';
 import { BODY_RADIUS, Walker } from '../common/character/walker';
+import { Lightning, LIGHTNING } from './objects/lightning';
 import { keepInside, MEADOW_CENTER, MEADOW_GROUND, meadowPoint } from './objects/meadowTerrain';
 import { SkyTvField, type SkyTv } from './objects/skyTvs';
 import { Wind, type WindFrame } from './objects/wind';
@@ -55,6 +56,8 @@ export class MeadowWorld {
   readonly wind = new Wind();
   /** 플레이어 둘레 하늘에 스폰되는 텔레비전 */
   readonly skyTvs = new SkyTvField();
+  /** 하늘 곳곳에 치는 번개 */
+  readonly lightning = new Lightning();
   /** 씬이 흐른 시간(초). 일시 정지하면 멈춘다. */
   time = 0;
   /** 하늘 텔레비전을 마지막으로 스폰한 플레이어 자리. 이만큼 움직였을 때만 칸을 다시 본다. */
@@ -77,6 +80,7 @@ export class MeadowWorld {
       if (out > 0) this.player.velocity = sub(this.player.velocity, scale(inside.outward, out));
     }
     this.walker.step(dt, this.player);
+    this.lightning.step(this.time, this.player.position);
     const [ax, , az] = this.skyTvAnchor;
     const [px, , pz] = this.player.position;
     if (Math.hypot(px - ax, pz - az) > SKY_TV_RESPAWN_STEP) {
@@ -111,9 +115,32 @@ export class MeadowWorld {
     ];
   }
 
-  /** 그림자 맵이 캐릭터를 따라간다. */
+  /** 지금 번개의 밝기 (0이면 번개가 없다) */
+  lightningFlash(): number {
+    return this.lightning.flash(this.time);
+  }
+
+  /**
+   * 그림자 맵이 캐릭터를 따라간다. 번개가 치면 번개 쪽에서 센 푸른 흰빛이 비치고(빛 방향이 번개 쪽으로 기운다),
+   * 앰비언트와 하늘·안개 색도 밝아진다.
+   */
   environment(alpha: number): Environment {
-    return { ...MEADOW_ENVIRONMENT, shadowCenter: this.interpolatedPlayerPosition(alpha) };
+    const center = this.interpolatedPlayerPosition(alpha);
+    const base: Environment = { ...MEADOW_ENVIRONMENT, shadowCenter: center };
+    const flash = this.lightningFlash();
+    const toward = this.lightning.direction(center);
+    if (flash <= 0 || !toward) return base;
+    const { color, lightBoost, ambientBoost, backgroundBoost, directionPull } = LIGHTNING;
+    const pull = Math.min(1, flash) * directionPull;
+    const sky = add(base.background, scale(color, backgroundBoost * flash));
+    return {
+      ...base,
+      lightDirection: normalize(add(scale(base.lightDirection, 1 - pull), scale(toward, pull))),
+      lightColor: add(base.lightColor, scale(color, lightBoost * flash)),
+      skyColor: add(base.skyColor, scale(color, ambientBoost * flash)),
+      groundColor: add(base.groundColor, scale(color, ambientBoost * 0.4 * flash)),
+      background: [Math.min(1, sky[0]), Math.min(1, sky[1]), Math.min(1, sky[2])],
+    };
   }
 
   occluder(alpha: number): { center: Vec3; radius: number } {
