@@ -4,7 +4,7 @@ import { createEnemy, ENEMY_SPECS, FLASH_SECONDS, HEAD_RADIUS, KNOCK_SPEED, move
 import type { Random } from './random';
 import { SpatialGrid } from './spatialGrid';
 import { pickTower, START_TOWER, type TowerType } from './towers';
-import { BOSS_SECONDS, BOSS_SPLIT, GROUP_SPREAD, MAX_ENEMIES, pickEnemy, SPAWN_MAX, SPAWN_MIN, WAVE_SECONDS, waveSize } from './waves';
+import { BOSS_SECONDS, BOSS_SPLIT, GROUP_SPREAD, MAX_ENEMIES, enemyGrowth, NO_GROWTH, pickEnemy, SPAWN_MAX, SPAWN_MIN, WAVE_SECONDS, waveSize, type EnemyGrowth } from './waves';
 
 export type { Cell, Direction } from '../../lib/gridSnake';
 
@@ -225,9 +225,9 @@ export class TowerSnakeWorld {
     return events;
   }
 
-  /** 적을 바로 놓는다 (개발 확인과 테스트용). */
-  spawnEnemy(type: EnemyType, x: number, y: number): Enemy {
-    const enemy = createEnemy(this.nextId++, type, x, y);
+  /** 적을 놓는다. 무리는 지금 때의 `enemyGrowth`로, 개발 확인과 테스트는 기본(1배)으로 놓는다. */
+  spawnEnemy(type: EnemyType, x: number, y: number, growth: EnemyGrowth = NO_GROWTH): Enemy {
+    const enemy = createEnemy(this.nextId++, type, x, y, growth.hp, growth.speed);
     this.enemies.push(enemy);
     return enemy;
   }
@@ -249,7 +249,7 @@ export class TowerSnakeWorld {
     if (enemy.type === 'boss') {
       for (let i = 0; i < BOSS_SPLIT; i++) {
         const angle = (i / BOSS_SPLIT) * Math.PI * 2;
-        this.spawnEnemy('jelly', enemy.x + Math.cos(angle) * 0.5, enemy.y + Math.sin(angle) * 0.5);
+        this.spawnEnemy('jelly', enemy.x + Math.cos(angle) * 0.5, enemy.y + Math.sin(angle) * 0.5, enemyGrowth(this.time));
       }
     }
     return true;
@@ -400,7 +400,7 @@ export class TowerSnakeWorld {
       const r = Math.sqrt(this.random()) * GROUP_SPREAD;
       const x = Math.min(BOARD - 1, Math.max(0, cx + Math.cos(angle) * r));
       const y = Math.min(BOARD - 1, Math.max(0, cy + Math.sin(angle) * r));
-      this.spawnEnemy(pick(), x, y);
+      this.spawnEnemy(pick(), x, y, enemyGrowth(this.time));
     }
   }
 

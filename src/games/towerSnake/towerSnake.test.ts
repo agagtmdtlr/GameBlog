@@ -12,7 +12,7 @@ import {
   type CombatWorld,
 } from './combat';
 import { createEnemy, type Enemy } from './enemies';
-import { ENEMY_SPECS, FLASH_SECONDS, HEAD_RADIUS, SEGMENT_RADIUS, type Point } from './enemies';
+import { ENEMY_SPECS, FLASH_SECONDS, HEAD_RADIUS, MAX_ENEMY_SPEED, SEGMENT_RADIUS, type Point } from './enemies';
 import { seededRandom } from './random';
 import { emptyTowerSnakeStats, TOWER_SNAKE_RECORDS, type TowerSnakePlay } from './records';
 import { SpatialGrid } from './spatialGrid';
@@ -30,7 +30,18 @@ import {
   type Cell,
   type KillEvent,
 } from './world';
-import { BOSS_SECONDS, GROUP_SPREAD, MAX_ENEMIES, pickEnemy, SPAWN_MAX, SPAWN_MIN, WAVE_SECONDS, waveSize } from './waves';
+import {
+  BOSS_SECONDS,
+  enemyGrowth,
+  GROWTH_FROM,
+  GROUP_SPREAD,
+  MAX_ENEMIES,
+  pickEnemy,
+  SPAWN_MAX,
+  SPAWN_MIN,
+  WAVE_SECONDS,
+  waveSize,
+} from './waves';
 
 const row = (y: number, ...xs: number[]): Cell[] => xs.map((x) => ({ x, y }));
 const STEP_SECONDS = 1 / SPEED;
@@ -790,5 +801,30 @@ describe('성능 (단계 7)', () => {
     expect(world.enemies.length).toBe(MAX_ENEMIES);
     // 데스크톱에서 약 0.3ms/걸음 (180ms). 느린 기기와 테스트 동시 실행을 생각해 넉넉히 잡는다.
     expect(elapsed).toBeLessThan(3000);
+  });
+});
+
+describe('시간에 따라 강해지는 적', () => {
+  it('처음 2분은 그대로이고, 그 뒤 체력은 90초, 빠르기는 240초마다 한 배씩 는다', () => {
+    expect(enemyGrowth(0)).toEqual({ hp: 1, speed: 1 });
+    expect(enemyGrowth(GROWTH_FROM)).toEqual({ hp: 1, speed: 1 });
+    expect(enemyGrowth(GROWTH_FROM + 90).hp).toBeCloseTo(2);
+    expect(enemyGrowth(GROWTH_FROM + 240).speed).toBeCloseTo(2);
+    expect(enemyGrowth(300)).toEqual({ hp: 3, speed: 1.75 });
+  });
+
+  it('5분에 생긴 무리는 체력 3배로 생기고, 빨라져도 뱀보다 느리다', () => {
+    const world = new TowerSnakeWorld(seededRandom(8));
+    world.boxes = [];
+    world.time = 300 - 0.01;
+    world.update(0.05);
+    const fresh = world.enemies.filter((e) => e.type === 'jelly');
+    expect(fresh.length).toBeGreaterThan(0);
+    for (const e of fresh) expect(e.maxHp).toBe(ENEMY_SPECS.jelly.hp * 3);
+    // 날쌘이가 많이 빨라져도 한계에서 멈춘다.
+    const dart = world.spawnEnemy('dart', 5, 5, enemyGrowth(600));
+    world.update(ENEMY_STEP);
+    expect(Math.hypot(dart.vx, dart.vy)).toBeCloseTo(MAX_ENEMY_SPEED);
+    expect(MAX_ENEMY_SPEED).toBeLessThan(SPEED);
   });
 });
