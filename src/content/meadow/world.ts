@@ -1,30 +1,21 @@
-import { add, dot, lerp, mat4Identity, normalize, normalMatrix, scale, sub, type Vec3 } from '../../engine/math';
-import { SurfacePattern, type DrawItem, type Environment, type Material } from '../../engine/frame';
+import { add, dot, lerp, normalize, scale, sub, type Vec3 } from '../../engine/math';
+import type { DrawItem, Environment, Material } from '../../engine/frame';
 import { characterDrawItems } from '../common/character/characterDraw';
 import { PLAYER_RADIUS, Player, type MoveCommand } from '../common/character/player';
 import { BODY_RADIUS, Walker } from '../common/character/walker';
 import { Lightning, LIGHTNING } from './objects/lightning';
-import { keepInside, MEADOW_CENTER, MEADOW_GROUND, meadowPoint } from './objects/meadowTerrain';
+import { keepInside, MEADOW_CENTER, MeadowGround, meadowPoint } from './objects/meadowTerrain';
 import { SkyTvField, type SkyTv } from './objects/skyTvs';
 import { Wind, type WindFrame } from './objects/wind';
 
-/** 분지 한가운데에서 시작한다. */
-export const MEADOW_SPAWN: Vec3 = meadowPoint(0, 0, PLAYER_RADIUS);
+/** 분지 한가운데, 시작할 때(시각 0)의 너울 위에서 시작한다. */
+export const MEADOW_SPAWN: Vec3 = meadowPoint(0, 0, PLAYER_RADIUS, 0);
 
 /** 캐릭터의 색 (선형 RGB, sRGB #FCC812). 행성 씬과 같다. */
 const PLAYER_COLOR: Vec3 = [0.973, 0.578, 0.006];
 
-/** 잔디 아래 땅의 색 (선형 RGB). 멀리 잔디가 사라진 곳도 잔디밭처럼 보이도록 풀빛이다. */
+/** 잔디 아래 땅의 색 (선형 RGB). 멀리 잔디가 사라진 곳도 잔디밭처럼 보이도록 풀빛이다. 땅은 `graphics/groundLayer.ts`가 그린다. */
 export const MEADOW_GROUND_COLOR: Vec3 = [0.06, 0.15, 0.045];
-
-const GROUND_MATERIAL: Material = {
-  baseColor: MEADOW_GROUND_COLOR,
-  roughness: 1,
-  metallic: 0,
-  emissive: [0, 0, 0],
-  pattern: SurfacePattern.None,
-  receivesOccluder: true,
-};
 
 /**
  * 비 오는 흐린 낮 (2026-11-28 사용자 요청, 맑은 하늘을 대체). 구름에 걸러진 햇빛은 약하고 회색이며, 하늘빛 앰비언트도 회색이라
@@ -52,7 +43,9 @@ const SKY_TV_RESPAWN_STEP = 4;
 /** 초원 씬의 상태와 규칙. GPU와 DOM에 의존하지 않는다. */
 export class MeadowWorld {
   readonly player = new Player(MEADOW_SPAWN);
-  readonly walker = new Walker(MEADOW_SPAWN, MEADOW_GROUND);
+  /** 캐릭터가 걷는 땅. 너울이 굽이치므로 씬 시간을 따라간다. */
+  readonly ground = new MeadowGround();
+  readonly walker = new Walker(MEADOW_SPAWN, this.ground);
   readonly wind = new Wind();
   /** 플레이어 둘레 하늘에 스폰되는 텔레비전 */
   readonly skyTvs = new SkyTvField();
@@ -70,8 +63,9 @@ export class MeadowWorld {
 
   fixedStep(dt: number, command: MoveCommand): void {
     this.time += dt;
+    this.ground.time = this.time;
     this.wind.step(dt);
-    this.player.step(dt, command, MEADOW_GROUND);
+    this.player.step(dt, command, this.ground);
     // 분지 가장자리 너머로는 가지 못한다. 바깥으로 가는 속도를 지운다.
     const inside = keepInside(this.player.position);
     if (inside) {
@@ -108,11 +102,8 @@ export class MeadowWorld {
   }
 
   buildDrawList(alpha: number): DrawItem<Material>[] {
-    const identity = mat4Identity();
-    return [
-      { mesh: 'meadowGround', model: identity, normal: normalMatrix(identity), material: GROUND_MATERIAL, castShadow: true },
-      ...characterDrawItems(this.walker, alpha, PLAYER_COLOR, 'sphere'),
-    ];
+    // 땅은 너울과 함께 움직이므로 엔진 메시가 아니라 땅 층(`graphics/groundLayer.ts`)이 그린다.
+    return characterDrawItems(this.walker, alpha, PLAYER_COLOR, 'sphere');
   }
 
   /** 지금 번개의 밝기 (0이면 번개가 없다) */

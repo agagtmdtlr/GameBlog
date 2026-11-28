@@ -6,9 +6,9 @@ import { defineCharacterMeshes } from '../common/character/characterGraphics';
 import { GrassLayer } from './graphics/grassLayer';
 import { LightningLayer } from './graphics/lightningLayer';
 import { RainLayer } from './graphics/rainLayer';
-import { defineMeadowMeshes } from './graphics/meshes';
+import { GroundLayer } from './graphics/groundLayer';
 import { SkyTvLayer } from './graphics/skyTvLayer';
-import { MEADOW_CENTER, MEADOW_GROUND } from './objects/meadowTerrain';
+import { MEADOW_CENTER } from './objects/meadowTerrain';
 import { MEADOW_GROUND_COLOR, MeadowWorld } from './world';
 
 /**
@@ -25,7 +25,8 @@ export const meadowScene: SceneDefinition = {
 
 class MeadowScene implements SceneInstance {
   private readonly world = new MeadowWorld();
-  private readonly camera = new CameraRig(this.world.player.position, MEADOW_CENTER, MEADOW_GROUND);
+  private readonly camera = new CameraRig(this.world.player.position, MEADOW_CENTER, this.world.ground);
+  private readonly ground = new GroundLayer(MEADOW_GROUND_COLOR);
   private readonly grass = new GrassLayer(MEADOW_GROUND_COLOR);
   private readonly skyTvs = new SkyTvLayer();
   private readonly rain = new RainLayer();
@@ -36,8 +37,8 @@ class MeadowScene implements SceneInstance {
 
   constructor(graphics: Graphics, onError: (error: unknown) => void) {
     defineCharacterMeshes(graphics).catch(onError);
-    defineMeadowMeshes(graphics);
     graphics.setSkybox(null);
+    graphics.addLayer(this.ground);
     graphics.addLayer(this.skyTvs);
     graphics.addLayer(this.grass);
     // 번개와 비는 반투명이라 불투명한 텔레비전·잔디 다음에 그린다. 앞의 비가 먼 번개 위에 덮인다.
@@ -63,7 +64,8 @@ class MeadowScene implements SceneInstance {
   frame(alpha: number) {
     const world = this.world;
     const wind = world.windFrame(alpha);
-    this.grass.set(wind, world.grassPusher(alpha));
+    this.ground.set(world.time);
+    this.grass.set(wind, world.grassPusher(alpha), world.time);
     this.rain.set(wind);
     this.lightning.set(world.lightning.current, world.lightningFlash());
     this.skyTvs.set(world.skyTvList(), world.time);
