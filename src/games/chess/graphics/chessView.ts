@@ -224,8 +224,6 @@ export class ChessView {
   private facing: 1 | -1 = 1;
   /** 도는 판: 받침·칸·표시·기물을 함께 담는다. */
   private readonly table = new Group();
-  /** 판 아래 잉크 판: 판과 함께 돌고 줄지만, 늘 오른쪽 아래로 비껴 있다. */
-  private readonly drop: Mesh;
   private readonly geometries = new Map<number, { fill: BufferGeometry; hull: BufferGeometry }>();
   private readonly whiteMaterial: MeshToonMaterial;
   private readonly blackMaterial: MeshToonMaterial;
@@ -272,9 +270,10 @@ export class ChessView {
     const frameInk = new Mesh(new BoxGeometry(8.8 + OUTLINE * 4, 0.36 + OUTLINE * 4, 8.8 + OUTLINE * 4).translate(0, -0.181, 0), this.inkMaterial);
     this.table.add(frameInk);
     // 판 아래 그림자처럼 놓인 잉크 판 (종이를 오려 붙인 느낌)
-    this.drop = new Mesh(new PlaneGeometry(9.2, 9.2).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: srgb(INK) }));
-    this.drop.position.set(0.18, -0.4, 0.26);
-    this.scene.add(this.drop);
+    // 판이 돌아도 이 잉크 판은 돌지 않는다 (받침 위에서 판만 돈다).
+    const drop = new Mesh(new PlaneGeometry(9.2, 9.2).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: srgb(INK) }));
+    drop.position.set(0.18, -0.4, 0.26);
+    this.scene.add(drop);
 
     const squareGeometry = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     this.squares = new InstancedMesh(squareGeometry, new MeshToonMaterial({ gradientMap: gradient }), 64);
@@ -429,18 +428,17 @@ export class ChessView {
    */
   setFacing(facing: 1 | -1): void {
     this.facing = facing;
-    this.turnTable(facing > 0 ? 0 : Math.PI, 1);
+    this.turnTable(facing > 0 ? 0 : Math.PI);
   }
 
-  private turnTable(angle: number, scale: number): void {
-    this.table.rotation.y = this.drop.rotation.y = angle;
-    this.table.scale.setScalar(scale);
-    this.drop.scale.setScalar(scale);
+  /** 판을 판 가운데(y축)로 돌린다. 크기와 카메라는 그대로다. */
+  private turnTable(angle: number): void {
+    this.table.rotation.y = angle;
   }
 
   /**
-   * `facing` 색이 앞에 오게 판을 부드럽게 반 바퀴 돌린다. 이미 앞이면 돌리지 않는다.
-   * 도는 동안 판 모서리가 화면 밖으로 나가지 않게 각에 맞춰 판을 줄인다.
+   * `facing` 색이 앞에 오게 판을 가운데를 축으로 부드럽게 반 바퀴(180도) 돌린다. 이미 앞이면 돌리지 않는다.
+   * 판 크기와 카메라는 바꾸지 않는다.
    */
   turnTo(facing: 1 | -1, seconds: number): Promise<void> {
     if (facing === this.facing) return Promise.resolve();
@@ -449,8 +447,8 @@ export class ChessView {
     return this.tween(seconds, (t) => {
       const angle = start + Math.PI * easeInOut(t);
       // 정사각형 판을 θ만큼 돌리면 가로 폭이 |cosθ|+|sinθ|배가 된다.
-      this.turnTable(angle, 1 / (Math.abs(Math.cos(angle)) + Math.abs(Math.sin(angle))));
-    }).then(() => this.turnTable(facing > 0 ? 0 : Math.PI, 1));
+      this.turnTable(angle);
+    }).then(() => this.turnTable(facing > 0 ? 0 : Math.PI));
   }
 
   /** 화면 바탕색을 `hex`로 부드럽게 바꾼다. */
