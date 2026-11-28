@@ -9,7 +9,7 @@
 - **최신 여부 확인:** 아래 명령에 결과가 있으면 그 변경분만 확인해 이 문서를 고친다.
 
 ```bash
-git log --oneline 469dc1e..HEAD -- src/games/snake src/home/previews/snake.jpg
+git log --oneline 469dc1e..HEAD -- src/games/snake src/lib/gridSnake src/home/previews/snake.jpg
 ```
 
 ## 놀이 규칙 (2026-11-28 사용자 요청 "스네이크 게임을 추가")
@@ -26,7 +26,7 @@ git log --oneline 469dc1e..HEAD -- src/games/snake src/home/previews/snake.jpg
 
 | 파일 | 내용 | DOM·GPU |
 |---|---|---|
-| `snakeGame.ts` | `SnakeGame`: 몸(머리부터), 방향과 받아 둔 방향(`turn`), 한 칸 나아가기(`tick`), 먹이 놓기, 빠르기(`speed`), 판 바로 놓기(`load`). 시간은 모른다 | 없음 |
+| `snakeGame.ts` | `SnakeGame`: 공용 `GridSnake` 위에 먹이 놓기, 점수, 빠르기(`speed`), 벽·제 몸에 부딪히면 끝나는 규칙, 판 채우기, 판 바로 놓기(`load`)를 얹는다. 시간은 모른다 | 없음 |
 | `records.ts` | 기록 모양(누적 수치·판 기록), 누적 계산, 저장된 값 검사(`SNAKE_RECORDS`) | 없음 |
 | `index.ts` | `snakeGame`. 버튼·점수·안내 DOM, 키·끌기 입력, 단계(`ready`·`run`·`pause`·`over`), 고정 간격 나아가기와 그리기 고리, 기록, 개발용 `window.__snake` | DOM |
 | `graphics/snakeView.ts` | three.js 그리기: 판(받침·칸·울타리), 몸(공 인스턴스), 머리(눈·혀), 열매, 바닥 그림자, 먹을 때 튀는 알갱이, 카메라 맞추기·흔들기 | GPU |
@@ -35,6 +35,24 @@ git log --oneline 469dc1e..HEAD -- src/games/snake src/home/previews/snake.jpg
 | `snake.test.ts` | 시작, 나아가기, 방향 받기, 먹기, 빠르기 한계, 벽·몸 부딪힘, 꼬리 칸, 판 채우기, 기록 누적·검사 | |
 
 버튼과 점수 표 스타일은 `src/style.css`의 "뱀" 부분이다 (2048과 같은 모양을 `snake-` 이름으로 따로 둔다).
+
+## 공용 움직임 (`src/lib/gridSnake/`, 2026-11-28)
+
+몸 움직임은 뱀과 타워 뱀([plans/towerSnake.md](../plans/towerSnake.md))이 함께 쓰도록 `lib/gridSnake/`로 옮겼다 (게임끼리는 서로 가져올 수 없어서). 부딪힘은 판정만 돌려주고, 그 결과(끝, 피해, 꺾기)는 게임이 정한다.
+
+| `GridSnake` | 하는 일 |
+|---|---|
+| `place(body, direction)` | 몸과 방향을 놓고 받아 둔 방향을 비운다 |
+| `turn(direction)` | 방향을 받아 둔다. 마지막으로 받은 방향과 같거나 반대면 무시, `queueLimit`(기본 2)까지 |
+| `takeDirection()`, `clearQueue()` | 받아 둔 방향 하나를 꺼내 지금 방향으로 / 모두 버림 |
+| `ahead(direction, from)`, `inside(cell)` | 한 칸 앞 칸 / 판 안인지 |
+| `bodyHit(cell, grow)` | 머리가 그 칸으로 가면 부딪히는 마디 번호(없으면 -1). 늘지 않으면 꼬리 칸은 비어 있는 것으로 본다 |
+| `moveTo(cell, grow)` | 머리를 옮기고, 늘지 않으면 꼬리를 뺀다. 부딪힘은 보지 않으므로 제 몸을 지나가는 규칙도 만들 수 있다 |
+| `shrink(count)` | 꼬리 끝부터 마디를 잃는다. 머리는 남긴다 |
+| `occupies`, `freeCells`, `cellAt` | 몸이 있는 칸, 빈 칸 번호 목록, 번호 → 칸 |
+| `RIGHT_OF`, `LEFT_OF`, `OPPOSITE` | 나아가는 쪽에서 오른쪽·왼쪽·반대 방향 |
+
+`SnakeGame.tick`은 `takeDirection` → `ahead` → `inside`(아니면 `wall`로 끝) → `bodyHit`(있으면 `self`로 끝) → `moveTo` 순서다. 테스트는 `src/lib/gridSnake/gridSnake.test.ts`에 있고, 뱀 테스트(`snake.test.ts`)는 옮기기 전과 같다.
 
 ## 시간과 움직임
 
