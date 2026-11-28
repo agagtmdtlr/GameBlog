@@ -191,6 +191,9 @@ interface Tween {
 }
 
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+/** 빠르게 돌다 천천히 멈춘다 (룰렛) */
+const easeOutQuart = (t: number) => 1 - (1 - t) ** 4;
+const TURN = Math.PI * 2;
 
 /** 판 위의 기물 하나 */
 interface PieceObject {
@@ -218,6 +221,10 @@ export class ChessView {
   private readonly squareColors: Color[] = [];
   private readonly pieces = new Map<number, PieceObject>();
   private readonly pieceRoot = new Group();
+  /** 돌아가는 판: 받침·칸·표시·기물을 함께 담는다. */
+  private readonly table = new Group();
+  /** 판 아래 잉크 판: 판과 함께 돌고 줄지만, 늘 오른쪽 아래로 비껴 있다. */
+  private readonly drop: Mesh;
   private readonly geometries = new Map<number, { fill: BufferGeometry; hull: BufferGeometry }>();
   private readonly whiteMaterial: MeshToonMaterial;
   private readonly blackMaterial: MeshToonMaterial;
@@ -260,12 +267,13 @@ export class ChessView {
     const frameGeometry = new BoxGeometry(8.8, 0.36, 8.8).translate(0, -0.181, 0);
     const frame = new Mesh(frameGeometry, new MeshToonMaterial({ color: srgb('#e9dcc6'), gradientMap: gradient }));
     frame.receiveShadow = true;
-    this.scene.add(frame);
+    this.table.add(frame);
     const frameInk = new Mesh(new BoxGeometry(8.8 + OUTLINE * 4, 0.36 + OUTLINE * 4, 8.8 + OUTLINE * 4).translate(0, -0.181, 0), this.inkMaterial);
-    this.scene.add(frameInk);
+    this.table.add(frameInk);
     // 판 아래 그림자처럼 놓인 잉크 판 (종이를 오려 붙인 느낌)
-    const drop = new Mesh(new PlaneGeometry(9.2, 9.2).rotateX(-Math.PI / 2).translate(0.18, -0.4, 0.26), new MeshBasicMaterial({ color: srgb(INK) }));
-    this.scene.add(drop);
+    this.drop = new Mesh(new PlaneGeometry(9.2, 9.2).rotateX(-Math.PI / 2), new MeshBasicMaterial({ color: srgb(INK) }));
+    this.drop.position.set(0.18, -0.4, 0.26);
+    this.scene.add(this.drop);
 
     const squareGeometry = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     this.squares = new InstancedMesh(squareGeometry, new MeshToonMaterial({ gradientMap: gradient }), 64);
@@ -278,7 +286,7 @@ export class ChessView {
       this.squareColors.push(srgb((fileOf(sq) + rankOf(sq)) % 2 === 0 ? DARK_SQUARE : LIGHT_SQUARE));
       this.squares.setColorAt(sq, this.squareColors[sq]);
     }
-    this.scene.add(this.squares);
+    this.table.add(this.squares);
 
     // 갈 수 있는 칸 표시: 빈 칸은 점, 잡을 수 있는 칸은 고리
     const markMaterial = new MeshBasicMaterial({ color: srgb(INK), transparent: true, opacity: 0.38, depthWrite: false });
@@ -291,10 +299,11 @@ export class ChessView {
       dot.renderOrder = ring.renderOrder = 1;
       this.dots.push(dot);
       this.rings.push(ring);
-      this.scene.add(dot, ring);
+      this.table.add(dot, ring);
     }
 
-    this.scene.add(this.pieceRoot);
+    this.table.add(this.pieceRoot);
+    this.scene.add(this.table);
   }
 
   private geometryOf(type: number) {
@@ -409,6 +418,37 @@ export class ChessView {
       king.group.rotation.z = side * k * 1.35;
       king.group.position.y = Math.max(0, k) * 0.18;
     });
+  }
+
+  /**
+   * 판을 돌리지 않고 `facing` 색이 카메라 쪽(앞)에 오게 놓는다.
+   * 1이면 백이 앞(처음 모습), -1이면 흑이 앞이다.
+   */
+  setFacing(facing: 1 | -1): void {
+    this.turnTable(facing > 0 ? 0 : Math.PI, 1);
+  }
+
+  private turnTable(angle: number, scale: number): void {
+    this.table.rotation.y = this.drop.rotation.y = angle;
+    this.table.scale.setScalar(scale);
+    this.drop.scale.setScalar(scale);
+  }
+
+  /**
+   * 룰렛처럼 판을 한 바퀴 넘게 돌려 `facing` 색이 앞에 오게 멈춘다.
+   * 도는 동안 판 모서리가 화면 밖으로 나가지 않게 각에 맞춰 판을 줄인다.
+   */
+  spin(facing: 1 | -1, seconds: number, turns = 1): Promise<void> {
+    const start = this.table.rotation.y;
+    const target = facing > 0 ? 0 : Math.PI;
+    const least = start + turns * TURN;
+    const end = least + ((((target - least) % TURN) + TURN) % TURN);
+    return this.tween(seconds, (t) => {
+      const angle = start + (end - start) * easeOutQuart(t);
+      // 정사각형 판을 θ만큼 돌리면 가로 폭이 |cosθ|+|sinθ|배가 된다.
+      const fit = 1 / (Math.abs(Math.cos(angle)) + Math.abs(Math.sin(angle)));
+      this.turnTable(angle, Math.min(fit, 1 - Math.sin(Math.PI * t) * 0.06));
+    }).then(() => this.setFacing(facing));
   }
 
   /** 컴퓨터가 생각하는 동안 그 색(컴퓨터가 맡은 색)의 킹이 갸웃거린다. 0이면 멈춘다. */
