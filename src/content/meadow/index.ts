@@ -4,6 +4,7 @@ import type { Graphics } from '../../engine/render/graphics';
 import { CameraRig } from '../common/cameraRig';
 import { defineCharacterMeshes } from '../common/character/characterGraphics';
 import { GrassLayer } from './graphics/grassLayer';
+import { RainLayer } from './graphics/rainLayer';
 import { defineMeadowMeshes } from './graphics/meshes';
 import { SkyTvLayer } from './graphics/skyTvLayer';
 import { MEADOW_CENTER, MEADOW_GROUND } from './objects/meadowTerrain';
@@ -11,7 +12,7 @@ import { MEADOW_GROUND_COLOR, MeadowWorld } from './world';
 
 /**
  * 바람 부는 넓은 초원. 언덕진 분지를 빽빽한 잔디가 덮고, 바람 물결이 잔디를 눕히며 지나간다.
- * 하늘에는 플레이어 둘레에 절차적으로 스폰되는 텔레비전들이 떠 있다.
+ * 하늘에는 플레이어 둘레에 절차적으로 스폰되는 검은 텔레비전들이 떠 있고, 바람에 비스듬히 비가 내린다.
  * 캐릭터가 걸어 다니면 잔디가 갈라진다. 게임 규칙은 `MeadowWorld`가, 그래픽 등록은 `graphics/`가 맡는다.
  */
 export const meadowScene: SceneDefinition = {
@@ -26,6 +27,7 @@ class MeadowScene implements SceneInstance {
   private readonly camera = new CameraRig(this.world.player.position, MEADOW_CENTER, MEADOW_GROUND);
   private readonly grass = new GrassLayer(MEADOW_GROUND_COLOR);
   private readonly skyTvs = new SkyTvLayer();
+  private readonly rain = new RainLayer();
   private direction: Vec3 = [0, 0, 0];
 
   readonly debug = { world: this.world, camera: this.camera };
@@ -36,6 +38,8 @@ class MeadowScene implements SceneInstance {
     graphics.setSkybox(null);
     graphics.addLayer(this.skyTvs);
     graphics.addLayer(this.grass);
+    // 비는 반투명이라 불투명한 텔레비전·잔디 다음에 그린다.
+    graphics.addLayer(this.rain);
   }
 
   applyControls({ forward, strafe, lookX, lookY }: Controls): void {
@@ -55,7 +59,9 @@ class MeadowScene implements SceneInstance {
 
   frame(alpha: number) {
     const world = this.world;
-    this.grass.set(world.windFrame(alpha), world.grassPusher(alpha));
+    const wind = world.windFrame(alpha);
+    this.grass.set(wind, world.grassPusher(alpha));
+    this.rain.set(wind);
     this.skyTvs.set(world.skyTvList(), world.time);
     return {
       items: world.buildDrawList(alpha),

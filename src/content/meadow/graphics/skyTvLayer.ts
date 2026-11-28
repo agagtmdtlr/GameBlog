@@ -20,8 +20,14 @@ import { createTvPartGeometries } from '../../common/tv/tvGraphics';
 import { TV_SHAPE } from '../../common/tv/tvShape';
 import { growScale, type SkyTv } from '../objects/skyTvs';
 
-/** 하늘 텔레비전의 나무 색 (선형 RGB). 텔레비전마다 `SkyTv.tint`를 곱한다. */
-const WOOD_COLOR: Vec3 = [0.2, 0.09, 0.035];
+/**
+ * 하늘 텔레비전은 검은 플라스틱 브라운관이다 (2026-11-28 사용자 요청, 사진을 보여 줌). 선형 RGB.
+ * 몸통은 텔레비전마다 `SkyTv.tint`를 곱하고, 테·손잡이는 몸통보다 조금 밝으며, 조작판·스피커는 더 검다.
+ * 검은 몸통은 빛을 거의 받지 않으므로, 형태는 셰이더의 광택(하늘 반사와 하이라이트)이 드러낸다.
+ */
+const BODY_COLOR: Vec3 = [0.016, 0.016, 0.018];
+const TRIM_COLOR: Vec3 = [0.024, 0.024, 0.027];
+const DARK_COLOR: Vec3 = [0.007, 0.007, 0.008];
 /** 채도. 흐린 날 빛에 맞춰 잔디(0.7)보다 조금 높게 둔다. */
 const SATURATION = 0.8;
 const INITIAL_CAPACITY = 512;
@@ -45,9 +51,9 @@ function paint(geometry: BufferGeometry, color: Vec3, part: number): BufferGeome
 function tvGeometry(): BufferGeometry {
   const parts = createTvPartGeometries();
   const painted = [
-    paint(parts.wood, WOOD_COLOR, 0),
-    paint(parts.trim, TV_SHAPE.trimColor, 1),
-    paint(parts.dark, TV_SHAPE.darkColor, 2),
+    paint(parts.wood, BODY_COLOR, 0),
+    paint(parts.trim, TRIM_COLOR, 1),
+    paint(parts.dark, DARK_COLOR, 2),
     paint(parts.screen, TV_SHAPE.screenColor, 3),
   ];
   const merged = mergeGeometries(painted);
