@@ -7,6 +7,7 @@ import { CHESS_RECORDS, emptyChessStats, type ChessPlay, type ChessProgress, typ
 import {
   BISHOP,
   BLACK,
+  colorLetter,
   colorOf,
   isPromotionChoice,
   KNIGHT,
@@ -15,28 +16,32 @@ import {
   PAWN,
   Position,
   QUEEN,
-  replay,
+  replayRoulette,
   ROOK,
   typeOf,
   WHITE,
+  type Color,
   type Move,
   type PromotionType,
+  type RouletteLog,
   type Status,
 } from './rules';
 
 /** 컴퓨터가 수를 고르는 데 걸리는 시간이 이보다 짧으면 이만큼은 기다린다 (ms). 너무 빨리 두면 정신없다. */
-const MIN_THINK_MS = 450;
+const MIN_THINK_MS = 400;
 /** 판이 끝나고 표시가 뜰 때까지 (ms) */
 const BANNER_DELAY_MS = 900;
+/** 룰렛이 도는 시간 (ms). style.css의 `.chess-wheel-disk` transition과 같게 둔다. */
+const SPIN_MS = 1100;
+/** 룰렛이 멈춘 뒤 결과를 보여 주는 시간 (ms) */
+const SPIN_HOLD_MS = 250;
 
 const ICON_HOME =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5M5.5 9.5V20h5v-5.5h3V20h5V9.5"/></svg>';
 const ICON_AGAIN =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>';
-const ICON_UNDO =
-  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
-const ICON_PAWN =
-  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3"/><path d="M9.5 11h5L16 18H8ZM6 21h12"/></svg>';
+/** 룰렛 칸의 폰 그림 (가운데 기준) */
+const PAWN_PATH = 'M0 -9.6a3.2 3.2 0 1 0 0.01 0ZM-2.8 -4.5h5.6L4.4 3.5h-8.8ZM-6 7h12';
 
 const PROMOTION_ICONS: Record<PromotionType, string> = {
   [QUEEN]:
@@ -55,6 +60,20 @@ const PROMOTION_LABELS: Record<PromotionType, string> = {
   [KNIGHT]: '나이트',
 };
 
+/** 룰렛 판: 위 반쪽이 백, 아래 반쪽이 흑. 바늘은 위에 고정되고 판이 돈다. */
+const WHEEL_SVG = `<svg class="chess-wheel-face" viewBox="-30 -30 60 60" aria-hidden="true">
+  <g class="chess-wheel-disk">
+    <path d="M-27 0A27 27 0 0 1 27 0Z" fill="#fffaf0"/>
+    <path d="M27 0A27 27 0 0 1 -27 0Z" fill="#4b3f63"/>
+    <path d="${PAWN_PATH}" transform="translate(0 -12) scale(0.85)" fill="none" stroke="#2a221e" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${PAWN_PATH}" transform="translate(0 12) rotate(180) scale(0.85)" fill="none" stroke="#fffaf0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M-27 0H27" stroke="#2a221e" stroke-width="2.4"/>
+  </g>
+  <circle r="27" fill="none" stroke="#2a221e" stroke-width="3"/>
+  <circle r="3.6" fill="#2a221e"/>
+</svg>
+<svg class="chess-wheel-pointer" viewBox="0 0 20 16" aria-hidden="true"><path d="M2 2h16L10 14Z"/></svg>`;
+
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, parent: HTMLElement): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   node.className = className;
@@ -66,6 +85,8 @@ type ChessBook = RecordBook<ChessStats, ChessPlay, ChessProgress>;
 
 /** 저장에 실패해도 게임은 계속한다. */
 const warn = (error: unknown) => console.warn('체스 기록을 저장하지 못했습니다.', error);
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** 컴퓨터 상대: 워커에서 고르고, 워커를 쓸 수 없으면 화면 스레드에서 고른다. */
 function createOpponent() {
@@ -86,29 +107,26 @@ function createOpponent() {
     worker = null;
   }
   let nextId = 1;
-  return (moves: readonly string[]): Promise<string | null> => {
+  return (log: RouletteLog): Promise<string | null> => {
     const id = nextId++;
-    if (!worker) return new Promise((resolve) => setTimeout(() => resolve(chooseHere(moves)), 0));
+    if (!worker) return new Promise((resolve) => setTimeout(() => resolve(chooseHere(log)), 0));
     return new Promise((resolve) => {
       // 워커가 도중에 죽으면 화면에서 다시 고른다.
-      waiting.set(id, (move) => resolve(move ?? chooseHere(moves)));
-      const request: AiRequest = { id, moves: [...moves] };
+      waiting.set(id, (move) => resolve(move ?? chooseHere(log)));
+      const request: AiRequest = { id, log: { ...log, moves: [...log.moves] } };
       worker!.postMessage(request);
     });
   };
 }
 
-function resultOf(status: Status, position: Position): ChessResult {
-  if (status !== 'checkmate') return 'draw';
-  // 체크메이트당한 쪽이 지금 차례다. 사람은 백이다.
-  return position.turn === BLACK ? 'win' : 'loss';
-}
+/** 끝 표시: 이김, 체크메이트로 짐, 킹이 잡혀 짐, 비김 */
+type Ending = 'win' | 'checkmate' | 'bang' | 'draw';
 
 function startChess(root: HTMLElement): void {
   const shell = element('div', 'chess', root);
   const canvas = element('canvas', 'chess-canvas', shell);
   canvas.setAttribute('role', 'application');
-  canvas.setAttribute('aria-label', '체스 판. 백 기물을 누르고 갈 칸을 누른다');
+  canvas.setAttribute('aria-label', '룰렛 체스 판. 백 기물을 누르고 갈 칸을 누른다. 수마다 룰렛이 다음 차례를 정한다');
 
   const home = element('a', 'chess-button chess-home', shell);
   home.href = './';
@@ -118,19 +136,13 @@ function startChess(root: HTMLElement): void {
   again.type = 'button';
   again.setAttribute('aria-label', '처음부터');
   again.innerHTML = ICON_AGAIN;
-  const undo = element('button', 'chess-button chess-undo', shell);
-  undo.type = 'button';
-  undo.setAttribute('aria-label', '한 수 무르기');
-  undo.innerHTML = ICON_UNDO;
 
-  // 차례 표시: 백 폰, 흑 폰 그림. 차례인 쪽이 튀어나오고, 컴퓨터가 생각하면 흔들린다.
-  const turns = element('div', 'chess-turns', shell);
-  const whiteTurn = element('div', 'chess-turn is-white', turns);
-  whiteTurn.innerHTML = ICON_PAWN;
-  whiteTurn.setAttribute('aria-label', '내 차례');
-  const blackTurn = element('div', 'chess-turn is-black', turns);
-  blackTurn.innerHTML = ICON_PAWN;
-  blackTurn.setAttribute('aria-label', '컴퓨터 차례');
+  // 차례 룰렛: 수를 둘 때마다 돌아 다음 차례(백·흑)를 바늘로 가리킨다.
+  const wheel = element('div', 'chess-wheel', shell);
+  wheel.innerHTML = WHEEL_SVG;
+  wheel.setAttribute('role', 'img');
+  const disk = wheel.querySelector<SVGGElement>('.chess-wheel-disk')!;
+  let wheelAngle = 0;
 
   const picker = element('div', 'chess-picker', shell);
   picker.hidden = true;
@@ -148,16 +160,18 @@ function startChess(root: HTMLElement): void {
   }
   picker.addEventListener('click', () => pickPromotion?.(null));
 
-  const banners: Record<ChessResult, HTMLElement | null> = { win: null, loss: null, draw: null, restart: null };
-  for (const [result, text] of [
+  const banners = new Map<Ending, HTMLElement>();
+  for (const [ending, text] of [
     ['win', 'YOU WIN!'],
-    ['loss', 'CHECKMATE'],
+    ['checkmate', 'CHECKMATE'],
+    ['bang', 'BANG!'],
     ['draw', 'DRAW'],
   ] as const) {
-    const banner = element('div', `chess-banner is-${result}`, shell);
-    banner.append(createRansomCanvas(text, { letterSize: 72, seed: `chess-${result}` }));
+    const banner = element('div', `chess-banner is-${ending}`, shell);
+    banner.append(createRansomCanvas(text, { letterSize: 72, seed: `chess-${ending}` }));
     banner.hidden = true;
-    banners[result] = banner;
+    banner.addEventListener('click', () => (banner.hidden = true));
+    banners.set(ending, banner);
   }
 
   const view = new ChessView(canvas);
@@ -165,48 +179,77 @@ function startChess(root: HTMLElement): void {
 
   let position = new Position();
   let moves: string[] = [];
-  let takebacks = 0;
+  let movers = '';
   let startedAt = Date.now();
   let recorded = false;
   let over = false;
   let book: ChessBook | null = null;
   let stats = emptyChessStats();
-  /** 기물이 움직이는 중 */
-  let animating = false;
-  /** 컴퓨터에게 묻는 번호. 무르거나 새로 시작하면 늘려서 늦게 온 답을 버린다. */
-  let turnToken = 0;
+  /** 기물이 움직이거나 룰렛이 도는 중 */
+  let busy = false;
+  /** 판 번호. 새로 시작하면 늘려서 늦게 끝난 움직임·컴퓨터 답을 버린다. */
+  let gameToken = 0;
   let thinking = false;
   let selected = -1;
   let legal: Move[] = [];
 
+  const log = (): RouletteLog => ({ moves, movers, next: colorLetter(position.turn) });
+
+  const attackedKings = () =>
+    ([WHITE, BLACK] as Color[])
+      .filter((color) => position.kingSquare(color) >= 0 && position.inCheck(color))
+      .map((color) => position.kingSquare(color));
+
   const highlight = () => {
     const last = moves.length ? moves[moves.length - 1] : null;
     const lastMove = last ? [parseSquare(last.slice(0, 2)), parseSquare(last.slice(2, 4))] : [];
-    const check = position.inCheck() ? position.kingSquare(position.turn) : -1;
     const targets = legal
       .filter((move) => move.from === selected && !(move.promotion && move.promotion !== QUEEN))
-      .map((move) => ({ square: move.to, capture: position.board[move.to] !== 0 || (move.to === position.enPassant && typeOf(position.board[move.from]) === PAWN) }));
-    view.setHighlights({ selected, targets, lastMove, check });
+      .map((move) => ({
+        square: move.to,
+        capture: position.board[move.to] !== 0 || (move.to === position.enPassant && typeOf(position.board[move.from]) === PAWN),
+      }));
+    view.setHighlights({ selected, targets, lastMove, checks: attackedKings() });
   };
 
-  const showTurn = () => {
-    whiteTurn.classList.toggle('is-active', !over && position.turn === WHITE);
-    blackTurn.classList.toggle('is-active', !over && position.turn === BLACK);
-    blackTurn.classList.toggle('is-thinking', thinking);
-    undo.disabled = over || moves.length === 0;
+  /** 룰렛을 `color` 쪽에 멈추게 돌린다. `spin`이 거짓이면 돌지 않고 바로 가리킨다. */
+  const pointWheel = async (color: Color, spin: boolean): Promise<void> => {
+    // 판을 r도 돌리면 판의 -r도 자리가 바늘(위) 아래에 온다. 백 반쪽은 -70~70도, 흑 반쪽은 110~250도에서 멈춘다.
+    const target = (color === WHITE ? 0 : 180) + (Math.random() * 140 - 70);
+    const current = ((wheelAngle % 360) + 360) % 360;
+    const turn = (((-target - current) % 360) + 360) % 360;
+    wheelAngle += turn + (spin ? 720 : 0);
+    disk.style.transition = spin ? '' : 'none';
+    disk.style.transform = `rotate(${wheelAngle}deg)`;
+    wheel.setAttribute('aria-label', color === WHITE ? '내 차례' : '컴퓨터 차례');
+    if (!spin) {
+      wheel.classList.toggle('is-black', color === BLACK);
+      return;
+    }
+    wheel.classList.add('is-spinning');
+    await wait(SPIN_MS);
+    wheel.classList.remove('is-spinning');
+    wheel.classList.toggle('is-black', color === BLACK);
+    wheel.classList.add('is-landed');
+    await wait(SPIN_HOLD_MS);
+    wheel.classList.remove('is-landed');
+  };
+
+  const showState = () => {
+    wheel.classList.toggle('is-thinking', thinking);
     shell.classList.toggle('is-over', over);
   };
 
   const saveProgress = () => {
     if (!book || over) return;
     if (moves.length === 0) book.clearProgress().catch(warn);
-    else book.saveProgress({ moves: [...moves], takebacks, startedAt }).catch(warn);
+    else book.saveProgress({ moves: [...moves], movers, next: colorLetter(position.turn), startedAt }).catch(warn);
   };
 
   const finishPlay = (result: ChessResult, reason: Status) => {
     if (recorded || moves.length === 0 || !book) return;
     recorded = true;
-    const play: ChessPlay = { result, reason, moves: [...moves], takebacks, fen: position.fen() };
+    const play: ChessPlay = { result, reason, moves: [...moves], movers, fen: position.fen() };
     book
       .record(play, { startedAt, endedAt: Date.now() })
       .then((next) => (stats = next))
@@ -215,92 +258,115 @@ function startChess(root: HTMLElement): void {
   };
 
   const hideBanners = () => {
-    for (const banner of Object.values(banners)) if (banner) banner.hidden = true;
+    for (const banner of banners.values()) banner.hidden = true;
   };
 
-  /** 판이 끝났는지 보고, 끝났으면 기록을 남기고 표시를 띄운다. */
-  const checkEnd = (): boolean => {
-    const status = position.status();
-    if (status === 'playing') return false;
+  /** 판을 끝낸다. `loser`가 `null`이면 비긴 판이다. */
+  const endGame = (reason: Status, loser: Color | null) => {
     over = true;
-    const result = resultOf(status, position);
-    finishPlay(result, status);
-    if (status === 'checkmate') view.topple(position.kingSquare(position.turn));
+    thinking = false;
+    view.setThinking(false);
+    const result: ChessResult = loser === null ? 'draw' : loser === BLACK ? 'win' : 'loss';
+    finishPlay(result, reason);
+    if (reason === 'checkmate' && loser !== null) view.topple(position.kingSquare(loser));
+    const ending: Ending = result === 'win' ? 'win' : result === 'draw' ? 'draw' : reason === 'captured' ? 'bang' : 'checkmate';
+    const token = gameToken;
     window.setTimeout(() => {
-      if (!over) return;
-      const banner = banners[result];
-      if (banner) banner.hidden = false;
+      if (token === gameToken) banners.get(ending)!.hidden = false;
     }, BANNER_DELAY_MS);
-    showTurn();
-    return true;
+    legal = [];
+    selected = -1;
+    highlight();
+    showState();
+  };
+
+  /** 룰렛이 고른 편의 차례를 시작한다. 판이 끝났는지, 둘 수가 있는지 먼저 본다. */
+  const beginTurn = async () => {
+    const status = position.rouletteStatus();
+    if (status === 'checkmate') return endGame(status, position.turn);
+    if (status !== 'playing') return endGame(status, null);
+    if (position.allowedMoves().length === 0) {
+      // 둘 수가 하나도 없으면 차례를 넘긴다. 두 편 다 없으면 비긴다.
+      const other = -position.turn as Color;
+      position.turn = other;
+      if (position.allowedMoves().length === 0) return endGame('stalemate', null);
+      await pointWheel(other, false);
+    }
+    legal = position.turn === WHITE ? position.allowedMoves() : [];
+    selected = -1;
+    highlight();
+    showState();
+    saveProgress();
+    if (position.turn === BLACK) void computerTurn();
   };
 
   const computerTurn = async () => {
-    const token = ++turnToken;
+    const token = gameToken;
     thinking = true;
     view.setThinking(true);
-    showTurn();
+    showState();
     const began = performance.now();
-    const uci = await ask(moves);
-    const wait = MIN_THINK_MS - (performance.now() - began);
-    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-    if (token !== turnToken) return;
+    const uci = await ask(log());
+    const rest = MIN_THINK_MS - (performance.now() - began);
+    if (rest > 0) await wait(rest);
+    if (token !== gameToken) return;
     thinking = false;
     view.setThinking(false);
-    const move = uci ? position.findMove(uci) : null;
-    if (!move) {
-      showTurn();
-      return;
-    }
-    await playMove(move);
+    showState();
+    const move = uci ? position.findAllowed(uci) : null;
+    if (move) await playMove(move);
   };
 
   const playMove = async (move: Move) => {
-    const token = turnToken;
+    const token = gameToken;
+    const mover = position.turn;
     selected = -1;
     legal = [];
     const effect = position.make(move);
     moves.push(moveToUci(move));
+    movers += colorLetter(mover);
     highlight();
-    showTurn();
-    animating = true;
+    busy = true;
     await view.play(effect);
-    animating = false;
-    if (token !== turnToken) return;
-    if (checkEnd()) return;
+    if (token !== gameToken) return;
+    // 상대 킹을 잡으면 바로 이긴다.
+    if (position.kingSquare(-mover as Color) < 0) {
+      busy = false;
+      return endGame('captured', -mover as Color);
+    }
+    // 룰렛: 반반으로 다음 차례를 정한다.
+    const next: Color = Math.random() < 0.5 ? mover : (-mover as Color);
+    position.turn = next;
     saveProgress();
-    legal = position.turn === WHITE ? position.legalMoves() : [];
-    highlight();
-    showTurn();
-    if (position.turn === BLACK) void computerTurn();
+    await pointWheel(next, true);
+    if (token !== gameToken) return;
+    busy = false;
+    await beginTurn();
   };
 
-  /** 판을 처음부터 `list`의 수까지 다시 두고 그대로 그린다. */
-  const setMoves = (list: readonly string[]): boolean => {
-    const next = replay(list);
+  /** 판을 `progress`(없으면 처음 판)로 놓는다. */
+  const setGame = (progress?: RouletteLog): boolean => {
+    const next = progress ? replayRoulette(progress) : new Position();
     if (!next) return false;
-    turnToken++;
+    gameToken++;
     thinking = false;
+    busy = false;
     view.setThinking(false);
     position = next;
-    moves = [...list];
+    moves = progress ? [...progress.moves] : [];
+    movers = progress?.movers ?? '';
     over = false;
-    selected = -1;
-    view.setBoard(position.board);
-    legal = position.turn === WHITE ? position.legalMoves() : [];
+    recorded = false;
     hideBanners();
-    highlight();
-    showTurn();
-    if (position.turn === BLACK) void computerTurn();
+    view.setBoard(position.board);
+    void pointWheel(position.turn, false);
+    void beginTurn();
     return true;
   };
 
   const newGame = () => {
-    takebacks = 0;
     startedAt = Date.now();
-    recorded = false;
-    setMoves([]);
-    saveProgress();
+    setGame();
   };
 
   const choosePromotion = () =>
@@ -314,7 +380,7 @@ function startChess(root: HTMLElement): void {
     });
 
   const press = async (square: number) => {
-    if (!book || over || animating || thinking || position.turn !== WHITE || pickPromotion) return;
+    if (!book || over || busy || thinking || position.turn !== WHITE || pickPromotion) return;
     const piece = square >= 0 ? position.board[square] : 0;
     if (selected >= 0 && square !== selected) {
       const candidates = legal.filter((move) => move.from === selected && move.to === square);
@@ -348,32 +414,19 @@ function startChess(root: HTMLElement): void {
   });
   canvas.addEventListener('pointercancel', () => (down = null));
 
-  // 끝난 판의 표시는 누르면 닫혀서 판을 볼 수 있다.
-  for (const banner of Object.values(banners)) banner?.addEventListener('click', () => (banner.hidden = true));
-
   again.addEventListener('click', () => {
-    if (!book || animating) return;
+    if (!book) return;
     if (!over) finishPlay('restart', 'playing');
     pickPromotion?.(null);
     newGame();
-  });
-
-  undo.addEventListener('click', () => {
-    if (!book || animating || over || moves.length === 0) return;
-    pickPromotion?.(null);
-    // 내 차례로 돌아간다: 컴퓨터가 생각 중이면 내 수 하나, 아니면 컴퓨터 수와 내 수 둘을 무른다.
-    const back = position.turn === BLACK ? 1 : Math.min(2, moves.length);
-    takebacks++;
-    setMoves(moves.slice(0, moves.length - back));
-    saveProgress();
   });
 
   const resize = () => view.resize(shell.clientWidth, shell.clientHeight);
   new ResizeObserver(resize).observe(shell);
   resize();
   view.setBoard(position.board);
+  void pointWheel(WHITE, false);
   highlight();
-  showTurn();
 
   let last = performance.now();
   const frame = (now: number) => {
@@ -395,10 +448,8 @@ function startChess(root: HTMLElement): void {
       warn(error);
     }
     book = opened;
-    if (progress && setMoves(progress.moves)) {
-      takebacks = progress.takebacks;
-      startedAt = progress.startedAt;
-    } else newGame();
+    if (progress && setGame(progress)) startedAt = progress.startedAt;
+    else newGame();
   })();
 
   if (import.meta.env.DEV) {
@@ -408,22 +459,22 @@ function startChess(root: HTMLElement): void {
         get position() {
           return position;
         },
-        get moves() {
-          return moves;
+        get log() {
+          return log();
         },
         get stats() {
           return stats;
         },
         book: () => book,
         press,
-        /** 개발 확인용: 처음부터 UCI 수들을 둔 판으로 바꾼다. */
-        setMoves,
+        /** 개발 확인용: 판 기록으로 판을 바꾼다. */
+        setGame,
       },
     });
   }
 }
 
-/** 체스: 3D 판에서 백을 잡고 컴퓨터(흑)와 둔다. */
+/** 룰렛 체스: 3D 판에서 백을 잡고 컴퓨터(흑)와 둔다. 수마다 룰렛이 다음 차례를 정한다. */
 export const chessGame: GameDefinition = {
   id: 'chess',
   start(root) {

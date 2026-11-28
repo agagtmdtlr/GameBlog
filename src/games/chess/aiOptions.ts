@@ -1,13 +1,15 @@
 import { chooseMove, type SearchOptions } from './ai';
-import { moveToUci, replay } from './rules';
+import { moveToUci, replayRoulette, type RouletteLog } from './rules';
 
-/** 컴퓨터 상대의 세기: 4반수까지, 0.7초 안에 보고, 최선과 15센티폰 안의 수에서 골라 판마다 다르게 둔다. */
-export const AI_OPTIONS: SearchOptions = { maxDepth: 4, timeMs: 700, spread: 15 };
+/**
+ * 컴퓨터 세기: 룰렛까지 3단계를 0.8초 안에 보고(깊이 1은 늘 끝까지),
+ * 최선과 15센티폰 안의 수에서 골라 판마다 다르게 둔다.
+ */
+export const AI_OPTIONS: SearchOptions = { maxDepth: 3, timeMs: 800, spread: 15 };
 
 export interface AiRequest {
   readonly id: number;
-  /** 처음부터 둔 수 (UCI) */
-  readonly moves: readonly string[];
+  readonly log: RouletteLog;
 }
 
 export interface AiReply {
@@ -16,9 +18,9 @@ export interface AiReply {
   readonly move: string | null;
 }
 
-/** 워커를 쓸 수 없을 때 화면 스레드에서 고른다. */
-export function chooseHere(moves: readonly string[]): string | null {
-  const position = replay(moves);
+/** 판 기록에서 다음 차례인 편의 수를 고른다. 워커와, 워커를 쓸 수 없을 때의 화면 스레드가 함께 쓴다. */
+export function chooseHere(log: RouletteLog): string | null {
+  const position = replayRoulette(log);
   const result = position ? chooseMove(position, AI_OPTIONS) : null;
   return result?.move ? moveToUci(result.move) : null;
 }
