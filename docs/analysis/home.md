@@ -90,7 +90,7 @@ git log --oneline e03a7f7..HEAD -- src/home src/main.ts index.html
 
 | 컷 | 콘텐츠 | 더한 날 | 미리 보기 |
 |---|---|---|---|
-| `a` | 체스 | 2026-11-28 | `chess.jpg`, 3D 판 화면 캡처 ([chess.md](chess.md)) |
+| `a` | 룰렛 체스 | 2026-11-28 | `chess.jpg`, 3D 판 화면 캡처 ([chess.md](chess.md)) |
 | `b` | 뱀 | 2026-11-28 | `snake.jpg`, 게임 화면 캡처 ([snake.md](snake.md)) |
 | `c` | 바람 부는 초원 | 2026-11-25 | `meadow.jpg` ([meadow.md](meadow.md)) |
 | `d` | 2048 | 2026-11-25 | `2048.svg`, 판 그림 ([game2048.md](game2048.md)) |

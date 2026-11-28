@@ -205,8 +205,8 @@ export interface Highlights {
   readonly targets: readonly { readonly square: number; readonly capture: boolean }[];
   /** 마지막 수의 두 칸 */
   readonly lastMove: readonly number[];
-  /** 체크당한 킹의 칸. 없으면 -1 */
-  readonly check: number;
+  /** 공격받는 킹의 칸들 (룰렛 체스는 어느 편이 둘지 몰라 두 킹을 다 본다) */
+  readonly checks: readonly number[];
 }
 
 /** 체스 판 그리기: 판, 기물, 표시, 기물 움직임, 눌린 칸 찾기 */
@@ -420,7 +420,7 @@ export class ChessView {
     for (let sq = 0; sq < 64; sq++) {
       color.copy(this.squareColors[sq]);
       if (highlights.lastMove.includes(sq)) color.lerp(srgb(LAST_MOVE), 0.6);
-      if (sq === highlights.check) color.lerp(srgb(CHECK), 0.85);
+      if (highlights.checks.includes(sq)) color.lerp(srgb(CHECK), 0.85);
       if (sq === highlights.selected) color.lerp(srgb(SELECTED), 0.85);
       this.squares.setColorAt(sq, color);
     }

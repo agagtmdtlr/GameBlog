@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { chooseMove, evaluate } from './ai';
 import { CHESS_RECORDS, emptyChessStats, type ChessPlay } from './records';
-import { isPromotionChoice, moveToUci, parseSquare, Position, replay, START_FEN } from './rules';
+import { BLACK, isPromotionChoice, moveToUci, parseSquare, Position, replay, replayRoulette, START_FEN } from './rules';
 
 /** 깊이 `depth`까지 둘 수 있는 수의 끝 개수 (규칙 검사용 표준 값과 맞춘다) */
 function perft(position: Position, depth: number): number {
@@ -98,26 +98,89 @@ describe('체스 규칙', () => {
   });
 });
 
-describe('컴퓨터 상대', () => {
-  it('한 수 만에 체크메이트할 수 있으면 그 수를 둔다', () => {
-    const position = new Position('6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1');
-    const result = chooseMove(position, { maxDepth: 3, timeMs: 5000, random: fixedRandom });
-    expect(result.move && moveToUci(result.move)).toBe('d1d8');
+describe('룰렛 체스 규칙', () => {
+  it('기물은 방금 떠나온 칸으로 돌아갈 수 없다 (다른 수를 둔 뒤에도)', () => {
+    const once = replayRoulette({ moves: ['g1f3'], movers: 'w', next: 'w' })!;
+    expect(once.findAllowed('f3g1')).toBeNull();
+    expect(once.findAllowed('f3e5')).not.toBeNull();
+    const later = replayRoulette({ moves: ['g1f3', 'e7e5', 'e2e4'], movers: 'wbw', next: 'w' })!;
+    expect(later.findAllowed('f3g1')).toBeNull();
+    const moved = replayRoulette({ moves: ['g1f3', 'f3d4'], movers: 'ww', next: 'w' })!;
+    expect(moved.findAllowed('d4f3')).toBeNull();
+    expect(moved.findAllowed('d4b5')).not.toBeNull();
+  });
+
+  it('자기 킹을 공격받는 칸에 두는 수도 둘 수 있고, 그러면 상대가 킹을 잡을 수 있다', () => {
+    const position = new Position('4k3/8/8/8/8/3q4/8/4K3 w - - 0 1');
+    expect(position.legalMoves().map(moveToUci)).not.toContain('e1e2');
+    position.make(position.findAllowed('e1e2')!);
+    position.turn = BLACK;
+    const capture = position.kingCapture();
+    expect(capture).not.toBeNull();
+    position.make(capture!);
+    expect(position.rouletteStatus()).toBe('captured');
+  });
+
+  it('룰렛이 체크당한 편을 골랐는데 피할 수 없으면 체크메이트, 공격한 편을 고르면 킹을 잡을 수 있다', () => {
+    const fools = { moves: ['f2f3', 'e7e5', 'g2g4', 'd8h4'], movers: 'wbwb' };
+    expect(replayRoulette({ ...fools, next: 'w' })!.rouletteStatus()).toBe('checkmate');
+    const again = replayRoulette({ ...fools, next: 'b' })!;
+    expect(again.rouletteStatus()).toBe('playing');
+    expect(moveToUci(again.kingCapture()!)).toBe('h4e1');
+  });
+
+  it('같은 편이 잇달아 두면 앙파상 칸은 자기 폰이 쓸 수 없다', () => {
+    const position = replayRoulette({ moves: ['e2e4'], movers: 'w', next: 'w' })!;
+    expect(position.findAllowed('d2e3')).toBeNull();
+    expect(position.findAllowed('f2e3')).toBeNull();
+  });
+
+  it('판 기록이 틀리면 다시 두지 않는다', () => {
+    expect(replayRoulette({ moves: ['e2e4'], movers: 'wb', next: 'w' })).toBeNull();
+    expect(replayRoulette({ moves: ['e7e5'], movers: 'w', next: 'w' })).toBeNull();
+    expect(replayRoulette({ moves: ['e7e5'], movers: 'b', next: 'w' })).not.toBeNull();
+  });
+});
+
+describe('컴퓨터 상대 (룰렛 기댓값 탐색)', () => {
+  it('상대 킹을 잡을 수 있으면 잡는다', () => {
+    const position = new Position('4k3/8/8/8/8/8/8/4RK2 w - - 0 1');
+    const result = chooseMove(position, { maxDepth: 2, timeMs: 5000, random: fixedRandom });
+    expect(result.move && moveToUci(result.move)).toBe('e1e8');
+  });
+
+  it('다음에 누가 두든 이기는 수보다 지금 킹을 잡는 수를 둔다 (무작위로 고를 때도)', () => {
+    const position = replayRoulette({ moves: ['f2f3', 'e7e5', 'g2g4', 'd8h4'], movers: 'wbwb', next: 'b' })!;
+    for (const random of [() => 0, () => 0.5, () => 0.99]) {
+      const result = chooseMove(position, { maxDepth: 3, timeMs: 5000, spread: 15, random });
+      expect(moveToUci(result.move!)).toBe('h4e1');
+    }
   });
 
   it('공짜로 잡을 수 있는 퀸을 잡는다', () => {
     const position = new Position('4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1');
-    const result = chooseMove(position, { maxDepth: 3, timeMs: 5000, random: fixedRandom });
+    const result = chooseMove(position, { maxDepth: 2, timeMs: 5000, random: fixedRandom });
     expect(result.move && moveToUci(result.move)).toBe('e4d5');
+  });
+
+  it('피할 수 있으면 상대가 킹을 잡을 수 있는 자리에 킹을 두지 않는다', () => {
+    const position = new Position('4k3/8/8/8/8/3q4/8/4K3 w - - 0 1');
+    const result = chooseMove(position, { maxDepth: 2, timeMs: 5000, random: fixedRandom });
+    const uci = result.move ? moveToUci(result.move) : '';
+    position.make(result.move!);
+    position.turn = BLACK;
+    expect(position.kingCapture(), uci).toBeNull();
   });
 
   it('탐색한 뒤 판이 처음 모습으로 돌아온다 (시간이 다 돼 멈춰도)', () => {
     const position = new Position();
-    chooseMove(position, { maxDepth: 3, timeMs: 5000, spread: 15, random: fixedRandom });
+    chooseMove(position, { maxDepth: 2, timeMs: 5000, spread: 15, random: fixedRandom });
     expect(position.fen()).toBe(START_FEN);
     let tick = 0;
-    chooseMove(position, { maxDepth: 6, timeMs: 1, now: () => tick++ });
+    const result = chooseMove(position, { maxDepth: 4, timeMs: 1, now: () => tick++ });
+    expect(result.depth).toBe(1);
     expect(position.fen()).toBe(START_FEN);
+    expect([...position.cameFrom].every((square) => square === -1)).toBe(true);
   });
 
   it('점수는 차례인 편 기준이다', () => {
@@ -130,35 +193,43 @@ describe('컴퓨터 상대', () => {
 });
 
 describe('체스 기록', () => {
-  const play = (result: ChessPlay['result'], moves: string[]): ChessPlay => ({
+  const play = (result: ChessPlay['result'], moves: string[], movers: string): ChessPlay => ({
     result,
-    reason: result === 'win' || result === 'loss' ? 'checkmate' : result === 'draw' ? 'stalemate' : 'playing',
+    reason: result === 'win' ? 'captured' : result === 'loss' ? 'checkmate' : result === 'draw' ? 'stalemate' : 'playing',
     moves,
-    takebacks: 1,
+    movers,
     fen: START_FEN,
   });
   const times = { startedAt: 0, endedAt: 1 };
 
-  it('판을 쌓아 승·패·무와 가장 빠른 승리를 센다', () => {
+  it('판을 쌓아 승·패·무와 가장 빠른 승리(내 수)를 센다', () => {
     let stats = emptyChessStats();
-    stats = CHESS_RECORDS.accumulate(stats, play('win', ['e2e4', 'e7e5', 'd1h5']), times);
-    stats = CHESS_RECORDS.accumulate(stats, play('loss', ['f2f3', 'e7e5', 'g2g4', 'd8h4']), times);
-    stats = CHESS_RECORDS.accumulate(stats, play('win', ['e2e4']), times);
-    stats = CHESS_RECORDS.accumulate(stats, play('draw', ['e2e4', 'e7e5']), times);
-    expect(stats).toEqual({ plays: 4, wins: 2, losses: 1, draws: 1, fastestWin: 1, totalMoves: 2 + 2 + 1 + 1, takebacks: 4 });
+    stats = CHESS_RECORDS.accumulate(stats, play('win', ['e2e4', 'd1h5', 'h5e8'], 'www'), times);
+    stats = CHESS_RECORDS.accumulate(stats, play('loss', ['f2f3', 'e7e5', 'g2g4', 'd8h4'], 'wbwb'), times);
+    stats = CHESS_RECORDS.accumulate(stats, play('win', ['e2e4', 'e7e5', 'd7d5', 'd1h5'], 'wbbw'), times);
+    stats = CHESS_RECORDS.accumulate(stats, play('draw', ['e2e4', 'e7e5'], 'wb'), times);
+    expect(stats).toEqual({ plays: 4, wins: 2, losses: 1, draws: 1, fastestWin: 2, totalMoves: 3 + 2 + 2 + 1 });
   });
 
-  it('저장된 값을 검사한다', () => {
+  it('저장된 값을 검사하고 형식 1을 옮긴다', () => {
     const migrate = CHESS_RECORDS.migrate!;
-    expect(migrate('play', 1, play('win', ['e2e4']))).toBeDefined();
-    expect(migrate('play', 1, { ...play('win', ['e2e4']), result: 'huh' })).toBeUndefined();
-    expect(migrate('play', 1, { ...play('win', ['e2e9']) })).toBeUndefined();
-    expect(migrate('progress', 1, { moves: ['e2e4', 'e7e5'], takebacks: 0, startedAt: 5 })).toBeDefined();
-    // 둘 수 없는 수, 빈 판, 이미 끝난 판은 이어 하지 않는다.
-    expect(migrate('progress', 1, { moves: ['e2e5'], takebacks: 0, startedAt: 5 })).toBeUndefined();
-    expect(migrate('progress', 1, { moves: [], takebacks: 0, startedAt: 5 })).toBeUndefined();
-    expect(migrate('progress', 1, { moves: ['f2f3', 'e7e5', 'g2g4', 'd8h4'], takebacks: 0, startedAt: 5 })).toBeUndefined();
+    expect(migrate('play', 2, play('win', ['e2e4'], 'w'))).toBeDefined();
+    expect(migrate('play', 2, { ...play('win', ['e2e4'], 'w'), result: 'huh' })).toBeUndefined();
+    expect(migrate('play', 2, play('win', ['e2e4'], 'wb'))).toBeUndefined();
+    expect(migrate('play', 2, play('win', ['e2e9'], 'w'))).toBeUndefined();
+    // 형식 1 판 기록은 번갈아 둔 것으로 옮긴다.
+    const old = { result: 'win', reason: 'checkmate', moves: ['e2e4', 'e7e5', 'd1h5'], takebacks: 2, fen: START_FEN };
+    expect(migrate('play', 1, old)).toEqual({ result: 'win', reason: 'checkmate', moves: old.moves, movers: 'wbw', fen: START_FEN });
+    expect(migrate('stats', 1, { plays: 3, wins: 1, takebacks: 4 })).toEqual({ ...emptyChessStats(), plays: 3, wins: 1 });
+    expect(migrate('progress', 1, { moves: ['e2e4'], takebacks: 0, startedAt: 5 })).toBeUndefined();
+    // 형식 2 하다 만 판: 다시 둘 수 있고 끝나지 않은 판만
+    expect(migrate('progress', 2, { moves: ['e2e4', 'g1f3'], movers: 'ww', next: 'b', startedAt: 5 })).toBeDefined();
+    expect(migrate('progress', 2, { moves: ['e2e4'], movers: 'b', next: 'w', startedAt: 5 })).toBeUndefined();
+    expect(migrate('progress', 2, { moves: [], movers: '', next: 'w', startedAt: 5 })).toBeUndefined();
+    expect(
+      migrate('progress', 2, { moves: ['f2f3', 'e7e5', 'g2g4', 'd8h4'], movers: 'wbwb', next: 'w', startedAt: 5 }),
+    ).toBeUndefined();
     expect(migrate('stats', 1, { plays: -1 })).toBeUndefined();
-    expect(migrate('stats', 2, emptyChessStats())).toBeUndefined();
+    expect(migrate('stats', 3, emptyChessStats())).toBeUndefined();
   });
 });

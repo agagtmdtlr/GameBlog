@@ -1,8 +1,10 @@
 /**
- * 컴퓨터 상대: 알파-베타 탐색(반복 깊이 늘리기, 잡기만 보는 정지 탐색)과 기물 값·자리 표로 수를 고른다.
+ * 룰렛 체스의 컴퓨터 상대: 기댓값 탐색(expectimax)으로 수를 고른다.
+ * 수를 둔 뒤에는 룰렛이 반반으로 차례를 정하므로, 수의 값은 "내가 또 둘 때의 값"과 "상대가 둘 때의 값"의 평균이다.
+ * 끝 깊이에서는 잡기만 보는 정지 탐색과 기물 값·자리 표로 판을 잰다.
  * DOM에 의존하지 않는다. 화면은 `aiWorker.ts`에서 돌려 멈추지 않게 한다.
  */
-import { BISHOP, KING, KNIGHT, PAWN, Position, QUEEN, ROOK, typeOf, type Move } from './rules';
+import { BISHOP, KING, KNIGHT, PAWN, Position, QUEEN, ROOK, typeOf, type Color, type Move } from './rules';
 
 /** 기물 값 (센티폰) */
 const VALUE = [0, 100, 320, 330, 500, 900, 0];
@@ -113,31 +115,32 @@ export function evaluate(position: Position): number {
   return score * position.turn;
 }
 
-/** 잡는 수를 먼저(값싼 기물로 비싼 기물을 잡는 수부터), 승진을 그다음으로 본다. */
+/** 잡는 수를 먼저(킹 잡기, 값싼 기물로 비싼 기물을 잡는 수 순서), 승진을 그다음으로 본다. */
 function orderScore(position: Position, move: Move): number {
   const victim = typeOf(position.board[move.to]);
   const attacker = typeOf(position.board[move.from]);
   let score = 0;
-  if (victim) score += 10 * VALUE[victim] - VALUE[attacker];
+  if (victim === KING) score += 1e6;
+  else if (victim) score += 10 * VALUE[victim] - VALUE[attacker];
   if (move.promotion) score += VALUE[move.promotion];
   return score;
 }
 
-const ordered = (position: Position, moves: Move[], first?: Move) =>
+const ordered = (position: Position, moves: Move[]) =>
   moves
-    .map((move) => ({
-      move,
-      score: first && move.from === first.from && move.to === first.to && move.promotion === first.promotion ? 1e9 : orderScore(position, move),
-    }))
+    .map((move) => ({ move, score: orderScore(position, move) }))
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.move);
 
 class TimeUp extends Error {}
 
+/** 정지 탐색에서 잡기를 이어 보는 최대 수 */
+const QUIESCE_DEPTH = 6;
+
 export interface SearchOptions {
-  /** 이 깊이까지 본다 (반수). */
+  /** 이 깊이까지 본다 (내 수와 룰렛을 한 단계로 센다). */
   readonly maxDepth?: number;
-  /** 이 시간(ms)이 지나면 끝낸 깊이의 결과를 쓴다. */
+  /** 이 시간(ms)이 지나면 끝낸 깊이의 결과를 쓴다. 깊이 1은 시간과 상관없이 끝까지 본다. */
   readonly timeMs?: number;
   /** 최선과 이만큼(센티폰) 차이 안의 수에서 무작위로 고른다. 0이면 늘 최선 */
   readonly spread?: number;
@@ -148,39 +151,39 @@ export interface SearchOptions {
 
 export interface SearchResult {
   readonly move: Move | null;
-  /** 차례인 편 기준 점수 */
+  /** 차례인 편 기준 기댓값 */
   readonly score: number;
   /** 끝까지 본 깊이 */
   readonly depth: number;
   readonly nodes: number;
 }
 
-/** 지금 차례인 편의 수를 고른다. 판(`position`)은 끝나면 처음 모습으로 돌아온다. */
+/** 지금 차례인 편의 룰렛 체스 수를 고른다. 판(`position`)은 끝나면 처음 모습으로 돌아온다. */
 export function chooseMove(position: Position, options: SearchOptions = {}): SearchResult {
-  const { maxDepth = 4, timeMs = 800, spread = 0, random = Math.random, now = () => performance.now() } = options;
+  const { maxDepth = 3, timeMs = 800, spread = 0, random = Math.random, now = () => performance.now() } = options;
   const deadline = now() + timeMs;
-  const rootMoves = position.legalMoves();
-  if (rootMoves.length === 0) return { move: null, score: position.inCheck() ? -MATE : 0, depth: 0, nodes: 0 };
+  const rootMoves = position.allowedMoves();
+  if (rootMoves.length === 0) return { move: null, score: 0, depth: 0, nodes: 0 };
   let nodes = 0;
+  let timed = false;
   const ply0 = position.ply;
+  const ply = () => position.ply - ply0;
 
   const checkTime = () => {
-    if ((++nodes & 1023) === 0 && now() > deadline) throw new TimeUp();
+    if (timed && (++nodes & 1023) === 0 && now() > deadline) throw new TimeUp();
   };
 
-  const quiesce = (alpha: number, beta: number): number => {
+  /** 잡기만 이어 보는 정지 탐색 (차례인 편 기준). 킹을 잡을 수 있으면 이긴 것으로 본다. */
+  const quiesce = (alpha: number, beta: number, depth: number): number => {
     checkTime();
+    const captures = position.allowedMoves(true);
+    if (position.kingCapture(captures)) return MATE - ply();
     const stand = evaluate(position);
-    if (stand >= beta) return stand;
+    if (stand >= beta || depth <= 0) return stand;
     if (stand > alpha) alpha = stand;
-    const us = position.turn;
-    for (const move of ordered(position, position.pseudoMoves(true))) {
+    for (const move of ordered(position, captures)) {
       position.make(move, false);
-      if (position.inCheck(us)) {
-        position.unmake();
-        continue;
-      }
-      const score = -quiesce(-beta, -alpha);
+      const score = -quiesce(-beta, -alpha, depth - 1);
       position.unmake();
       if (score >= beta) return score;
       if (score > alpha) alpha = score;
@@ -188,52 +191,52 @@ export function chooseMove(position: Position, options: SearchOptions = {}): Sea
     return alpha;
   };
 
-  const search = (depth: number, alpha: number, beta: number): number => {
-    if (depth <= 0) return quiesce(alpha, beta);
+  /** 차례인 편(`position.turn`)이 두는 판의 값 */
+  const value = (depth: number): number => {
     checkTime();
-    // 탐색 중 같은 형태가 되풀이되면 무승부로 본다.
-    if (position.halfmove >= 100) return 0;
     const us = position.turn;
-    let legal = 0;
+    const moves = position.allowedMoves();
+    if (position.kingCapture(moves)) return MATE - ply();
+    if (position.inCheck(us) && position.safeMoves(moves).length === 0) return -MATE + ply();
+    if (moves.length === 0 || position.halfmove >= 100) return 0;
+    if (depth <= 0) return quiesce(-MATE * 2, MATE * 2, QUIESCE_DEPTH);
     let best = -MATE * 2;
-    for (const move of ordered(position, position.pseudoMoves())) {
-      position.make(move, false);
-      if (position.inCheck(us)) {
-        position.unmake();
-        continue;
-      }
-      legal++;
-      const score = -search(depth - 1, -beta, -alpha);
-      position.unmake();
-      if (score > best) best = score;
-      if (score > alpha) alpha = score;
-      if (alpha >= beta) break;
-    }
-    if (legal === 0) return position.inCheck() ? -MATE + (position.ply - ply0) : 0;
+    for (const move of ordered(position, moves)) best = Math.max(best, chance(move, depth));
     return best;
   };
 
+  /** 수를 둔 뒤 룰렛을 돌린 기댓값 (둔 편 기준) */
+  const chance = (move: Move, depth: number): number => {
+    const us = position.turn;
+    const them = -us as Color;
+    position.make(move, false);
+    let score: number;
+    // 킹을 잡은 수는 둔 단계에서 이긴 것으로 센다 (`value`가 잡을 수 있는 판을 매기는 값과 같다).
+    // 그래서 지금 잡는 수가 "다음에 누가 두든 이기는 수"보다 높다.
+    if (position.kingSquare(them) < 0) score = MATE - ply() + 1;
+    else {
+      position.turn = us;
+      const again = value(depth - 1);
+      position.turn = them;
+      const other = -value(depth - 1);
+      score = (again + other) / 2;
+    }
+    position.unmake();
+    return score;
+  };
+
   let result: { move: Move; score: number; depth: number } = { move: rootMoves[0], score: 0, depth: 0 };
-  let previousBest: Move | undefined;
   try {
     for (let depth = 1; depth <= maxDepth; depth++) {
-      const scored: { move: Move; score: number }[] = [];
-      let best = -MATE * 2;
-      for (const move of ordered(position, rootMoves, previousBest)) {
-        position.make(move, false);
-        // 최선과 spread 안에 드는지 알 수 있을 만큼만 좁혀 본다.
-        const alpha = Math.max(-MATE * 2, best - spread - 1);
-        const score = -search(depth - 1, -MATE * 2, -alpha);
-        position.unmake();
-        scored.push({ move, score });
-        if (score > best) best = score;
-      }
-      const near = scored.filter((entry) => entry.score >= best - spread);
-      const pick = near.find((entry) => entry.score === best)!;
-      const chosen = spread > 0 ? near[Math.floor(random() * near.length)] : pick;
+      timed = depth > 1;
+      const scored = ordered(position, rootMoves).map((move) => ({ move, score: chance(move, depth) }));
+      const best = Math.max(...scored.map((entry) => entry.score));
+      // 이기는 길이 보이면 무작위로 고르지 않고 가장 빠른 길을 둔다.
+      const loose = best < MATE / 2 ? spread : 0;
+      const near = scored.filter((entry) => entry.score >= best - loose);
+      const chosen = loose > 0 ? near[Math.floor(random() * near.length)] : near.find((entry) => entry.score === best)!;
       result = { move: chosen.move, score: chosen.score, depth };
-      previousBest = pick.move;
-      // 체크메이트를 찾았으면 더 볼 것이 없다.
+      // 킹을 잡는 수가 있으면 더 볼 것이 없다.
       if (best > MATE / 2) break;
     }
   } catch (error) {

@@ -1,6 +1,13 @@
 /**
  * 체스 규칙: 판 상태, 수 만들기(캐슬링·앙파상·승진 포함), 체크·체크메이트·무승부 판정, 수 기록(UCI)과 FEN.
+ * 표준 체스 규칙(`legalMoves`, `status`) 위에 룰렛 체스 규칙(`allowedMoves`, `rouletteStatus`, `replayRoulette`)을 둔다.
  * DOM과 three.js에 의존하지 않는다.
+ *
+ * 룰렛 체스 (2026-11-28 사용자 요청):
+ * - 수를 둘 때마다 룰렛이 반반으로 다음 차례를 정한다. 같은 편이 잇달아 둘 수 있다.
+ * - 자기 킹을 공격받는 칸에 두는 수도 둘 수 있다 (도박). 상대 킹을 잡으면 이긴다.
+ * - 룰렛이 고른 편이 체크인데 피할 수가 없으면 체크메이트로 진다.
+ * - 기물은 자기가 마지막으로 떠나온 칸으로 바로 돌아갈 수 없다 (되돌리기 금지).
  *
  * 칸 번호는 `rank * 8 + file`이다 (a1 = 0, h1 = 7, a8 = 56). 기물은 부호 있는 수로 적는다:
  * 백은 양수, 흑은 음수, 0은 빈 칸.
@@ -41,8 +48,23 @@ export interface MoveEffect {
   readonly rook: { readonly from: number; readonly to: number } | null;
 }
 
-/** 판 상태: `playing` 말고는 판이 끝났다. */
-export type Status = 'playing' | 'checkmate' | 'stalemate' | 'fifty' | 'repetition' | 'material';
+/**
+ * 판 상태: `playing` 말고는 판이 끝났다. `captured`는 룰렛 체스에서 킹이 잡힌 판이다.
+ * `material`은 표준 체스에만 있다 (룰렛 체스에서는 킹끼리도 서로 잡을 수 있다).
+ */
+export type Status = 'playing' | 'checkmate' | 'captured' | 'stalemate' | 'fifty' | 'repetition' | 'material';
+
+/** 룰렛 체스의 판 기록: 둔 수, 수마다 둔 편, 다음 차례 */
+export interface RouletteLog {
+  /** 처음부터 둔 수 (UCI) */
+  readonly moves: readonly string[];
+  /** 수마다 둔 편 (`w`, `b`). `moves`와 길이가 같다 */
+  readonly movers: string;
+  /** 룰렛이 고른 다음 차례 */
+  readonly next: 'w' | 'b';
+}
+
+export const colorLetter = (color: Color) => (color === WHITE ? 'w' : 'b');
 
 const CASTLE_WK = 1;
 const CASTLE_WQ = 2;
@@ -146,6 +168,7 @@ interface Undo {
   readonly enPassant: number;
   readonly halfmove: number;
   readonly rook: { from: number; to: number } | null;
+  readonly cameFrom: Int8Array;
 }
 
 export class Position {
@@ -158,6 +181,8 @@ export class Position {
   /** 50수 규칙: 폰을 움직이거나 잡은 뒤 지난 반수 */
   halfmove = 0;
   fullmove = 1;
+  /** 칸마다 그 칸의 기물이 마지막으로 떠나온 칸. 없으면 -1 (룰렛 체스의 되돌리기 금지) */
+  readonly cameFrom = new Int8Array(64).fill(-1);
   private readonly undos: Undo[] = [];
   /** 같은 형태가 나온 횟수를 세려고 쌓는 형태 열쇠 */
   private readonly keys: string[] = [];
@@ -194,6 +219,7 @@ export class Position {
     this.enPassant = enPassant && enPassant !== '-' ? parseSquare(enPassant) : -1;
     this.halfmove = Number(halfmove) || 0;
     this.fullmove = Number(fullmove) || 1;
+    this.cameFrom.fill(-1);
     this.undos.length = 0;
     this.keys.length = 0;
     this.keys.push(this.key());
@@ -232,9 +258,9 @@ export class Position {
     ].join(' ');
   }
 
-  /** 같은 형태인지 비교하는 열쇠: 기물 자리, 차례, 캐슬링, 앙파상 */
+  /** 같은 형태인지 비교하는 열쇠: 기물 자리, 캐슬링, 앙파상. 룰렛 체스는 차례가 무작위라 차례는 넣지 않는다. */
   private key(): string {
-    return `${this.board.join(',')}|${this.turn}|${this.castling}|${this.enPassant}`;
+    return `${this.board.join(',')}|${this.castling}|${this.enPassant}`;
   }
 
   /** 지금까지 둔 반수 */
@@ -308,7 +334,9 @@ export class Position {
         for (const df of [-1, 1]) {
           if (file + df < 0 || file + df > 7) continue;
           const to = forward + df;
-          if ((b[to] !== 0 && colorOf(b[to]) !== us) || to === this.enPassant) pawnPush(from, to);
+          // 앙파상은 방금 두 칸 나온 상대 폰 옆에서만 (룰렛 체스에서는 두 칸 나온 편이 또 둘 수 있다).
+          const enPassant = to === this.enPassant && b[to - 8 * us] === -PAWN * us;
+          if ((b[to] !== 0 && colorOf(b[to]) !== us) || enPassant) pawnPush(from, to);
         }
         continue;
       }
@@ -398,13 +426,20 @@ export class Position {
       enPassant: this.enPassant,
       halfmove: this.halfmove,
       rook,
+      cameFrom: this.cameFrom.slice(),
     });
+    const from = this.cameFrom;
+    from[capturedAt] = -1;
+    from[move.to] = move.from;
+    from[move.from] = -1;
     b[capturedAt] = 0;
     b[move.from] = 0;
     b[move.to] = move.promotion ? move.promotion * us : piece;
     if (rook) {
       b[rook.to] = b[rook.from];
       b[rook.from] = 0;
+      from[rook.to] = rook.from;
+      from[rook.from] = -1;
     }
     this.castling &= CASTLE_MASK[move.from] & CASTLE_MASK[move.to];
     this.enPassant = type === PAWN && Math.abs(move.to - move.from) === 16 ? (move.from + move.to) / 2 : -1;
@@ -429,6 +464,7 @@ export class Position {
       b[undo.rook.from] = b[undo.rook.to];
       b[undo.rook.to] = 0;
     }
+    this.cameFrom.set(undo.cameFrom);
     this.castling = undo.castling;
     this.enPassant = undo.enPassant;
     this.halfmove = undo.halfmove;
@@ -463,6 +499,47 @@ export class Position {
     return 'playing';
   }
 
+  // ─── 룰렛 체스 ───────────────────────────────────────────
+
+  /** 룰렛 체스에서 둘 수 있는 수: 킹을 위험에 두는 수도 되고, 기물이 방금 떠나온 칸으로는 못 간다. */
+  allowedMoves(capturesOnly = false): Move[] {
+    return this.pseudoMoves(capturesOnly).filter((move) => this.cameFrom[move.from] !== move.to);
+  }
+
+  /** 둔 뒤 자기 킹이 공격받지 않는 수 */
+  safeMoves(moves: readonly Move[] = this.allowedMoves()): Move[] {
+    const us = this.turn;
+    return moves.filter((move) => {
+      this.make(move, false);
+      const safe = !this.inCheck(us);
+      this.unmake();
+      return safe;
+    });
+  }
+
+  /** 차례인 편이 상대 킹을 바로 잡을 수 있는 수. 없으면 `null` */
+  kingCapture(moves: readonly Move[] = this.allowedMoves()): Move | null {
+    const king = this.kingSquare(-this.turn as Color);
+    return moves.find((move) => move.to === king) ?? null;
+  }
+
+  /**
+   * 룰렛 체스의 판 상태 (지금 차례인 편 기준). `captured`·`checkmate`면 차례인 편이 졌다.
+   * 차례인 편이 둘 수가 하나도 없는 것은 판이 끝난 것이 아니라 차례를 넘긴다 (화면이 처리한다).
+   */
+  rouletteStatus(): Status {
+    if (this.kingSquare(this.turn) < 0) return 'captured';
+    if (this.inCheck() && this.safeMoves().length === 0) return 'checkmate';
+    if (this.halfmove >= 100) return 'fifty';
+    if (this.repetitions() >= 3) return 'repetition';
+    return 'playing';
+  }
+
+  /** UCI 글에 맞는 룰렛 체스의 수. 없으면 `null` */
+  findAllowed(uci: string): Move | null {
+    return this.allowedMoves().find((move) => moveToUci(move) === uci) ?? null;
+  }
+
   /** UCI 글(`e2e4`, `e7e8q`)에 맞는 둘 수 있는 수. 없으면 `null` */
   findMove(uci: string): Move | null {
     return this.legalMoves().find((move) => moveToUci(move) === uci) ?? null;
@@ -477,6 +554,21 @@ export function replay(moves: readonly string[]): Position | null {
     if (!move) return null;
     position.make(move);
   }
+  return position;
+}
+
+/** 룰렛 체스 판 기록을 처음부터 다시 둔 판. 둘 수 없는 수가 있거나 모양이 틀리면 `null` */
+export function replayRoulette(log: RouletteLog): Position | null {
+  if (log.movers.length !== log.moves.length || !/^[wb]*$/.test(log.movers)) return null;
+  const position = new Position();
+  for (let i = 0; i < log.moves.length; i++) {
+    if (position.kingSquare(WHITE) < 0 || position.kingSquare(BLACK) < 0) return null;
+    position.turn = log.movers[i] === 'w' ? WHITE : BLACK;
+    const move = position.findAllowed(log.moves[i]);
+    if (!move) return null;
+    position.make(move);
+  }
+  position.turn = log.next === 'w' ? WHITE : BLACK;
   return position;
 }
 

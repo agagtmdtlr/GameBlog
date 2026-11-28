@@ -32,7 +32,7 @@
       "open": { "game": "snake" }
     },
     {
-      "title": "체스",
+      "title": "룰렛 체스",
       "added": "2026-11-28",
       "preview": { "image": "chess.jpg" },
       "open": { "game": "chess" }
