@@ -226,7 +226,8 @@ export class ChessView {
   private readonly rings: Mesh[] = [];
   private readonly tweens: Tween[] = [];
   private readonly raycaster = new Raycaster();
-  private thinking = false;
+  /** 컴퓨터가 생각하는 동안 갸웃거릴 킹의 색 (컴퓨터가 맡은 색). 없으면 0 */
+  private thinking = 0;
   private time = 0;
   private width = 1;
   private height = 1;
@@ -410,9 +411,9 @@ export class ChessView {
     });
   }
 
-  /** 컴퓨터가 생각하는 동안 흑 킹이 갸웃거린다. */
-  setThinking(thinking: boolean): void {
-    this.thinking = thinking;
+  /** 컴퓨터가 생각하는 동안 그 색(컴퓨터가 맡은 색)의 킹이 갸웃거린다. 0이면 멈춘다. */
+  setThinking(color: 1 | -1 | 0): void {
+    this.thinking = color;
   }
 
   setHighlights(highlights: Highlights): void {
@@ -505,8 +506,9 @@ export class ChessView {
     // 갸웃거림은 기물 안쪽 메시에 줘서, 판 위를 옮기는 움직임(group)과 섞이지 않게 한다.
     const tilt = this.thinking ? Math.sin(this.time * 5) * 0.1 : 0;
     for (const [, object] of this.pieces) {
-      if (object.piece !== -KING) continue;
-      for (const mesh of object.group.children) mesh.rotation.z += (tilt - mesh.rotation.z) * (this.thinking ? 1 : 0.2);
+      if (typeOf(object.piece) !== KING) continue;
+      const wobble = this.thinking !== 0 && colorOf(object.piece) === this.thinking;
+      for (const mesh of object.group.children) mesh.rotation.z += ((wobble ? tilt : 0) - mesh.rotation.z) * (wobble ? 1 : 0.2);
     }
     this.renderer.render(this.scene, this.camera);
   }
