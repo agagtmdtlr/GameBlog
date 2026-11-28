@@ -45,6 +45,7 @@ GameBlog/
 │  │  ├─ snake/                뱀: 놀이 상태(snakeGame.ts), 기록(records.ts), three.js 그리기(graphics/, shaders/) ([analysis/snake.md](analysis/snake.md))
 │  │  └─ chess/                체스: 규칙(rules.ts), 컴퓨터 상대(ai.ts, 웹 워커), 기록(records.ts), three.js 판·기물(graphics/) ([analysis/chess.md](analysis/chess.md))
 │  ├─ lib/ransomText/          오림 글자: 찢어 오린 종이 글자로 만든 영어 제목 ([analysis/ransomText.md](analysis/ransomText.md))
+│  ├─ lib/gridSnake/           칸 위의 뱀 몸 움직임: 방향 받기, 나아가기, 늘이기, 마디 잃기. 뱀과 타워 뱀이 함께 씀 ([analysis/snake.md](analysis/snake.md))
 │  ├─ lib/save/                플레이 기록: 이 기기의 IndexedDB에 누적 수치·판 기록·하다 만 판 ([analysis/saveRecords.md](analysis/saveRecords.md))
 │  ├─ home/                    메인 페이지: 코믹 프레임 컷마다 콘텐츠 미리 보기 ([analysis/home.md](analysis/home.md))
 │  │  ├─ comicLayout.ts        컷 배치(볼록 다각형)와 컷 사이 여백 계산
@@ -243,7 +244,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 
 ### 자동 테스트
 
-`npm test` 기준 30개 파일, 303개가 모두 통과한다 (2026-11-28, 메인 페이지를 최근 콘텐츠부터 놓게 바꾼 뒤). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 31개 파일, 313개가 모두 통과한다 (2026-11-28, 뱀 몸 움직임을 `lib/gridSnake/`로 옮긴 뒤). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
@@ -251,6 +252,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 | [`layers.test.ts`](../src/layers.test.ts) | 9 | 계층 가져오기 규칙: 엔진 → 콘텐츠 금지, 씬끼리 금지, three.js를 가져오는 곳, 메인 페이지·lib·미니 게임의 가져오기 |
 | [`coloring.test.ts`](../src/games/coloring/coloring.test.ts) | 21 | 색칠 놀이의 순환 도로 경로, 도시 배치(조각 목록, 이웃, 차·사람 자리, 차 간격, 건물 자리), 자유 시점 카메라, 색 고르기와 완성, 색 묶음, 기록 누적·검사, 저장·되돌리기 |
 | [`game2048.test.ts`](../src/games/game2048/game2048.test.ts) | 11 | 2048의 밀기·합치기 순서, 새 타일, 끝, 이김, 타일 id, 타일 색, 기록 누적·검사 |
+| [`gridSnake.test.ts`](../src/lib/gridSnake/gridSnake.test.ts) | 10 | 칸 위의 뱀 몸: 놓기, 방향 받기·버리기, 앞 칸·판 안, 꼬리 칸 판정, 나아가기·늘기, 제 몸 칸으로 옮기기, 마디 잃기, 빈 칸, 꺾은 방향 |
 | [`snake.test.ts`](../src/games/snake/snake.test.ts) | 10 | 뱀의 시작, 나아가기, 방향 받기, 먹기, 빠르기 한계, 벽·몸 부딪힘, 꼬리 칸, 판 채우기, 기록 누적·검사 |
 | [`chess.test.ts`](../src/games/chess/chess.test.ts) | 17 | 체스 수 개수(perft) 표준 값, 무르기 복원, 체크메이트·스테일메이트·무승부, 캐슬링·앙파상·승진, 컴퓨터의 메이트·잡기·판 복원, 기록 누적·검사 |
 | [`save.test.ts`](../src/lib/save/save.test.ts) | 18 | 플레이 기록장: IndexedDB·메모리 저장소의 쌓기, 누적, 최근 순서, 게임별 분리, 하다 만 판, 거래 실패, 형식 버전, 다시 열기, 동시 쓰기 |
