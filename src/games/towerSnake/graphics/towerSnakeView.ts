@@ -324,6 +324,9 @@ export class TowerSnakeView {
   /** 카메라가 보는 곳 (판 위 x, z) */
   private readonly target = new Vector3();
   private distance = 20;
+  private readonly tiles: InstancedMesh;
+  /** 지금 그리는 칸 범위 (`minX,maxX,minY,maxY`). 바뀔 때만 칸을 다시 놓는다. */
+  private tileWindow = '';
   private shakeUntil = 0;
   private time = 0;
   private headYaw = 0;
@@ -351,17 +354,12 @@ export class TowerSnakeView {
     this.addOutlined(new RoundedBoxGeometry(BOARD + 2.2, 0.9, BOARD + 2.2, 3, 0.35), this.toon(SLAB), (m) =>
       m.position.set(0, -0.55, 0),
     );
-    const tiles = new InstancedMesh(new RoundedBoxGeometry(0.94, 0.24, 0.94, 2, 0.08), this.toon(WHITE), BOARD * BOARD);
-    for (let y = 0; y < BOARD; y++) {
-      for (let x = 0; x < BOARD; x++) {
-        const i = y * BOARD + x;
-        this.dummy.position.set(cellX(x), -0.12, cellX(y));
-        this.dummy.updateMatrix();
-        tiles.setMatrixAt(i, this.dummy.matrix);
-        tiles.setColorAt(i, raw((x + y) % 2 === 0 ? TILE_A : TILE_B));
-      }
-    }
-    this.scene.add(tiles);
+    // 칸: 화면에 보이는 칸만 그린다 (`drawTiles`). 판 전체(1,681칸)를 늘 그리면 휴대폰에 삼각형이 너무 많다.
+    this.tiles = new InstancedMesh(new RoundedBoxGeometry(0.94, 0.24, 0.94, 2, 0.08), this.toon(WHITE), BOARD * BOARD);
+    this.tiles.frustumCulled = false;
+    this.tiles.count = 0;
+    this.tiles.setColorAt(0, raw(TILE_A));
+    this.scene.add(this.tiles);
     const rimLong = new RoundedBoxGeometry(BOARD + 1.6, 0.7, 0.6, 3, 0.25);
     const rimShort = new RoundedBoxGeometry(0.6, 0.7, BOARD, 3, 0.25);
     const rimMaterial = this.toon(RIM);
@@ -396,7 +394,8 @@ export class TowerSnakeView {
       // 느려진 적을 물들이려고 조각마다 색을 쓴다.
       this.enemyBodies[type].setColorAt(0, raw(ENEMY_SHAPES[type].color));
     }
-    const eyeBall = new SphereGeometry(1, 12, 8);
+    // 눈은 화면에서 몇 픽셀뿐이라 거친 공으로 충분하다 (적 250마리면 눈·테두리·눈동자가 1,500개).
+    const eyeBall = new SphereGeometry(1, 8, 6);
     this.eyes = this.addInstanced(eyeBall, this.toon(WHITE), DRAW_ENEMIES * 2);
     this.pupils = new InstancedMesh(eyeBall, this.toon(INK), DRAW_ENEMIES * 2);
     this.pupils.frustumCulled = false;
@@ -693,7 +692,55 @@ export class TowerSnakeView {
       this.target.z + Math.cos(elevation) * this.distance + Math.cos(t * 53) * jitter,
     );
     this.camera.lookAt(this.target.x, 0, this.target.z);
+    this.drawTiles();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /** 화면 네 모서리가 바닥에 닿는 곳을 감싸는 칸만 놓는다. 범위가 바뀔 때만 다시 놓는다. */
+  private drawTiles(): void {
+    this.camera.updateMatrixWorld();
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    const corner = new Vector3();
+    for (const [nx, ny] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      corner.set(nx, ny, 0.5).unproject(this.camera).sub(this.camera.position);
+      // 바닥(y = 0)에 닿지 않는 쪽(하늘)이면 판 끝까지 본다.
+      const t = corner.y < -1e-6 ? -this.camera.position.y / corner.y : 1e4;
+      const x = this.camera.position.x + corner.x * t;
+      const z = this.camera.position.z + corner.z * t;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minZ = Math.min(minZ, z);
+      maxZ = Math.max(maxZ, z);
+    }
+    // 칸 번호로 바꾸고 한 칸 넉넉히 (흔들림, 칸 두께)
+    const offset = (BOARD - 1) / 2;
+    const clamp = (v: number) => Math.max(0, Math.min(BOARD - 1, v));
+    const x0 = clamp(Math.floor(minX + offset) - 1);
+    const x1 = clamp(Math.ceil(maxX + offset) + 1);
+    const y0 = clamp(Math.floor(minZ + offset) - 1);
+    const y1 = clamp(Math.ceil(maxZ + offset) + 1);
+    const key = `${x0},${x1},${y0},${y1}`;
+    if (key === this.tileWindow) return;
+    this.tileWindow = key;
+    let i = 0;
+    const color = new Color();
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        this.dummy.position.set(cellX(x), -0.12, cellX(y));
+        this.dummy.rotation.set(0, 0, 0);
+        this.dummy.scale.setScalar(1);
+        this.dummy.updateMatrix();
+        this.tiles.setMatrixAt(i, this.dummy.matrix);
+        this.tiles.setColorAt(i, color.copy(raw((x + y) % 2 === 0 ? TILE_A : TILE_B)));
+        i++;
+      }
+    }
+    this.tiles.count = i;
+    this.tiles.instanceMatrix.needsUpdate = true;
+    if (this.tiles.instanceColor) this.tiles.instanceColor.needsUpdate = true;
   }
 
   /** 화면에 보이는 대략의 칸 수 (가로, 세로). 미니맵의 보기 상자 크기 */

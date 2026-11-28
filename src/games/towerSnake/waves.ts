@@ -21,9 +21,9 @@ const WAVE_ENEMIES: readonly { readonly type: EnemyType; readonly from: number; 
   { type: 'rock', from: 120, weight: 0.4 },
 ];
 
-/** 한 무리의 수 = 3 + 지난 분 × 2 */
+/** 한 무리의 수 = 2 + 지난 분 × 2 (단계 7에서 3 → 2) */
 export function waveSize(time: number): number {
-  return 3 + Math.floor(time / 60) * 2;
+  return 2 + Math.floor(time / 60) * 2;
 }
 
 /** 지금 나올 수 있는 종류 가운데 비율에 맞게 하나를 고른다. `roll`은 0~1 난수다. */

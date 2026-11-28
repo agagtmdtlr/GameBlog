@@ -169,12 +169,13 @@ describe('타워 상자와 타워 (단계 2)', () => {
 
   it('처음 마디는 모두 화살 타워다', () => {
     const world = new TowerSnakeWorld(seededRandom(3));
-    expect(world.towers).toEqual(['arrow', 'arrow']);
+    expect(world.towers).toEqual(Array.from({ length: START_SEGMENTS }, () => 'arrow'));
   });
 
-  it('상자를 먹으면 꼬리 끝에 그 타워 마디가 붙고, 새 상자가 생겨 늘 3개다', () => {
+  it('상자를 먹으면 꼬리 끝에 그 타워 마디가 붙고, 새 상자가 생겨 늘 같은 수다', () => {
     const world = new TowerSnakeWorld(seededRandom(5));
-    const far = [{ cell: { x: 0, y: 0 }, type: 'arrow' as TowerType }, { cell: { x: 0, y: 1 }, type: 'arrow' as TowerType }];
+    // 먹을 상자 하나와 멀리 있는 나머지 (늘 `BOX_COUNT`개)
+    const far = Array.from({ length: BOX_COUNT - 1 }, (_, i) => ({ cell: { x: 0, y: i }, type: 'arrow' as TowerType }));
     world.load(row(10, 10, 9, 8), 'right', ['arrow', 'ice'], [{ cell: { x: 11, y: 10 }, type: 'cannon' }, ...far]);
     const event = world.tick();
     expect(event.eat?.box.type).toBe('cannon');
@@ -273,10 +274,10 @@ describe('적 (단계 3)', () => {
   });
 
   it('무리 크기는 분마다 2씩 늘고, 종류는 때가 되어야 나온다', () => {
-    expect(waveSize(0)).toBe(3);
-    expect(waveSize(59)).toBe(3);
-    expect(waveSize(60)).toBe(5);
-    expect(waveSize(150)).toBe(7);
+    expect(waveSize(0)).toBe(2);
+    expect(waveSize(59)).toBe(2);
+    expect(waveSize(60)).toBe(4);
+    expect(waveSize(150)).toBe(6);
     for (let roll = 0; roll < 1; roll += 0.05) expect(pickEnemy(30, roll)).toBe('jelly');
     const after1 = new Set(Array.from({ length: 20 }, (_, i) => pickEnemy(90, i / 20)));
     expect([...after1].sort()).toEqual(['dart', 'jelly']);
@@ -764,5 +765,30 @@ describe('타워 뱀 기록 (단계 6)', () => {
     expect(world.longest).toBe(3);
     expect(world.time).toBeCloseTo(STEP_SECONDS * 1.5);
     expect(TOWER_SNAKE_RECORDS.migrate!('play', 1, play({ seconds: world.time, longest: world.longest, eaten: { ...world.eaten }, towers: [...world.towers] }))).toBeDefined();
+  });
+});
+
+describe('성능 (단계 7)', () => {
+  it('적 250마리와 타워 40마디로 600걸음(10초)을 넉넉한 한도 안에 돈다', () => {
+    const world = new TowerSnakeWorld(seededRandom(9));
+    world.boxes = [];
+    // 판 가운데에서 U자로 감은 41칸짜리 몸: 윗줄 20칸, 꺾는 칸, 아랫줄 20칸
+    const body: Cell[] = [];
+    for (let i = 0; i < 20; i++) body.push({ x: 30 - i, y: 14 });
+    body.push({ x: 11, y: 15 });
+    for (let i = 0; i < 20; i++) body.push({ x: 11 + i, y: 16 });
+    const kinds = TOWER_TYPES;
+    world.load(body, 'up', Array.from({ length: MAX_SEGMENTS }, (_, i) => kinds[i % kinds.length]), []);
+    world.invulnerable = 1e9;
+    for (let i = 0; i < MAX_ENEMIES; i++) {
+      const enemy = world.spawnEnemy(['jelly', 'dart', 'rock'][i % 3] as 'jelly', 5 + (i % 30), 20 + Math.floor(i / 30) * 1.5);
+      enemy.hp = 1e9;
+    }
+    const started = performance.now();
+    for (let i = 0; i < 600; i++) world.update(ENEMY_STEP);
+    const elapsed = performance.now() - started;
+    expect(world.enemies.length).toBe(MAX_ENEMIES);
+    // 데스크톱에서 약 0.3ms/걸음 (180ms). 느린 기기와 테스트 동시 실행을 생각해 넉넉히 잡는다.
+    expect(elapsed).toBeLessThan(3000);
   });
 });

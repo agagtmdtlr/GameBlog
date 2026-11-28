@@ -11,7 +11,7 @@ export type { Cell, Direction } from '../../lib/gridSnake';
 /** 판 한 변의 칸 수 (D1: 큰 판) */
 export const BOARD = 41;
 /** 처음 타워 마디 수 (머리 빼고) */
-export const START_SEGMENTS = 2;
+export const START_SEGMENTS = 3;
 /** 타워 마디 수 한계 (머리 빼고, D4) */
 export const MAX_SEGMENTS = 40;
 /** 뱀이 나아가는 빠르기 (초당 칸, 일정) */
@@ -19,7 +19,7 @@ export const SPEED = 5;
 /** 피해를 받은 뒤 무적 시간 (초) */
 export const INVULNERABLE_SECONDS = 1;
 /** 판에 늘 있는 타워 상자 수 */
-export const BOX_COUNT = 3;
+export const BOX_COUNT = 4;
 /** 새 상자는 머리에서 이 칸 수보다 멀리 생긴다 (가로·세로 중 먼 쪽) */
 export const BOX_MIN_DISTANCE = 6;
 /** 적이 움직이는 고정 간격 (초) */
@@ -93,7 +93,7 @@ export type WorldEvent = TickEvent | BumpEvent | CombatEvent | KillEvent;
 const reach = (a: Cell, b: Cell) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
 /**
- * 타워 뱀 한 판의 상태 (단계 5: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격, 연출 이벤트).
+ * 타워 뱀 한 판의 상태: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격, 연출 이벤트.
  * 몸 움직임은 공용 `GridSnake`가 맡고, 여기서는 울타리에서 꺾기, 제 몸 지나가기, 마디 잃기, 무적, 끝, 상자 먹기, 적 무리, 타워 공격(`Combat`)을 정한다.
  * `update(dt)`로 시간을 받아 `SPEED`마다 한 칸 나아가고, 적은 `ENEMY_STEP`마다 움직인다.
  */
