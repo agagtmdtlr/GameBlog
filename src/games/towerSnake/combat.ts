@@ -6,7 +6,7 @@ import { TOWER_SPECS, type TowerType } from './towers';
 export type ProjectileType = 'arrow' | 'cannon' | 'ice';
 
 /** 투사체 빠르기 (칸/초) */
-export const PROJECTILE_SPEED: Readonly<Record<ProjectileType, number>> = { arrow: 14, cannon: 8, ice: 11 };
+export const PROJECTILE_SPEED: Readonly<Record<ProjectileType, number>> = { arrow: 18, cannon: 10, ice: 14 };
 /** 판에 함께 날 수 있는 투사체 수 (계획서 5.4) */
 export const MAX_PROJECTILES = 200;
 /** 대포알이 터지는 반지름 (칸). 적 몸이 이 원에 걸치면 맞는다. */

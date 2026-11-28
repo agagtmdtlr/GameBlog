@@ -68,7 +68,7 @@ const VIEW_CELLS = 18;
 /** 세로로 긴 화면에서 가로로 보이는 칸 수 (머리 높이에서) */
 const NARROW_CELLS = 12;
 /** 카메라가 머리를 따라가는 빠르기 (클수록 바짝) */
-const FOLLOW = 4;
+const FOLLOW = 5;
 /** 선 굵기 (CSS px) */
 const OUTLINE_PX = 2.4;
 const HEAD_RADIUS = 0.46;

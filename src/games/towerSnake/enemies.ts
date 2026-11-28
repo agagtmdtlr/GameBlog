@@ -7,7 +7,7 @@ export const ENEMY_TYPES: readonly EnemyType[] = ['jelly', 'dart', 'rock', 'boss
 
 export interface EnemySpec {
   readonly hp: number;
-  /** 빠르기 (칸/초). 뱀(5)보다 늘 느리다. */
+  /** 빠르기 (칸/초). 뱀(6.5)보다 늘 느리다. */
   readonly speed: number;
   /** 몸 반지름 (칸) */
   readonly radius: number;
@@ -15,10 +15,10 @@ export interface EnemySpec {
 
 /** 계획서 3.6의 표 */
 export const ENEMY_SPECS: Readonly<Record<EnemyType, EnemySpec>> = {
-  jelly: { hp: 20, speed: 2.0, radius: 0.3 },
-  dart: { hp: 12, speed: 3.6, radius: 0.26 },
-  rock: { hp: 90, speed: 1.3, radius: 0.38 },
-  boss: { hp: 600, speed: 1.0, radius: 0.7 },
+  jelly: { hp: 20, speed: 2.6, radius: 0.3 },
+  dart: { hp: 12, speed: 4.7, radius: 0.26 },
+  rock: { hp: 90, speed: 1.7, radius: 0.38 },
+  boss: { hp: 600, speed: 1.3, radius: 0.7 },
 };
 
 /** 몸 마디의 반지름 (칸). 적은 이 원을 벽처럼 돌아간다. */
@@ -31,8 +31,8 @@ export const KNOCK_SPEED = 7;
 const KNOCK_DECAY = 6;
 /** 얼음에 맞아 느려졌을 때 빠르기 비율 (단계 4) */
 export const SLOW_FACTOR = 0.5;
-/** 시간에 따라 빨라져도 넘지 않는 빠르기 (칸/초). 뱀(5)보다 느려야 피할 수 있다. */
-export const MAX_ENEMY_SPEED = 4.6;
+/** 시간에 따라 빨라져도 넘지 않는 빠르기 (칸/초). 뱀(6.5)보다 느려야 피할 수 있다. */
+export const MAX_ENEMY_SPEED = 6;
 /** 피해를 받고 하얗게 번쩍이는 시간 (초, 단계 5) */
 export const FLASH_SECONDS = 0.12;
 /** 마디에 막혔을 때 옆으로 미끄러지는 정도 (빠르기 비율) */

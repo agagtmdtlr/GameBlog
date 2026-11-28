@@ -1,7 +1,7 @@
 import type { EnemyType } from './enemies';
 
 /** 무리가 나오는 간격 (초) */
-export const WAVE_SECONDS = 2;
+export const WAVE_SECONDS = 1.5;
 /** 판에 함께 있을 수 있는 적 수 */
 export const MAX_ENEMIES = 250;
 /** 큰 녀석(보스)이 나오는 간격 (초) */
@@ -46,9 +46,9 @@ const WAVE_ENEMIES: readonly { readonly type: EnemyType; readonly from: number; 
   { type: 'rock', from: 120, weight: 0.4 },
 ];
 
-/** 한 무리의 수 = 2 + 지난 분 × 2 (단계 7에서 3 → 2) */
+/** 한 무리의 수 = 1 + 지난 분 × 2 (단계 7에서 3 → 2, 템포를 올리며 1.5초마다로 잦아져 2 → 1) */
 export function waveSize(time: number): number {
-  return 2 + Math.floor(time / 60) * 2;
+  return 1 + Math.floor(time / 60) * 2;
 }
 
 /** 지금 나올 수 있는 종류 가운데 비율에 맞게 하나를 고른다. `roll`은 0~1 난수다. */

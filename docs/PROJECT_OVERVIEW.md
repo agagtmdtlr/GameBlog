@@ -261,7 +261,7 @@ main.ts ─┬─ content/index.ts ─ content/<씬>/ ─┬─ content/common/ 
 - 어느 것을 돌릴지는 [CLAUDE.md](../CLAUDE.md)의 "브랜치와 커밋" 4번을 따른다. `npm test`는 여전히 전부 돌린다.
 - 확인 (2026-11-28): `npm test` 369개, `test:only chess` 34개(체스 25 + layers 9), `test:only snake game2048` 30개, `test:only planet` 141개, `test:only shared` 112개, `test:only nope`은 목록을 보이고 실패.
 
-`npm test` 기준 32개 파일, 387개가 모두 통과한다 (2026-11-28, 타워 뱀 강해지는 적 뒤. 봇으로 수치를 보는 `towerSnake/balance.test.ts` 1개는 `TOWER_SNAKE_BALANCE=1`일 때만 돌아 건너뛴다). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
+`npm test` 기준 32개 파일, 390개가 모두 통과한다 (2026-11-28, 타워 뱀 템포 올리기 뒤. 봇으로 수치를 보는 `towerSnake/balance.test.ts` 1개는 `TOWER_SNAKE_BALANCE=1`일 때만 돌아 건너뛴다). 아래 표는 주요 파일만 적었다. `npm run build`의 타입 검사와 빌드도 오류가 없다 (청크 크기 경고만 있다).
 
 | 파일 | 개수 | 대상 |
 |---|---|---|
