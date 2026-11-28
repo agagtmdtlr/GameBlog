@@ -1,4 +1,5 @@
 import { GridSnake, LEFT_OF, RIGHT_OF, sameCell, type Cell, type Direction } from '../../lib/gridSnake';
+import { Combat, type CombatEvent, type Projectile } from './combat';
 import { createEnemy, ENEMY_SPECS, HEAD_RADIUS, KNOCK_SPEED, moveEnemies, type Enemy, type EnemyType, type Point } from './enemies';
 import type { Random } from './random';
 import { SpatialGrid } from './spatialGrid';
@@ -78,14 +79,14 @@ export interface BumpEvent {
   readonly killed: boolean;
 }
 
-export type WorldEvent = TickEvent | BumpEvent;
+export type WorldEvent = TickEvent | BumpEvent | CombatEvent;
 
 /** 가로·세로 중 먼 쪽의 칸 거리 */
 const reach = (a: Cell, b: Cell) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 
 /**
- * 타워 뱀 한 판의 상태 (단계 3: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적).
- * 몸 움직임은 공용 `GridSnake`가 맡고, 여기서는 울타리에서 꺾기, 제 몸 지나가기, 마디 잃기, 무적, 끝, 상자 먹기, 적 무리를 정한다.
+ * 타워 뱀 한 판의 상태 (단계 4: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격).
+ * 몸 움직임은 공용 `GridSnake`가 맡고, 여기서는 울타리에서 꺾기, 제 몸 지나가기, 마디 잃기, 무적, 끝, 상자 먹기, 적 무리, 타워 공격(`Combat`)을 정한다.
  * `update(dt)`로 시간을 받아 `SPEED`마다 한 칸 나아가고, 적은 `ENEMY_STEP`마다 움직인다.
  */
 export class TowerSnakeWorld {
@@ -118,6 +119,7 @@ export class TowerSnakeWorld {
   /** 지난 칸의 몸. 지금 몸과 `alpha`로 이어 마디의 실제 자리를 낸다 (그리기와 같다). */
   private previous: Cell[] = [];
   private readonly grid = new SpatialGrid<Enemy>(BOARD);
+  private readonly combat = new Combat();
 
   constructor(private readonly random: Random = Math.random) {
     this.reset();
@@ -140,6 +142,7 @@ export class TowerSnakeWorld {
     this.previous = this.body.map((c) => ({ ...c }));
     this.enemies = [];
     this.killed = 0;
+    this.combat.reset();
     this.enemyPending = 0;
     this.nextWave = WAVE_SECONDS;
     this.nextBoss = BOSS_SECONDS;
@@ -175,6 +178,11 @@ export class TowerSnakeWorld {
   turn(direction: Direction): boolean {
     if (!this.alive) return false;
     return this.snake.turn(direction);
+  }
+
+  /** 날아가는 투사체 */
+  get projectiles(): readonly Projectile[] {
+    return this.combat.projectiles;
   }
 
   /** `i`번째 마디(0은 머리)의 지금 자리. 지난 칸과 이번 칸 사이를 `alpha`로 잇는다. */
@@ -287,7 +295,7 @@ export class TowerSnakeWorld {
     this.longest = Math.max(this.longest, this.segments);
   }
 
-  /** 적을 `span`초 움직인다: 무리 만들기, 움직이기, 머리와 부딪히기. 고정 간격으로 나눠 돈다. */
+  /** 적을 `span`초 움직인다: 무리 만들기, 움직이기, 머리와 부딪히기, 타워 공격. 고정 간격으로 나눠 돈다. */
   private advanceEnemies(span: number, events: WorldEvent[]): void {
     this.enemyPending += span;
     while (this.alive && this.enemyPending >= ENEMY_STEP - 1e-9) {
@@ -305,6 +313,18 @@ export class TowerSnakeWorld {
       for (let i = 1; i < this.body.length; i++) segments.push(this.point(i));
       moveEnemies(this.enemies, ENEMY_STEP, head, segments, this.grid, BOARD);
       this.bump(head, events);
+      if (!this.alive) return;
+      this.combat.step(
+        ENEMY_STEP,
+        {
+          towers: this.towers,
+          towerPoint: (i) => segments[i] ?? this.point(i + 1),
+          head: this.point(0),
+          grid: this.grid,
+          damage: (enemy, amount) => this.damageEnemy(enemy, amount),
+        },
+        events as CombatEvent[],
+      );
     }
   }
 

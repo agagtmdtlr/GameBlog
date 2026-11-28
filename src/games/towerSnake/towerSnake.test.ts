@@ -1,4 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import {
+  BLAST_RADIUS,
+  CHAIN_FALLOFF,
+  CHAIN_JUMPS,
+  CHAIN_RANGE,
+  Combat,
+  findTarget,
+  MAX_PROJECTILES,
+  SLOW_SECONDS,
+  type CombatEvent,
+  type CombatWorld,
+} from './combat';
+import { createEnemy, type Enemy } from './enemies';
 import { ENEMY_SPECS, HEAD_RADIUS, SEGMENT_RADIUS, type Point } from './enemies';
 import { seededRandom } from './random';
 import { SpatialGrid } from './spatialGrid';
@@ -404,7 +417,8 @@ describe('적 (단계 3)', () => {
     world.load([{ x: 20, y: 20 }], 'right', [], []);
     world.spawnEnemy('jelly', 20.3, 20);
     const events = world.update(ENEMY_STEP);
-    expect(events.at(-1)?.hurt?.over).toBe(true);
+    const last = events.at(-1);
+    expect(last && 'hurt' in last ? last.hurt?.over : undefined).toBe(true);
     expect(world.alive).toBe(false);
     expect(world.update(1)).toEqual([]);
   });
@@ -438,5 +452,202 @@ describe('적 (단계 3)', () => {
     expect(world.killed).toBe(0);
     world.update(WAVE_SECONDS - 0.1);
     expect(world.enemies).toEqual([]);
+  });
+});
+
+describe('자동 공격 (단계 4)', () => {
+  /** 타워 자리를 손으로 정한 판. 처치하면 적 목록에서 뺀다. */
+  const arena = (towers: TowerType[], points: Point[], enemies: Enemy[], head: Point = { x: 0, y: 0 }) => {
+    const grid = new SpatialGrid<Enemy>(BOARD);
+    const list = [...enemies];
+    let kills = 0;
+    const world: CombatWorld & { list: Enemy[]; kills: () => number; refresh: () => void } = {
+      towers,
+      towerPoint: (i) => points[i],
+      head,
+      grid,
+      damage(enemy, amount) {
+        enemy.hp -= amount;
+        if (enemy.hp > 0) return false;
+        list.splice(list.indexOf(enemy), 1);
+        kills++;
+        return true;
+      },
+      list,
+      kills: () => kills,
+      refresh() {
+        grid.clear();
+        for (const e of list) grid.insert(e, e.x, e.y);
+      },
+    };
+    world.refresh();
+    return world;
+  };
+  /** `seconds`초 동안 싸운다 (적은 움직이지 않는다). */
+  const fight = (combat: Combat, world: ReturnType<typeof arena>, seconds: number) => {
+    const out: CombatEvent[] = [];
+    for (let t = 0; t < seconds - 1e-9; t += ENEMY_STEP) {
+      world.refresh();
+      combat.step(ENEMY_STEP, world, out);
+    }
+    return out;
+  };
+  let id = 1;
+  const enemy = (type: Parameters<typeof createEnemy>[1], x: number, y: number) => createEnemy(id++, type, x, y);
+
+  it('사거리 안에서 머리에 가장 가까운 적을 고른다', () => {
+    const near = enemy('jelly', 13, 10);
+    const closeToHead = enemy('jelly', 10, 13);
+    const far = enemy('jelly', 20, 10);
+    const world = arena([], [], [near, closeToHead, far], { x: 10, y: 15 });
+    expect(findTarget(world.grid, { x: 10, y: 10 }, 4, world.head)).toBe(closeToHead);
+    expect(findTarget(world.grid, { x: 30, y: 30 }, 4, world.head)).toBeNull();
+  });
+
+  it('화살은 쿨다운마다 한 발씩 쏘고, 젤리를 두 발에 처치한다', () => {
+    const target = enemy('jelly', 13, 10);
+    const world = arena(['arrow'], [{ x: 10, y: 10 }], [target]);
+    const combat = new Combat();
+    combat.step(ENEMY_STEP, world, []);
+    expect(combat.projectiles).toHaveLength(1);
+    combat.step(ENEMY_STEP, world, []);
+    expect(combat.projectiles).toHaveLength(1);
+    fight(combat, world, TOWER_SPECS.arrow.cooldown + 0.4);
+    expect(target.hp).toBeLessThanOrEqual(0);
+    expect(world.kills()).toBe(1);
+    expect(world.list).toHaveLength(0);
+  });
+
+  it('사거리 밖의 적은 쏘지 않는다', () => {
+    const world = arena(['arrow'], [{ x: 10, y: 10 }], [enemy('jelly', 10 + TOWER_SPECS.arrow.range + 0.3, 10)]);
+    const combat = new Combat();
+    fight(combat, world, 1);
+    expect(combat.projectiles).toHaveLength(0);
+    expect(world.list[0].hp).toBe(ENEMY_SPECS.jelly.hp);
+  });
+
+  it('대포알은 떨어진 자리 둘레의 적을 모두 맞힌다', () => {
+    const target = enemy('rock', 13, 10);
+    const beside = enemy('rock', 13, 10 + BLAST_RADIUS);
+    const away = enemy('rock', 13, 10 + BLAST_RADIUS + ENEMY_SPECS.rock.radius + 0.5);
+    const world = arena(['cannon'], [{ x: 10, y: 10 }], [target, beside, away]);
+    const combat = new Combat();
+    const out = fight(combat, world, 0.6);
+    expect(out.filter((e) => e.kind === 'blast')).toHaveLength(1);
+    expect(target.hp).toBe(ENEMY_SPECS.rock.hp - TOWER_SPECS.cannon.damage);
+    expect(beside.hp).toBe(ENEMY_SPECS.rock.hp - TOWER_SPECS.cannon.damage);
+    expect(away.hp).toBe(ENEMY_SPECS.rock.hp);
+  });
+
+  it('얼음에 맞은 적은 2초 동안 느려진다', () => {
+    const target = enemy('rock', 12, 10);
+    const world = arena(['ice'], [{ x: 10, y: 10 }], [target]);
+    const combat = new Combat();
+    fight(combat, world, 0.3);
+    expect(target.hp).toBe(ENEMY_SPECS.rock.hp - TOWER_SPECS.ice.damage);
+    expect(target.slow).toBeGreaterThan(SLOW_SECONDS - 0.3);
+  });
+
+  it('느려진 적은 절반 빠르기로 움직인다', () => {
+    const world = new TowerSnakeWorld(seededRandom(1));
+    world.boxes = [];
+    world.load([{ x: 5, y: 5 }], 'right', [], []);
+    const fast = world.spawnEnemy('rock', 30, 20);
+    const slow = world.spawnEnemy('rock', 30, 30);
+    slow.slow = SLOW_SECONDS;
+    const fx = fast.x;
+    const sx = slow.x;
+    world.update(0.5);
+    const fastMoved = Math.hypot(fast.x - fx, fast.y - 20);
+    const slowMoved = Math.hypot(slow.x - sx, slow.y - 30);
+    expect(slowMoved / fastMoved).toBeCloseTo(0.5, 1);
+  });
+
+  it('번개는 가까운 적으로 세 번 튀며 약해지고, 멀리는 튀지 않는다', () => {
+    const chain = [enemy('rock', 12, 10), enemy('rock', 14, 10), enemy('rock', 16, 10), enemy('rock', 18, 10)];
+    const extra = enemy('rock', 20, 10);
+    const lonely = enemy('rock', 12, 10 + CHAIN_RANGE + 5);
+    const world = arena(['lightning'], [{ x: 10, y: 10 }], [...chain, extra, lonely]);
+    const combat = new Combat();
+    const out: CombatEvent[] = [];
+    combat.step(ENEMY_STEP, world, out);
+    const bolt = out.find((e) => e.kind === 'bolt');
+    expect(bolt?.kind === 'bolt' && bolt.points).toHaveLength(CHAIN_JUMPS + 2);
+    let amount = TOWER_SPECS.lightning.damage;
+    for (const e of chain) {
+      expect(e.hp).toBeCloseTo(ENEMY_SPECS.rock.hp - amount);
+      amount *= CHAIN_FALLOFF;
+    }
+    expect(extra.hp).toBe(ENEMY_SPECS.rock.hp);
+    expect(lonely.hp).toBe(ENEMY_SPECS.rock.hp);
+    expect(combat.projectiles).toHaveLength(0);
+  });
+
+  it('표적이 먼저 처치되면 화살은 헛맞고, 대포알은 마지막 자리에서 터진다', () => {
+    const a = enemy('jelly', 13, 10);
+    const c = enemy('jelly', 13, 12);
+    const world = arena(['arrow', 'cannon'], [{ x: 10, y: 10 }, { x: 10, y: 12 }], [a, c]);
+    const combat = new Combat();
+    combat.step(ENEMY_STEP, world, []);
+    expect(combat.projectiles).toHaveLength(2);
+    world.damage(a, 100);
+    world.damage(c, 100);
+    const out = fight(combat, world, 0.5);
+    expect(combat.projectiles).toHaveLength(0);
+    expect(out.filter((e) => e.kind === 'blast')).toHaveLength(1);
+  });
+
+  it('투사체는 200개를 넘지 않는다', () => {
+    const towers = Array.from({ length: 40 }, () => 'arrow' as TowerType);
+    const points = towers.map((_, i) => ({ x: 1, y: i }));
+    const targets = Array.from({ length: 40 }, (_, i) => enemy('boss', 4.5, i));
+    const world = arena(towers, points, targets);
+    const combat = new Combat();
+    // 화살을 아주 느리게 해 쌓이게 한다: 표적을 멀리 두고 몇 번 쏜다.
+    for (let k = 0; k < 8; k++) {
+      for (const p of combat.projectiles) {
+        p.x = 1;
+        p.tx = 40;
+        p.target = null;
+      }
+      combat.step(TOWER_SPECS.arrow.cooldown + 0.01, world, []);
+    }
+    expect(combat.projectiles.length).toBeLessThanOrEqual(MAX_PROJECTILES);
+  });
+
+  it('마디를 잃어 타워가 줄어도 남은 타워는 그대로 쏜다', () => {
+    const towers: TowerType[] = ['arrow', 'arrow', 'arrow'];
+    const target = enemy('rock', 12, 10);
+    const world = arena(towers, [{ x: 10, y: 10 }, { x: 10, y: 11 }, { x: 10, y: 12 }], [target]);
+    const combat = new Combat();
+    combat.step(ENEMY_STEP, world, []);
+    expect(combat.projectiles).toHaveLength(3);
+    towers.length = 1;
+    fight(combat, world, TOWER_SPECS.arrow.cooldown + 0.05);
+    expect(combat.projectiles.length).toBeLessThanOrEqual(2);
+  });
+
+  it('판에서 타워가 다가온 적을 쏘아 처치 수가 오른다', () => {
+    const world = new TowerSnakeWorld(seededRandom(6));
+    world.boxes = [];
+    world.load(row(20, 20, 19, 18, 17, 16, 15, 14), 'right', ['arrow', 'arrow', 'cannon', 'lightning', 'ice', 'arrow'], []);
+    world.spawnEnemy('jelly', 24, 16);
+    world.spawnEnemy('jelly', 24, 24);
+    world.spawnEnemy('dart', 16, 24);
+    const events = world.update(1.5);
+    expect(world.killed).toBe(3);
+    expect(world.enemies).toHaveLength(0);
+    expect(world.segments).toBe(6);
+    expect(events.some((e) => e.kind === 'bolt')).toBe(true);
+  });
+
+  it('처음부터 다시 하면 투사체가 비워진다', () => {
+    const world = new TowerSnakeWorld(seededRandom(6));
+    world.load(row(20, 20, 19, 18), 'right', ['arrow', 'arrow'], []);
+    world.spawnEnemy('rock', 23, 20);
+    world.update(ENEMY_STEP);
+    expect(world.projectiles.length).toBeGreaterThan(0);
+    world.reset();
+    expect(world.projectiles).toHaveLength(0);
   });
 });

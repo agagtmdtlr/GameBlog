@@ -1386,15 +1386,30 @@ a.comic-cut.is-youtube::after {
   animation: coloring-pop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
 
-@media (max-width: 400px) {
-  .tsnake-score {
-    font-size: 16px;
-    padding: 0 8px 0 6px;
-  }
-}
-
 .tsnake-score-value {
   min-width: 2.6em;
+}
+
+/* 좁은 화면: 점수 표 셋(시간, 처치, 마디)이 버튼 사이에 들어가게 줄인다. */
+@media (max-width: 400px) {
+  .tsnake-scores {
+    gap: 4px;
+  }
+
+  .tsnake-score {
+    gap: 2px;
+    font-size: 14px;
+    padding: 0 6px 0 4px;
+  }
+
+  .tsnake-score svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .tsnake-score-value {
+    min-width: 1.2em;
+  }
 }
 
 .tsnake-length.is-hit {

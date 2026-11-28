@@ -22,6 +22,9 @@ const ICON_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v1
 /** 버틴 시간: 모래시계 */
 const ICON_TIME =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/></svg>';
+/** 처치 수: 터진 방울 */
+const ICON_KILL =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>';
 /** 타워 마디 수: 작은 탑 */
 const ICON_TOWER =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16M7 20v-8h10v8M12 3l-6 6h12Z"/></svg>';
@@ -82,6 +85,10 @@ function startTowerSnake(root: HTMLElement): void {
   timeTag.innerHTML = ICON_TIME;
   timeTag.setAttribute('aria-label', '버틴 시간');
   const timeValue = element('span', 'tsnake-score-value', timeTag);
+  const killTag = element('div', 'tsnake-score tsnake-kills', scores);
+  killTag.innerHTML = ICON_KILL;
+  killTag.setAttribute('aria-label', '처치 수');
+  const killValue = element('span', 'tsnake-score-value', killTag);
   const lengthTag = element('div', 'tsnake-score tsnake-length', scores);
   lengthTag.innerHTML = ICON_TOWER;
   lengthTag.setAttribute('aria-label', '타워 수');
@@ -116,6 +123,7 @@ function startTowerSnake(root: HTMLElement): void {
   let shownSegments = -1;
   const showScore = () => {
     timeValue.textContent = clock(world.time);
+    killValue.textContent = String(world.killed);
     if (world.segments !== shownSegments) {
       // 마디를 잃으면 점수 표가 흔들린다.
       if (world.segments < shownSegments) {
@@ -201,6 +209,10 @@ function startTowerSnake(root: HTMLElement): void {
     last = now;
     if (phase === 'run') {
       for (const event of world.update(dt)) {
+        if (event.kind === 'blast' || event.kind === 'bolt') {
+          view.effect(event);
+          continue;
+        }
         if (event.hurt?.over) {
           view.crash();
           setPhase('over');
@@ -218,7 +230,7 @@ function startTowerSnake(root: HTMLElement): void {
       showScore();
     }
     const alpha = phase === 'over' ? 1 : world.alpha;
-    view.render(dt, { alpha, invulnerable: world.invulnerable, dead: phase === 'over', towers: world.towers, boxes: world.boxes, enemies: world.enemies });
+    view.render(dt, { alpha, invulnerable: world.invulnerable, dead: phase === 'over', towers: world.towers, boxes: world.boxes, enemies: world.enemies, projectiles: world.projectiles });
     minimap.draw(world.body, world.boxes, world.enemies, view.focus, view.visible, world.invulnerable > 0 && Math.sin(now / 25) > 0);
     requestAnimationFrame(frame);
   };
@@ -249,7 +261,7 @@ function startTowerSnake(root: HTMLElement): void {
   }
 }
 
-/** 타워 뱀: 몸 마디마다 타워를 싣고 큰 판을 누빈다 (단계 3까지: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적). */
+/** 타워 뱀: 몸 마디마다 타워를 싣고 큰 판을 누빈다 (단계 4까지: 판, 움직임, 울타리·제 몸 피해, 타워 상자, 적, 자동 공격). */
 export const towerSnakeGame: GameDefinition = {
   id: 'tower-snake',
   start(root) {
