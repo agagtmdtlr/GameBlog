@@ -6,6 +6,7 @@ import {
   Mesh,
   NormalBlending,
   RawShaderMaterial,
+  Sphere,
   Vector2,
   Vector3,
 } from 'three';
@@ -36,6 +37,8 @@ export class RainLayer implements RenderLayer {
     // 두 삼각형: (폭 방향, 머리→꼬리). three.js는 `position` 속성의 개수로 그릴 정점 수를 정하므로 이 이름을 쓴다.
     geometry.setAttribute('position', new BufferAttribute(new Float32Array([-1, 0, 1, 0, 1, 1, -1, 0, 1, 1, -1, 1]), 2));
     geometry.instanceCount = RAIN.count;
+    // 2성분 `position`으로는 경계 구를 계산할 수 없으므로(NaN) 미리 둔다. 컬링은 끄므로 값은 쓰이지 않는다.
+    geometry.boundingSphere = new Sphere();
     this.object = new Mesh(
       geometry,
       new RawShaderMaterial({
