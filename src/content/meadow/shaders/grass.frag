@@ -15,6 +15,8 @@ uniform vec2 uColorFade;
 // 거리 안개 (툰 셰이더와 같은 식): 색은 sRGB 배경색, 범위는 시작·끝 거리
 uniform vec3 uFogColor;
 uniform vec2 uFogRange;
+// 잎 색의 채도 (1이면 그대로). 흐린 날의 회색 빛에 맞춰 낮춘다.
+uniform float uSaturation;
 
 in vec3 vWorldPos;
 in vec3 vNormal;
@@ -30,12 +32,12 @@ out vec4 fragColor;
 const float PI = 3.14159265;
 const vec3 TOON_EDGES = vec3(0.06, 0.32, 0.68);
 const vec3 TOON_STEPS = vec3(0.4, 0.35, 0.25);
-/** 잎 밑동과 끝의 풀빛 (선형 RGB, sRGB #3F8F3A, #B9E58A) */
-const vec3 ROOT_COLOR = vec3(0.05, 0.275, 0.042);
-const vec3 TIP_COLOR = vec3(0.485, 0.783, 0.254);
+/** 잎 밑동과 끝의 진한 풀빛 (선형 RGB, sRGB #234A1F, #5E8A3C) */
+const vec3 ROOT_COLOR = vec3(0.017, 0.069, 0.014);
+const vec3 TIP_COLOR = vec3(0.111, 0.254, 0.045);
 /** 얼룩 풀빛: 노란 풀, 푸른 풀 */
-const vec3 DRY_TINT = vec3(1.25, 1.05, 0.55);
-const vec3 COOL_TINT = vec3(0.7, 1.0, 1.05);
+const vec3 DRY_TINT = vec3(1.2, 1.05, 0.7);
+const vec3 COOL_TINT = vec3(0.8, 1.0, 1.05);
 /** 꽃 색: 흰색, 노랑, 분홍 (선형 RGB) */
 const vec3 FLOWER_COLORS[3] = vec3[3](vec3(0.95, 0.93, 0.88), vec3(1.0, 0.75, 0.08), vec3(0.95, 0.38, 0.62));
 
@@ -88,11 +90,14 @@ void main() {
 
   // 역광: 해를 마주 보면 잎 끝이 비쳐 빛난다.
   float back = pow(max(dot(-V, L), 0.0), 4.0) * smoothstep(0.4, 1.0, vT);
-  color += TIP_COLOR * uLightColor * back * 0.12;
+  color += TIP_COLOR * uLightColor * back * 0.1;
 
   // 돌풍이 지나는 잎은 뒤집혀 옅은 면이 햇빛에 반짝인다. 끝으로 갈수록 세다.
   float sheen = vGust * smoothstep(0.3, 1.0, vT);
-  color += mix(TIP_COLOR, vec3(1.0), 0.5) * sheen * 0.35;
+  color += mix(TIP_COLOR, uSkyColor, 0.5) * sheen * 0.3;
+
+  // 흐린 날의 회색 빛을 받아 채도가 낮아진다.
+  color = mix(vec3(dot(color, vec3(0.2126, 0.7152, 0.0722))), color, uSaturation);
 
   // 멀리서는 땅 색으로 녹아들어 잔디가 끝나는 경계가 보이지 않는다.
   float far = smoothstep(uColorFade.x, uColorFade.y, length(vWorldPos.xz - uCameraPos.xz));

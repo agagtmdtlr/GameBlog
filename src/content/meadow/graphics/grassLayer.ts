@@ -31,6 +31,8 @@ export const GRASS_BLADE = {
   tallHeight: [1.8, 2.5] as const,
   width: [0.06, 0.11] as const,
   pushReach: 1.6,
+  /** 잎 색의 채도 (1이면 그대로). 흐린 날의 회색 빛에 맞춰 낮춘다. 먼 잎이 녹아드는 땅 색도 같이 낮춘다. */
+  saturation: 0.7,
 };
 
 /**
@@ -100,6 +102,7 @@ export class GrassLayer implements RenderLayer {
           uTallChance: { value: GRASS_BLADE.tallChance },
           uWidth: { value: new Vector2(...GRASS_BLADE.width) },
           uPushReach: { value: GRASS_BLADE.pushReach },
+          uSaturation: { value: GRASS_BLADE.saturation },
           uTime: { value: 0 },
           uWindDir: { value: new Vector2(1, 0) },
           uWindStrength: { value: 0 },
@@ -137,7 +140,9 @@ export class GrassLayer implements RenderLayer {
     const forward = [fx / fl, fz / fl];
     // 먼 잎이 녹아드는 색: 해를 정면으로 받은 땅의 툰 색 (밝은 단계 + 앰비언트)
     const ambient = environment.groundColor.map((g, i) => g * 0.4 + environment.skyColor[i] * 0.6);
-    const fade = this.groundColor.map((c, i) => c * (environment.lightColor[i] / Math.PI + ambient[i]));
+    const lit = this.groundColor.map((c, i) => c * (environment.lightColor[i] / Math.PI + ambient[i]));
+    const luma = 0.2126 * lit[0] + 0.7152 * lit[1] + 0.0722 * lit[2];
+    const fade = lit.map((c) => luma + (c - luma) * GRASS_BLADE.saturation);
 
     GRASS_RINGS.forEach((ring, index) => {
       const u = this.meshes[index].material.uniforms;
