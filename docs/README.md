@@ -29,7 +29,7 @@
 | 인공위성 | 행성을 도는 인공위성, 몸통·접시 안테나·태양 전지판 모양, 해를 따라 도는 전지판, 궤도와 궤적 고리, 접시에서 퍼지는 신호 물결 | 없음 | [analysis/satellite.md](analysis/satellite.md) |
 | 표면 장면 | 행성 표면에 놓는 객체(아날로그 텔레비전 모형, 로켓 모형)의 장면 파일, 위치·크기·색·충돌, 객체 추가, 로켓·텔레비전 모형 모양, 텔레비전 화면의 YouTube 영상 | 없음 | [analysis/surfaceScene.md](analysis/surfaceScene.md) |
 | 몽환적인 땅 | 행성 땅의 언덕·높이 함수, 파스텔 색 물결, 둥근 지형물(언덕·기둥·공·막대사탕)의 수·크기·색·충돌, 땅 충돌 | [rules/world.md](rules/world.md) | [analysis/terrain.md](analysis/terrain.md) |
-| 바람 부는 초원 | 새 지형 씬(`content/meadow/`, `?scene=meadow`), 큰 구로 만든 넓은 분지의 높이 함수·가장자리, GPU 해시로 만드는 카메라 둘레 잔디 격자, 바람(방향·세기·돌풍 띠), 잎 휘기·떨림·꽃, 몸이 잔디 밀어내기, `Environment.worldCenter`·`shadowCenter` | [rules/world.md](rules/world.md) | [analysis/meadow.md](analysis/meadow.md) |
+| 바람 부는 초원 | 새 지형 씬(`content/meadow/`, `?scene=meadow`), 큰 구로 만든 넓은 분지의 높이 함수·가장자리, GPU 해시로 만드는 카메라 둘레 잔디 격자, 바람(방향·세기·돌풍 띠), 잎 휘기·떨림·꽃, 몸이 잔디 밀어내기, `Environment.worldCenter`·`shadowCenter`·`fog`(거리 안개), 잔디 가시거리 | [rules/world.md](rules/world.md) | [analysis/meadow.md](analysis/meadow.md) |
 | 기차 | 행성 표면의 스플라인 선로(레일·침목), 노선 조절점, 선로를 도는 기차의 차량·빠르기·충돌, 굴뚝 연기 | 없음 | [analysis/train.md](analysis/train.md) |
 | 해 | 행성을 도는 해, 햇살 빌보드, 캐릭터를 보는 눈, 궤적 고리, 해와 맞춘 직사광 방향, 낮과 밤 | 없음 | [analysis/sun.md](analysis/sun.md) |
 | three.js 렌더러 | 렌더러, 그림자 패스, 툰 셰이더와 재질, 셰이더 규약, three.js 버전 변경, 브라우저 확인 방법 | [rules/threejs.md](rules/threejs.md) | [analysis/threejs.md](analysis/threejs.md) |

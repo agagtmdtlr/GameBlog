@@ -22,16 +22,17 @@ import { meadowTerrainGlsl } from './terrainGlsl';
 const SEGMENTS = 4;
 
 /**
- * 잔디 격자. 가까운 격자는 촘촘하고, 먼 격자는 성기고 잎이 넓다. 둘은 카메라 거리 `band`로 몫을 나눠 맞물린다.
+ * 잔디 격자. 가까울수록 촘촘하고, 멀수록 성기고 잎이 넓다. 이웃 격자는 카메라 거리 `band`로 몫을 나눠 맞물린다.
  * 격자 가운데는 카메라에서 바라보는 쪽으로 `ahead`만큼 앞이다.
  */
 export const GRASS_RINGS = [
   { spacing: 0.13, size: 320, ahead: 15, band: [-2, -1, 16, 21], widthScale: 1 },
   { spacing: 0.4, size: 260, ahead: 40, band: [16, 21, 46, 54], widthScale: 2.6 },
+  { spacing: 1.0, size: 220, ahead: 90, band: [46, 54, 110, 130], widthScale: 6 },
 ] as const;
 
-/** 카메라 수평 거리: 이 사이에서 잎 색이 땅 색으로 녹아든다. */
-const COLOR_FADE: readonly [number, number] = [30, 54];
+/** 카메라 수평 거리: 이 사이에서 잎 색이 땅 색으로 녹아든다. 그 너머는 안개가 땅과 함께 덮는다. */
+const COLOR_FADE: readonly [number, number] = [80, 130];
 
 /** 밑동에서 끝으로 가며 가늘어지는 잎 하나 */
 function bladeGeometry(): InstancedBufferGeometry {
@@ -56,7 +57,7 @@ function bladeGeometry(): InstancedBufferGeometry {
 
 /**
  * 초원 잔디를 그린다. 잔디는 버퍼에 담지 않고, 정점 셰이더가 격자 칸의 월드 좌표에서 해시로 잎을 만든다.
- * 그래서 초원이 아무리 넓어도 카메라 둘레 격자만큼(약 17만 잎)만 그린다. 바람은 정점 셰이더가 휜다.
+ * 그래서 초원이 아무리 넓어도 카메라 둘레 격자 셋만큼(약 21만 8천 칸)만 그린다. 바람은 정점 셰이더가 휜다.
  */
 export class GrassLayer implements RenderLayer {
   readonly object = new Group();
@@ -94,6 +95,8 @@ export class GrassLayer implements RenderLayer {
           uGroundColor: { value: new Vector3() },
           uFadeColor: { value: new Vector3() },
           uColorFade: { value: new Vector2(...COLOR_FADE) },
+          uFogColor: { value: new Vector3() },
+          uFogRange: { value: new Vector2() },
         },
         side: DoubleSide,
       });
@@ -133,6 +136,8 @@ export class GrassLayer implements RenderLayer {
       u.uSkyColor.value.fromArray(environment.skyColor);
       u.uGroundColor.value.fromArray(environment.groundColor);
       u.uFadeColor.value.fromArray(fade);
+      u.uFogColor.value.fromArray(environment.background);
+      u.uFogRange.value.set(environment.fog?.near ?? 0, environment.fog?.far ?? 0);
       const wind = this.wind;
       if (wind) {
         u.uTime.value = wind.time;

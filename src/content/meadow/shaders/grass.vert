@@ -17,6 +17,8 @@ uniform float uSpacing;
 uniform int uGridSize;
 // 카메라 수평 거리로 정하는 이 격자의 몫: x~y에서 나타나고 z~w에서 사라진다.
 uniform vec4 uBand;
+// 카메라 수평 거리: 이 사이에서 잎이 땅 색으로 녹아들고 키가 준다 (grass.frag와 같은 값).
+uniform vec2 uColorFade;
 // 먼 격자는 잎을 넓혀 빈 곳을 메운다.
 uniform float uWidthScale;
 
@@ -88,8 +90,8 @@ void main() {
   float yaw = r2.x * 2.0 * PI;
   // 대부분 0.35~0.8이고 몇몇은 길게 자란다.
   float height = r2.y < 0.07 ? mix(0.9, 1.3, r1.y) : mix(0.35, 0.8, r1.y);
-  // 땅으로 사라지는 바깥 가장자리에서는 키가 줄어든다.
-  height *= 1.0 - smoothstep(uBand.z, uBand.w + 4.0, dist) * 0.7;
+  // 잎 색이 땅 색으로 녹아드는 먼 곳에서는 키도 줄어 땅으로 사라진다. 격자끼리 맞물리는 곳에서는 줄지 않는다.
+  height *= 1.0 - smoothstep(uColorFade.x, uColorFade.y + 10.0, dist) * 0.7;
   float width = mix(0.05, 0.085, r0.x) * uWidthScale;
 
   vec3 root = meadowPoint(xz, -0.06);

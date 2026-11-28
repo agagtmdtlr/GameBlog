@@ -115,6 +115,8 @@ export class Renderer implements Graphics {
     uMoonColor: { value: new Vector3() },
     uNightAmbient: { value: new Vector3() },
     uWorldCenter: { value: new Vector3() },
+    uFogColor: { value: new Vector3() },
+    uFogRange: { value: new Vector2() },
     uHalftoneCell: { value: HALFTONE_CELL_CSS_PX },
   };
   private readonly frameUniforms: Uniforms;
@@ -417,6 +419,8 @@ export class Renderer implements Graphics {
     shared.uMoonColor.value.fromArray(env.moonColor);
     shared.uNightAmbient.value.fromArray(env.nightAmbient);
     shared.uWorldCenter.value.fromArray(env.worldCenter ?? [0, 0, 0]);
+    shared.uFogColor.value.fromArray(env.background);
+    shared.uFogRange.value.set(env.fog?.near ?? 0, env.fog?.far ?? 0);
 
     const { center, radius } = frame.occluder;
     this.frameUniforms.uOccluder.value.set(center[0], center[1], center[2], radius);

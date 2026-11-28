@@ -36,6 +36,8 @@ export const MEADOW_ENVIRONMENT: Environment = {
   background: [0.66, 0.84, 0.96],
   shadowRadius: 24,
   worldCenter: MEADOW_CENTER,
+  // 먼 언덕은 하늘색 안개로 사라진다. 땅 메시 끝(260)보다 앞에서 다 덮는다.
+  fog: { near: 45, far: 230 },
 };
 
 /** 초원 씬의 상태와 규칙. GPU와 DOM에 의존하지 않는다. */
