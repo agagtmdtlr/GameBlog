@@ -1,5 +1,5 @@
 import { add, cross, dot, mat4FromBasis, normalize, scale, sub, type Mat4, type Vec3 } from '../../../engine/math';
-import { TV_SHAPE, tvScreenDepths } from '../shapes/tvShape';
+import { TV_SHAPE, tvScreenDepths } from '../../common/tv/tvShape';
 import type { OrientedBox } from '../../../engine/physics/collision';
 import SURFACE_SCENE_DATA from '../scenes/surface.json';
 import { MOON } from './moon';

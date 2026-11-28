@@ -97,8 +97,9 @@ GameBlog/
 │     │     ├─ speechBubble.ts NPC 인사말 목록과 말풍선 그림
 │     │     ├─ characterGraphics.ts  다리 모델(glb)과 피라미드 메시 등록
 │     │     ├─ characterDraw.ts  캐릭터 몸·다리 그리기 항목 (행성·초원 씬이 함께 씀)
+│     ├─ common/tv/          아날로그 텔레비전 모양(`tvShape.ts`)과 부품 지오메트리(`tvGraphics.ts`). 행성 표면 텔레비전과 초원 하늘 텔레비전이 함께 씀
 │     │     └─ character.glb   Blender에서 내보낸 다리 스킨 메시
-│     ├─ meadow/               바람 부는 초원 씬: 큰 분지 땅, GPU로 만드는 잔디 격자, 바람 ([analysis/meadow.md](analysis/meadow.md))
+│     ├─ meadow/               바람 부는 초원 씬: 큰 분지 땅, GPU로 만드는 잔디 격자, 바람, 플레이어 둘레에 절차적으로 스폰되는 하늘 텔레비전 ([analysis/meadow.md](analysis/meadow.md))
 │     └─ planet/               행성 씬
 │        ├─ index.ts           planetScene: 그래픽 등록, World·카메라·영상 소리 진행
 │        ├─ world.ts           월드 조립, 게임 규칙, 그리기 목록
@@ -118,7 +119,6 @@ GameBlog/
 │        │  ├─ alienShape.ts   문어 외계인의 머리 단면, 눈가리개 구면 조각, 촉수 스킨 메시
 │        │  ├─ moonShape.ts    위성의 충돌구·바위 덩어리 모양
 │        │  ├─ rocketShape.ts  로켓 모형의 달걀 몸통·다리·창·옆문·리벳 자리
-│        │  ├─ tvShape.ts      아날로그 텔레비전 모형의 모양 값과 부품 계산
 │        │  ├─ satelliteShape.ts, signalArc.ts  인공위성 접시 안테나 단면, 신호 물결 호
 │        │  ├─ dreamShape.ts   지형물(종 모양 언덕, 둥근 기둥)의 회전체 단면
 │        │  ├─ trackPath.ts    구 표면 닫힌 스플라인 경로와 레일·침목 모양
